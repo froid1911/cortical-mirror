@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Experiments and generated media
+artifacts/
+runs/
+checkpoints/
+data/
+out_*/
+*.mp4
+*.avi
+*.mov
+*.pt
+*.pth
+*.onnx
+
+# Local deployment
+.env
+*.log
