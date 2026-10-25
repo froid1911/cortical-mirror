@@ -10,13 +10,21 @@ from . import __version__
 from .classical import OpticalFlowEngine
 from .dmvfn import DMVFNEngine
 from .engines import CopyEngine, CorticalEngine
+from .ensemble import AdaptiveEngine
 from .evaluate import evaluate_video
 from .server import serve
 
 
 def add_engine_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--engine", choices=("cortical", "dmvfn", "flow", "copy"), required=True)
-    parser.add_argument("--checkpoint", type=Path, help="model checkpoint for cortical or dmvfn")
+    parser.add_argument(
+        "--engine", choices=("cortical", "dmvfn", "adaptive", "flow", "copy"), required=True
+    )
+    parser.add_argument(
+        "--checkpoint", type=Path, help="cortical checkpoint, or standalone DMVFN checkpoint"
+    )
+    parser.add_argument(
+        "--dmvfn-checkpoint", type=Path, help="DMVFN checkpoint used by --engine adaptive"
+    )
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--width", type=int, default=256)
     parser.add_argument("--height", type=int, default=192)
@@ -24,8 +32,28 @@ def add_engine_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def create_engine(args):
-    if args.engine in ("cortical", "dmvfn") and not args.checkpoint:
+    if args.engine in ("cortical", "dmvfn", "adaptive") and not args.checkpoint:
         raise SystemExit(f"--engine {args.engine} requires --checkpoint")
+    if args.engine == "adaptive":
+        if not args.dmvfn_checkpoint:
+            raise SystemExit("--engine adaptive requires --dmvfn-checkpoint")
+        cortical = CorticalEngine.from_checkpoint(
+            args.checkpoint, device=args.device, mixed_precision=not args.no_amp
+        )
+        dmvfn = DMVFNEngine(
+            args.dmvfn_checkpoint,
+            device=args.device,
+            width=cortical.width,
+            height=cortical.height,
+            mixed_precision=not args.no_amp,
+        )
+        return AdaptiveEngine(
+            {
+                "copy": CopyEngine(cortical.width, cortical.height),
+                "cortical": cortical,
+                "dmvfn": dmvfn,
+            }
+        )
     if args.engine == "cortical":
         return CorticalEngine.from_checkpoint(
             args.checkpoint, device=args.device, mixed_precision=not args.no_amp
