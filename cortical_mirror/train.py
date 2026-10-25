@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from .data import ClipConfig, SyntheticMotionDataset, VideoClipDataset, split_videos
+from .engines import load_checkpoint
 from .model import CorticalFlowNet
 
 
@@ -114,7 +115,10 @@ def save_checkpoint(path: Path, model, optimizer, epoch: int, metrics: dict, arg
         "image_size": [args.width, args.height],
         "epoch": epoch,
         "metrics": metrics,
-        "train_config": vars(args),
+        "train_config": {
+            key: str(value) if isinstance(value, Path) else value
+            for key, value in vars(args).items()
+        },
     }
     temporary = path.with_suffix(path.suffix + ".tmp")
     torch.save(checkpoint, temporary)
@@ -192,7 +196,7 @@ def main() -> None:
     start_epoch = 0
     best_validation = float("inf")
     if args.resume:
-        checkpoint = torch.load(args.resume, map_location="cpu", weights_only=True)
+        checkpoint = load_checkpoint(args.resume)
         model.load_state_dict(checkpoint["state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         start_epoch = checkpoint["epoch"] + 1

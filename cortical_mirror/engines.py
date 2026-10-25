@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PosixPath, WindowsPath
 from typing import Protocol
 
 import cv2
@@ -12,6 +12,13 @@ import numpy as np
 import torch
 
 from .model import CorticalFlowNet, ModelState
+
+
+def load_checkpoint(path: str | Path) -> dict:
+    """Load model data without permitting arbitrary checkpoint code execution."""
+
+    with torch.serialization.safe_globals([PosixPath, WindowsPath]):
+        return torch.load(path, map_location="cpu", weights_only=True)
 
 
 @dataclass
@@ -82,7 +89,7 @@ class CorticalEngine:
         device: str = "cuda",
         mixed_precision: bool = True,
     ) -> CorticalEngine:
-        checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+        checkpoint = load_checkpoint(path)
         model = CorticalFlowNet(**checkpoint["model_config"])
         model.load_state_dict(checkpoint["state_dict"])
         width, height = checkpoint["image_size"]
