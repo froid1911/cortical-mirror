@@ -242,11 +242,11 @@ def serve(
     max_frames: int,
 ) -> None:
     state = LiveState(engine, source, engine_name, loop, max_frames)
-    capture_thread = threading.Thread(target=state.run, name="cortical-capture", daemon=True)
-    capture_thread.start()
     server = ThreadingHTTPServer((host, port), Handler)
     server.state = state
     server.daemon_threads = True
+    capture_thread = threading.Thread(target=state.run, name="cortical-capture", daemon=True)
+    capture_thread.start()
     print(f"Cortical Mirror: http://{host}:{port}", flush=True)
     try:
         server.serve_forever()
