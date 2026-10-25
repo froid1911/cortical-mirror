@@ -29,6 +29,9 @@ def add_engine_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--width", type=int, default=256)
     parser.add_argument("--height", type=int, default=192)
     parser.add_argument("--no-amp", action="store_true")
+    parser.add_argument("--temperature", type=float, default=0.02)
+    parser.add_argument("--adaptation", type=float, default=0.15)
+    parser.add_argument("--patch-size", type=int, default=16)
 
 
 def create_engine(args):
@@ -52,7 +55,10 @@ def create_engine(args):
                 "copy": CopyEngine(cortical.width, cortical.height),
                 "cortical": cortical,
                 "dmvfn": dmvfn,
-            }
+            },
+            temperature=args.temperature,
+            adaptation=args.adaptation,
+            patch_size=args.patch_size,
         )
     if args.engine == "cortical":
         return CorticalEngine.from_checkpoint(

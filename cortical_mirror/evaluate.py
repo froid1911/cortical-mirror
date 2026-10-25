@@ -175,6 +175,11 @@ def evaluate_video(
         "inference_ms_p95": float(np.percentile(steady_latencies, 95)) if steady_latencies else 0.0,
         "evaluation_wall_fps": frame_index / max(elapsed, 1e-6),
     }
+    last_weights = getattr(engine, "last_weights", None)
+    if last_weights is not None:
+        result["expert_weights"] = {
+            name: float(last_weights[..., index].mean()) for index, name in enumerate(engine.names)
+        }
     if output:
         (output / "metrics.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     return result
