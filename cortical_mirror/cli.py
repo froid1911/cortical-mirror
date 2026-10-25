@@ -29,8 +29,8 @@ def add_engine_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--width", type=int, default=256)
     parser.add_argument("--height", type=int, default=192)
     parser.add_argument("--no-amp", action="store_true")
-    parser.add_argument("--temperature", type=float, default=0.02)
-    parser.add_argument("--adaptation", type=float, default=0.15)
+    parser.add_argument("--temperature", type=float, default=0.001)
+    parser.add_argument("--adaptation", type=float, default=0.3)
     parser.add_argument("--patch-size", type=int, default=16)
 
 
@@ -40,15 +40,16 @@ def create_engine(args):
     if args.engine == "adaptive":
         if not args.dmvfn_checkpoint:
             raise SystemExit("--engine adaptive requires --dmvfn-checkpoint")
+        # Alternating these small models was faster in FP32 than BF16 on RTX 3090.
         cortical = CorticalEngine.from_checkpoint(
-            args.checkpoint, device=args.device, mixed_precision=not args.no_amp
+            args.checkpoint, device=args.device, mixed_precision=False
         )
         dmvfn = DMVFNEngine(
             args.dmvfn_checkpoint,
             device=args.device,
             width=cortical.width,
             height=cortical.height,
-            mixed_precision=not args.no_amp,
+            mixed_precision=False,
         )
         return AdaptiveEngine(
             {
