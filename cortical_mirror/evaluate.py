@@ -161,6 +161,7 @@ def evaluate_video(
     if writer is not None:
         writer.release()
     elapsed = time.perf_counter() - start
+    steady_latencies = latencies[3:] if len(latencies) > 3 else latencies
     result = {
         "source": str(source),
         "width": engine.width,
@@ -169,8 +170,9 @@ def evaluate_video(
         "model": model_metrics.summary(),
         "copy": copy_metrics.summary(),
         "beat_copy": wins / model_metrics.frames if model_metrics.frames else 0.0,
-        "inference_ms_mean": float(np.mean(latencies)) if latencies else 0.0,
-        "inference_ms_p95": float(np.percentile(latencies, 95)) if latencies else 0.0,
+        "cold_start_ms": latencies[0] if latencies else 0.0,
+        "inference_ms_mean": float(np.mean(steady_latencies)) if steady_latencies else 0.0,
+        "inference_ms_p95": float(np.percentile(steady_latencies, 95)) if steady_latencies else 0.0,
         "evaluation_wall_fps": frame_index / max(elapsed, 1e-6),
     }
     if output:
