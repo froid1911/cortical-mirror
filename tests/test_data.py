@@ -1,6 +1,8 @@
+import cv2
 import numpy as np
+import pytest
 
-from cortical_mirror.data import ClipConfig, SyntheticMotionDataset, split_videos
+from cortical_mirror.data import ClipConfig, SyntheticMotionDataset, VideoClipDataset, split_videos
 
 
 def test_synthetic_motion_is_repeatable_and_temporal():
@@ -23,3 +25,22 @@ def test_video_split_is_deterministic_and_has_no_leakage(tmp_path):
     assert len(validation_a) == 1
     assert set(train_a).isdisjoint(validation_a)
     assert set(train_a + validation_a) == {tmp_path / name for name in ("a.avi", "b.avi", "c.avi")}
+
+
+def test_unreadable_video_is_skipped_with_warning(tmp_path):
+    bad = tmp_path / "bad.avi"
+    bad.write_bytes(b"not a video")
+    good = tmp_path / "good.avi"
+    writer = cv2.VideoWriter(str(good), cv2.VideoWriter_fourcc(*"FFV1"), 10, (64, 48))
+    for value in (20, 40, 60):
+        writer.write(np.full((48, 64, 3), value, dtype=np.uint8))
+    writer.release()
+    dataset = VideoClipDataset(
+        [bad, good],
+        ClipConfig(width=64, height=48, frames=2, clips_per_video=1),
+        deterministic=True,
+    )
+    with pytest.warns(RuntimeWarning, match="skipping unreadable video"):
+        clip = dataset[0]
+    assert clip.shape == (2, 3, 48, 64)
+    assert 0.07 < float(clip[0].mean()) < 0.09

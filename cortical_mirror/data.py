@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import random
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -66,6 +67,7 @@ class VideoClipDataset(Dataset):
         self.videos = videos
         self.config = config
         self.deterministic = deterministic
+        self.unreadable: set[Path] = set()
         if not videos:
             raise ValueError("dataset needs at least one video")
 
@@ -73,18 +75,35 @@ class VideoClipDataset(Dataset):
         return len(self.videos) * self.config.clips_per_video
 
     def __getitem__(self, index: int) -> torch.Tensor:
-        video_index = index % len(self.videos)
-        path = self.videos[video_index]
-        capture = cv2.VideoCapture(str(path))
-        count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-        capture.release()
-        span = (self.config.frames - 1) * self.config.stride + 1
-        max_start = max(0, count - span)
-        if self.deterministic:
-            start = 0 if max_start == 0 else (index * 37) % (max_start + 1)
-        else:
-            start = random.randint(0, max_start)
-        return read_clip(path, self.config, start)
+        last_error = None
+        for offset in range(min(3, len(self.videos))):
+            video_index = (index + offset) % len(self.videos)
+            path = self.videos[video_index]
+            if path in self.unreadable:
+                continue
+            capture = cv2.VideoCapture(str(path))
+            count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+            capture.release()
+            span = (self.config.frames - 1) * self.config.stride + 1
+            max_start = max(0, count - span)
+            if self.deterministic:
+                start = 0 if max_start == 0 else (index * 37) % (max_start + 1)
+            else:
+                start = random.randint(0, max_start)
+            try:
+                return read_clip(path, self.config, start)
+            except RuntimeError as error:
+                last_error = error
+                if start:
+                    try:
+                        return read_clip(path, self.config, 0)
+                    except RuntimeError as fallback_error:
+                        last_error = fallback_error
+                warnings.warn(
+                    f"skipping unreadable video {path}: {last_error}", RuntimeWarning, stacklevel=2
+                )
+                self.unreadable.add(path)
+        raise RuntimeError("could not decode a clip after three video attempts") from last_error
 
 
 class SyntheticMotionDataset(Dataset):
