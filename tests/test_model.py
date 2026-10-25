@@ -57,7 +57,7 @@ def test_observed_next_frame_error_trains_flow_renderer():
     model = small_model()
     state = None
     loss = 0.0
-    for index in range(5):
+    for _ in range(5):
         output = model(torch.rand(1, 3, 16, 24), state)
         if output.has_ground_truth:
             loss = loss + model.loss(output)

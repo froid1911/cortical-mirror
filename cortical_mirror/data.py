@@ -107,13 +107,15 @@ class SyntheticMotionDataset(Dataset):
         size = int(rng.integers(max(12, height // 8), max(20, height // 4)))
         velocity = rng.integers(-4, 5, size=2)
         velocity[velocity == 0] = 2
-        position = rng.integers(0, [max(width - size - 12, 1), max(height - size - 12, 1)]).astype(float)
+        position = rng.integers(0, [max(width - size - 12, 1), max(height - size - 12, 1)]).astype(
+            float
+        )
         position += np.array([6.0, 6.0])
         texture = rng.random((size, size, 3), dtype=np.float32) * 0.8 + 0.2
         frames = []
         x, y = position
         vx, vy = velocity.astype(float)
-        for frame_index in range(cfg.frames):
+        for _ in range(cfg.frames):
             frame = background.copy()
             x0, y0 = int(round(x)), int(round(y))
             x1, y1 = x0 + size, y0 + size
@@ -121,9 +123,7 @@ class SyntheticMotionDataset(Dataset):
             dx0, dy0 = max(0, x0), max(0, y0)
             dx1, dy1 = min(width, x1), min(height, y1)
             if dx0 < dx1 and dy0 < dy1:
-                frame[dy0:dy1, dx0:dx1] = texture[
-                    sy0 : sy0 + (dy1 - dy0), sx0 : sx0 + (dx1 - dx0)
-                ]
+                frame[dy0:dy1, dx0:dx1] = texture[sy0 : sy0 + (dy1 - dy0), sx0 : sx0 + (dx1 - dx0)]
             cv2.rectangle(frame, (x0 - 2, y0 - 2), (x1 + 2, y1 + 2), (0.9, 0.9, 0.9), 1)
             frame += rng.normal(0.0, 0.01, frame.shape).astype(np.float32)
             frames.append(np.clip(frame, 0.0, 1.0))

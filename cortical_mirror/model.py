@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import torch
 from torch import Tensor, nn
@@ -18,7 +17,7 @@ class ModelState:
     predicted: list[Tensor]
     confidence: Tensor
 
-    def detached(self) -> "ModelState":
+    def detached(self) -> ModelState:
         return ModelState(
             recurrent=[(h.detach(), c.detach()) for h, c in self.recurrent],
             predicted=[p.detach() for p in self.predicted],
@@ -33,8 +32,8 @@ class StepOutput:
     prediction: Tensor
     state: ModelState
     errors: list[Tensor]
-    observed_error: Optional[Tensor]
-    previous_confidence: Optional[Tensor]
+    observed_error: Tensor | None
+    previous_confidence: Tensor | None
 
     @property
     def has_ground_truth(self) -> bool:
@@ -60,8 +59,8 @@ class ConvLSTMCell(nn.Module):
     def forward(
         self,
         x: Tensor,
-        state: Optional[tuple[Tensor, Tensor]],
-        context: Optional[Tensor],
+        state: tuple[Tensor, Tensor] | None,
+        context: Tensor | None,
     ) -> tuple[Tensor, Tensor]:
         batch, _, height, width = x.shape
         if state is None:
@@ -137,7 +136,14 @@ class CorticalFlowNet(nn.Module):
 
         self.target_convs = nn.ModuleList(
             [
-                nn.Conv2d(2 * self.target_channels[level], self.target_channels[level + 1], 3, 2, 1, bias=False)
+                nn.Conv2d(
+                    2 * self.target_channels[level],
+                    self.target_channels[level + 1],
+                    3,
+                    2,
+                    1,
+                    bias=False,
+                )
                 for level in range(2)
             ]
         )
@@ -152,7 +158,10 @@ class CorticalFlowNet(nn.Module):
             ]
         )
         self.representation_predictors = nn.ModuleList(
-            [nn.Conv2d(channels[level], self.target_channels[level], 1, bias=False) for level in range(1, 3)]
+            [
+                nn.Conv2d(channels[level], self.target_channels[level], 1, bias=False)
+                for level in range(1, 3)
+            ]
         )
         self.flow_head = nn.Conv2d(channels[0], 2, 3, padding=1, bias=False)
         self.residual_head = nn.Conv2d(channels[0], 3, 3, padding=1, bias=False)
@@ -160,7 +169,7 @@ class CorticalFlowNet(nn.Module):
         for head in (self.flow_head, self.residual_head, self.confidence_head):
             nn.init.zeros_(head.weight)
 
-    def forward(self, frame: Tensor, state: Optional[ModelState] = None) -> StepOutput:
+    def forward(self, frame: Tensor, state: ModelState | None = None) -> StepOutput:
         if frame.ndim != 4 or frame.shape[1] != 3:
             raise ValueError("frame must have shape [batch, 3, height, width]")
         previous = state.predicted if state is not None else None
@@ -182,7 +191,7 @@ class CorticalFlowNet(nn.Module):
             errors.append(positive_negative(target - predicted))
 
         recurrent: list[tuple[Tensor, Tensor]] = [(None, None)] * 3  # type: ignore[list-item]
-        context: Optional[Tensor] = None
+        context: Tensor | None = None
         for level in (2, 1, 0):
             old_state = state.recurrent[level] if state is not None else None
             hidden, cell = self.cells[level](errors[level], old_state, context)

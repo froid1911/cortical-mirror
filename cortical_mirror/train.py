@@ -138,7 +138,9 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--max-steps", type=int, default=0, help="cap clips per epoch for smoke tests")
+    parser.add_argument(
+        "--max-steps", type=int, default=0, help="cap clips per epoch for smoke tests"
+    )
     parser.add_argument("--no-amp", action="store_true")
     return parser.parse_args()
 
@@ -177,7 +179,9 @@ def main() -> None:
     else:
         train_set = SyntheticMotionDataset(args.synthetic, config)
         validation_set = SyntheticMotionDataset(max(16, args.synthetic // 10), config)
-    train_loader = make_loader(train_set, args.batch_size, args.workers, True, args.seed, device.type == "cuda")
+    train_loader = make_loader(
+        train_set, args.batch_size, args.workers, True, args.seed, device.type == "cuda"
+    )
     validation_loader = make_loader(
         validation_set, args.batch_size, args.workers, False, args.seed + 1, device.type == "cuda"
     )

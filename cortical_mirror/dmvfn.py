@@ -5,7 +5,6 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-import cv2
 import numpy as np
 import torch
 
@@ -61,10 +60,13 @@ class DMVFNEngine:
         else:
             if self.device.type == "cuda":
                 torch.cuda.synchronize(self.device)
-            with torch.inference_mode(), torch.autocast(
-                device_type=self.device.type,
-                dtype=torch.bfloat16,
-                enabled=self.mixed_precision,
+            with (
+                torch.inference_mode(),
+                torch.autocast(
+                    device_type=self.device.type,
+                    dtype=torch.bfloat16,
+                    enabled=self.mixed_precision,
+                ),
             ):
                 merged = self.model(
                     torch.cat((self.previous, current), dim=1), training=False, deterministic=True

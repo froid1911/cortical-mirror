@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Protocol
 
 import cv2
 import numpy as np
@@ -18,7 +18,7 @@ from .model import CorticalFlowNet, ModelState
 class EnginePrediction:
     image: np.ndarray
     confidence: np.ndarray
-    observed_error: Optional[np.ndarray]
+    observed_error: np.ndarray | None
     inference_ms: float
 
 
@@ -73,7 +73,7 @@ class CorticalEngine:
         self.width = int(width)
         self.height = int(height)
         self.mixed_precision = mixed_precision and self.device.type == "cuda"
-        self.state: Optional[ModelState] = None
+        self.state: ModelState | None = None
 
     @classmethod
     def from_checkpoint(
@@ -81,7 +81,7 @@ class CorticalEngine:
         path: str | Path,
         device: str = "cuda",
         mixed_precision: bool = True,
-    ) -> "CorticalEngine":
+    ) -> CorticalEngine:
         checkpoint = torch.load(path, map_location="cpu", weights_only=True)
         model = CorticalFlowNet(**checkpoint["model_config"])
         model.load_state_dict(checkpoint["state_dict"])
@@ -108,9 +108,7 @@ class CorticalEngine:
         tensor = self._tensor(frame_bgr)
         if self.device.type == "cuda":
             torch.cuda.synchronize(self.device)
-            autocast = torch.autocast(
-                "cuda", dtype=torch.bfloat16, enabled=self.mixed_precision
-            )
+            autocast = torch.autocast("cuda", dtype=torch.bfloat16, enabled=self.mixed_precision)
         else:
             autocast = torch.autocast("cpu", enabled=False)
         with torch.inference_mode(), autocast:

@@ -16,10 +16,14 @@ _grid_cache: dict[tuple, Tensor] = {}
 def warp(image: Tensor, flow: Tensor) -> Tensor:
     key = (image.device.type, image.device.index, image.dtype, tuple(image.shape))
     if key not in _grid_cache:
-        horizontal = torch.linspace(-1.0, 1.0, image.shape[3], device=image.device, dtype=image.dtype)
+        horizontal = torch.linspace(
+            -1.0, 1.0, image.shape[3], device=image.device, dtype=image.dtype
+        )
         vertical = torch.linspace(-1.0, 1.0, image.shape[2], device=image.device, dtype=image.dtype)
         yy, xx = torch.meshgrid(vertical, horizontal, indexing="ij")
-        _grid_cache[key] = torch.stack((xx, yy), dim=-1).unsqueeze(0).expand(image.shape[0], -1, -1, -1)
+        _grid_cache[key] = (
+            torch.stack((xx, yy), dim=-1).unsqueeze(0).expand(image.shape[0], -1, -1, -1)
+        )
         if len(_grid_cache) > 8:
             del _grid_cache[next(iter(_grid_cache))]
     normalized = torch.stack(
@@ -27,7 +31,11 @@ def warp(image: Tensor, flow: Tensor) -> Tensor:
         dim=-1,
     )
     return F.grid_sample(
-        image, _grid_cache[key] + normalized, mode="bilinear", padding_mode="border", align_corners=True
+        image,
+        _grid_cache[key] + normalized,
+        mode="bilinear",
+        padding_mode="border",
+        align_corners=True,
     )
 
 
@@ -84,7 +92,10 @@ class MVFB(nn.Module):
         x0, flow0 = x, flow
         if scale != 1:
             x = F.interpolate(x, scale_factor=1.0 / scale, mode="bilinear", align_corners=False)
-            flow = F.interpolate(flow, scale_factor=1.0 / scale, mode="bilinear", align_corners=False) / scale
+            flow = (
+                F.interpolate(flow, scale_factor=1.0 / scale, mode="bilinear", align_corners=False)
+                / scale
+            )
         x = torch.cat((x, flow), 1)
         x1 = self.conv0(x)
         x2 = self.conv_sq(self.convblock(x1) + x1)
@@ -115,7 +126,9 @@ class DMVFN(nn.Module):
         )
         self.l1 = nn.Linear(32, 9)
 
-    def forward(self, x: Tensor, scale=(4, 4, 4, 2, 2, 2, 1, 1, 1), training=True, deterministic=True):
+    def forward(
+        self, x: Tensor, scale=(4, 4, 4, 2, 2, 2, 1, 1, 1), training=True, deterministic=True
+    ):
         batch_size, _, height, width = x.shape
         if not training and batch_size != 1:
             raise ValueError("DMVFN inference currently requires batch_size=1")
@@ -157,7 +170,9 @@ class DMVFN(nn.Module):
             for index, block in enumerate(blocks):
                 if bool(ref[0, index]):
                     flow_d, mask_d = block(
-                        torch.cat((img0, img1, warped_img0, warped_img1, mask), 1), flow, scale[index]
+                        torch.cat((img0, img1, warped_img0, warped_img1, mask), 1),
+                        flow,
+                        scale[index],
                     )
                     flow, mask = flow + flow_d, mask + mask_d
                     mask_final.append(torch.sigmoid(mask))
@@ -165,5 +180,7 @@ class DMVFN(nn.Module):
                     warped_img0, warped_img1 = warp(img0, flow[:, :2]), warp(img1, flow[:, 2:4])
                     merged_final.append((warped_img0, warped_img1))
         for index, (first, second) in enumerate(merged_final):
-            merged_final[index] = (first * mask_final[index] + second * (1 - mask_final[index])).clamp(0, 1)
+            merged_final[index] = (
+                first * mask_final[index] + second * (1 - mask_final[index])
+            ).clamp(0, 1)
         return merged_final

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cortical-mirror"
+version = "0.1.0"
+description = "Live causal video prediction with hierarchical predictive coding"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "froid1911"}]
+dependencies = [
+  "numpy>=1.26,<3",
+  "opencv-python-headless>=4.9",
+  "torch>=2.4",
+  "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.8"]
+dmvfn = ["gdown>=5"]
+
+[project.scripts]
+cortical-mirror = "cortical_mirror.cli:main"
+cortical-train = "cortical_mirror.train:main"
+
+[tool.setuptools.packages.find]
+include = ["cortical_mirror*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"cortical_mirror/server.py" = ["E501"]
