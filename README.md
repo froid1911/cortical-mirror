@@ -2,11 +2,38 @@
 
 A live, causal next-frame predictor inspired by hierarchical predictive coding in the visual cortex. Recurrent models propose the future; an online router learns **which predictor to trust in each image region** from errors made by predictions that have already come due.
 
-![The trained adaptive mirror running in a browser](docs/images/live-demo.webp)
+![Animated comparison of the camera, predicted next frame, due prediction, and prediction error](docs/images/live-demo.gif)
 
 **Why it is interesting:** it is not a delayed webcam copy or a large diffusion demo. It combines a three-level predictive-coding network, DMVFN's multi-scale voxel flow, and persistence. The adaptive engine won the held-out comparison below while remaining inside a 30 fps frame budget.
 
 **Scientific scope:** this is a functional predictive-coding architecture, not a claim of biological cortical simulation or machine consciousness.
+
+## The plain-English version
+
+### What is working
+
+- **The system guesses the next camera frame.** At 30 fps, that is roughly 33 ms into the future—not the far future.
+- **Three predictors work together.** Persistence repeats the current image, the cortical model uses recent recurrent state, and DMVFN specializes in motion.
+- **A scorekeeper learns whom to trust.** Small image regions choose predictors using only mistakes from earlier guesses. The system never uses tomorrow's image to make today's prediction.
+- **The internal process is visible.** The browser shows the camera, the next-frame guess, the guess that is due now, and where it was wrong.
+- **It is fast enough for the benchmark host.** The adaptive model's measured compute time fits inside a 30 fps budget.
+
+### What is still missing
+
+- **No consciousness or real cortical simulation.** This is an engineering approximation of predictive coding.
+- **No long-term imagination or object permanence.** It does not explicitly track identity, intention, hidden objects, or long-term scene changes.
+- **Some blur and warping remain.** Occlusions, sudden scene changes, and unfamiliar motion can still fool it. Static scenes can make simple persistence better.
+- **The large neural weights do not learn live.** They were trained offline. Only recurrent state and the router's trust scores change during the demo.
+- **No guarantee beyond this data and resolution.** The model runs at 256×192 and was trained on UCF101 YouTube actions, not the hackathon webcam. Venue-like fine-tuning may be needed.
+- **No pristine test-set claim.** The 32 videos were excluded from weight updates but were also used to choose the best checkpoint. They are validation results, so a separate test set is still needed.
+
+### What the results mean
+
+- The 32 videos produced **480 next-frame guesses**.
+- Adaptive MAE of **0.02450** means an average channel difference of about **6.25 brightness levels out of 255**. Persistence measured **0.02851**, or **7.27 levels**. That is roughly **14% less pixel error**, not 14% higher intelligence.
+- SSIM of **0.8690 vs 0.8412** means the adaptive output preserved more image structure. It does not measure consciousness or understanding.
+- **67.9%** means adaptive had lower error on **326 of 480 guesses**. It is not an accuracy percentage.
+- **21.35 ms** is below the **33.3 ms** frame period at 30 fps. It does not guarantee end-to-end latency on every machine or camera.
 
 ## Architecture
 
