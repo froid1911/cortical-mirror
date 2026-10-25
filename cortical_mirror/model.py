@@ -189,9 +189,12 @@ class CorticalFlowNet(nn.Module):
             recurrent[level] = (hidden, cell)
             context = hidden
 
-        flow = torch.tanh(self.flow_head(recurrent[0][0])) * self.max_displacement
-        residual = torch.tanh(self.residual_head(recurrent[0][0])) * self.residual_scale
-        prediction = (warp_forward(frame, flow) + residual).clamp(0.0, 1.0)
+        if previous is None:
+            prediction = frame.clone()
+        else:
+            flow = torch.tanh(self.flow_head(recurrent[0][0])) * self.max_displacement
+            residual = torch.tanh(self.residual_head(recurrent[0][0])) * self.residual_scale
+            prediction = (warp_forward(frame, flow) + residual).clamp(0.0, 1.0)
         confidence = torch.sigmoid(self.confidence_head(recurrent[0][0]))
 
         predicted = [prediction]
