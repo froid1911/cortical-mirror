@@ -89,28 +89,83 @@ The frozen untrained network scores exactly 1.00 on every window: it *is* persis
 
 It underestimates a 3 px pan, plausibly because typical UCF101 motion at this resolution is about 1 px per frame (validation teacher flow averages 1.1 px).
 
-## Quick start
+## Setup
 
-Python 3.10+.
+You need a computer with a webcam, about 1 GB of free disk space, and internet access the first time. An NVIDIA GPU is optional: without one, the mirror runs on the CPU (see [What to expect](#what-to-expect)).
+
+### macOS
+
+1. Open **Terminal** and install Apple's command-line tools, which include `git` (skip this if `git --version` already works):
+   ```bash
+   xcode-select --install
+   ```
+2. Install [`uv`](https://docs.astral.sh/uv/), which also provides Python, then **open a new Terminal window**:
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+3. Download the project and install it:
+   ```bash
+   git clone https://github.com/froid1911/cortical-mirror.git
+   cd cortical-mirror
+   uv venv --python 3.12
+   uv pip install --python .venv/bin/python -e .
+   ```
+4. Start the mirror:
+   ```bash
+   .venv/bin/cortical-mirror demo
+   ```
+5. The first time, macOS asks whether Terminal may use the camera: click **Allow**. If you missed the prompt, enable Terminal under **System Settings → Privacy & Security → Camera** and run the command again. Without camera access, the mirror plays a sample clip instead.
+6. Open **http://127.0.0.1:8080** in a browser on the same Mac.
+
+### Linux
 
 ```bash
-git clone git@github.com:froid1911/cortical-mirror.git
+curl -LsSf https://astral.sh/uv/install.sh | sh      # then open a new terminal
+git clone https://github.com/froid1911/cortical-mirror.git
 cd cortical-mirror
-uv venv && uv pip install --python .venv/bin/python -e '.[dev,eval]'
+uv venv --python 3.12
+uv pip install --python .venv/bin/python -e .
 .venv/bin/cortical-mirror demo
 ```
 
-Open **http://127.0.0.1:8080**. `demo` downloads the weights and DMVFN checkpoint to `~/.cache/cortical-mirror` on first use, opens camera 0, and turns live learning on. Without a camera it plays a 22-second sample clip of a person signing in Belgian French Sign Language, chosen because it looks like someone standing in front of a mirror: looped in the demo, it takes an untrained hierarchy from 6% above to 27% below persistence error within about a minute of live learning, and to 14% below within its first pass (`reports/live-scratch-sample.json`). Without CUDA it runs on the CPU, routes between persistence and the hierarchy only (≈ 26 ms per frame on a 12-thread laptop CPU), and turns live learning off, because a CPU learner cannot keep up; install the CUDA build of PyTorch for DMVFN and live learning. On an RTX 3090 the full mirror with live learning runs at 30 fps with about 18 ms inference per frame.
+Open **http://127.0.0.1:8080**. On Linux the default PyTorch package includes NVIDIA CUDA support. With an NVIDIA GPU and a recent driver (`nvidia-smi` should list it), the mirror uses the GPU automatically. Add `'.[dev,eval]'` instead of `.` to the install command to run the tests and benchmarks.
+
+### What to expect
+
+On first start, `demo` downloads the trained weights and a sample clip from the [v0.2.0 release](https://github.com/froid1911/cortical-mirror/releases/tag/v0.2.0) to `~/.cache/cortical-mirror`, then opens camera 0.
+
+| | With an NVIDIA GPU | Without (any Mac, or a PC without one) |
+|---|---|---|
+| Predictors | Trained hierarchy, DMVFN, and persistence | Trained hierarchy and persistence |
+| Live learning | On, in the background | Off: a CPU learner cannot keep up |
+| `demo --from-scratch` | On most scenes we measured, beats persistence within about a minute of motion | Learns too, but takes many minutes |
+
+Macs run on the CPU because the project does not yet use Apple's GPU (it has not been measured on a Mac). The mirror itself runs on the CPU; live learning is what needs the GPU.
+
+Without a camera, it plays a 22-second sample clip of a person signing in Belgian French Sign Language, chosen because it looks like someone standing in front of a mirror. Looped in the demo, the clip takes an untrained hierarchy from 6% above to 27% below persistence error within about a minute of live learning on a GPU, and to 14% below within its first pass (`reports/live-scratch-sample.json`).
 
 ```bash
 .venv/bin/cortical-mirror demo --from-scratch     # start untrained and watch it learn
-.venv/bin/cortical-mirror demo --source clip.mp4  # any video file
+.venv/bin/cortical-mirror demo --source clip.mp4  # any video file instead of the camera
+.venv/bin/cortical-mirror demo --source 1         # a second camera
 .venv/bin/cortical-mirror demo --horizon 3        # show three frames ahead
 ```
 
 Append `?view=lab` to the URL to open the lab view directly, for example on a second screen.
 
-The weights and sample clip come from the [v0.2.0 release](https://github.com/froid1911/cortical-mirror/releases/tag/v0.2.0), which lists their SHA-256 checksums.
+### Webcam on one machine, GPU on another
+
+`--source` also accepts a network stream. To use a Linux laptop's camera with a GPU server you can reach over SSH, stream the camera's own MJPEG frames from the laptop, then forward the stream to the server and the page back to the laptop:
+
+```bash
+# On a Linux laptop whose webcam outputs MJPEG (tested setup)
+ffmpeg -f v4l2 -input_format mjpeg -framerate 30 -video_size 640x480 -i /dev/video0 \
+  -c:v copy -f mjpeg "tcp://127.0.0.1:9000?listen=1" &
+ssh -tt -L 8080:127.0.0.1:8080 -R 9000:127.0.0.1:9000 gpu-server \
+  'cd cortical-mirror && .venv/bin/cortical-mirror demo --source tcp://127.0.0.1:9000'
+```
+
+Then open **http://127.0.0.1:8080** on the laptop.
 
 ### Controls
 
