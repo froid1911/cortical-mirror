@@ -1,4 +1,10 @@
-"""Online expert routing driven only by errors from predictions already due."""
+"""Precision-weighted routing driven only by errors from predictions already due.
+
+In predictive coding, precision is the expected reliability of a prediction error
+and decides how much each signal is trusted (Feldman & Friston, 2010). Here each
+image region estimates the precision of every predictor from its recent due errors
+and weights the predictors' forecasts accordingly.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +14,8 @@ import cv2
 import numpy as np
 
 from .engines import EnginePrediction, PredictiveEngine, _resize
+
+MEAN_OF_CHANNELS = np.full((1, 3), 1.0 / 3.0, dtype=np.float32)
 
 
 class AdaptiveEngine:
@@ -44,44 +52,56 @@ class AdaptiveEngine:
         self.pending: np.ndarray | None = None
         self.pending_experts: dict[str, np.ndarray] | None = None
         self.last_weights = None
+        self.routing: np.ndarray | None = None
+        self.last_expert_errors: dict[str, float] = {}
+
+    @property
+    def learner(self):
+        return getattr(self.engines.get("cortical"), "learner", None)
+
+    def rollout(self, first_bgr: np.ndarray, steps: int) -> np.ndarray:
+        cortical = self.engines.get("cortical")
+        if cortical is None or not hasattr(cortical, "rollout"):
+            return first_bgr
+        return cortical.rollout(first_bgr, steps)
+
+    def _grid(self) -> tuple[int, int]:
+        return max(1, self.width // self.patch_size), max(1, self.height // self.patch_size)
+
+    def _patch_error(self, prediction: np.ndarray, actual: np.ndarray) -> np.ndarray:
+        """Mean absolute error of one predictor in every routing patch, in [0, 1]."""
+
+        difference = cv2.absdiff(prediction, actual)
+        small = cv2.resize(difference, self._grid(), interpolation=cv2.INTER_AREA)
+        return small.astype(np.float32).reshape(*small.shape[:2], -1).mean(axis=2) / 255.0
 
     def _weights(self) -> np.ndarray:
+        """Softmax of negative patch error: low recent error means high precision."""
+
+        width, height = self._grid()
         if self.errors is None:
-            self.last_weights = np.full(
-                (self.height, self.width, len(self.engines)),
-                1.0 / len(self.engines),
-                dtype=np.float32,
-            )
-        else:
-            logits = -self.errors / self.temperature
-            logits -= logits.max(axis=2, keepdims=True)
-            weights = np.exp(logits)
-            self.last_weights = weights / weights.sum(axis=2, keepdims=True)
-        return self.last_weights
+            return np.full((height, width, len(self.engines)), 1.0 / len(self.engines), np.float32)
+        logits = -self.errors / self.temperature
+        logits -= logits.max(axis=2, keepdims=True)
+        weights = np.exp(logits)
+        return (weights / weights.sum(axis=2, keepdims=True)).astype(np.float32)
 
     def predict(self, frame_bgr: np.ndarray) -> EnginePrediction:
         start = time.perf_counter()
         actual = _resize(frame_bgr, self.width, self.height)
-        observed = (
-            np.mean(np.abs(actual.astype(np.float32) - self.pending), axis=2) / 255.0
-            if self.pending is not None
-            else None
-        )
+        observed = None
+        if self.pending is not None:
+            observed = cv2.transform(cv2.absdiff(self.pending, actual), MEAN_OF_CHANNELS)
+            observed = observed.astype(np.float32) / 255.0
         if self.pending_experts is not None:
             current_errors = np.stack(
-                [
-                    np.mean(
-                        np.abs(
-                            self.pending_experts[name].astype(np.float32)
-                            - actual.astype(np.float32)
-                        ),
-                        axis=2,
-                    )
-                    / 255.0
-                    for name in self.names
-                ],
+                [self._patch_error(self.pending_experts[name], actual) for name in self.names],
                 axis=2,
             )
+            self.last_expert_errors = {
+                name: float(current_errors[..., index].mean())
+                for index, name in enumerate(self.names)
+            }
             self.errors = (
                 current_errors
                 if self.errors is None
@@ -89,29 +109,31 @@ class AdaptiveEngine:
             )
 
         predictions = {name: self.engines[name].predict(actual) for name in self.names}
-        weights = self._weights()
-        small_size = (max(1, self.width // self.patch_size), max(1, self.height // self.patch_size))
-        small_weights = cv2.resize(weights, small_size, interpolation=cv2.INTER_AREA)
+        small_weights = self._weights()
         weights = cv2.resize(
             small_weights, (self.width, self.height), interpolation=cv2.INTER_LINEAR
         )
         if weights.ndim == 2:
             weights = weights[..., None]
         weights /= weights.sum(axis=2, keepdims=True)
-        prediction = np.sum(
-            np.stack([predictions[name].image.astype(np.float32) for name in self.names], axis=2)
-            * weights[..., None],
-            axis=2,
-        )
-        confidence = (
-            np.full((self.height, self.width), 0.5, dtype=np.float32)
-            if self.errors is None
-            else np.exp(-10.0 * np.sum(weights * self.errors, axis=2)).astype(np.float32)
-        )
-        self.pending = prediction
+        self.routing = self.last_weights = weights
+        prediction = np.zeros((self.height, self.width, 3), np.float32)
+        for index, name in enumerate(self.names):
+            prediction += predictions[name].image.astype(np.float32) * weights[..., index, None]
+        if self.errors is None:
+            confidence = np.full((self.height, self.width), 0.5, dtype=np.float32)
+        else:
+            expected = np.sum(small_weights * self.errors, axis=2)
+            confidence = cv2.resize(
+                np.exp(-10.0 * expected).astype(np.float32),
+                (self.width, self.height),
+                interpolation=cv2.INTER_LINEAR,
+            )
+        image = np.rint(np.clip(prediction, 0, 255)).astype(np.uint8)
+        self.pending = image
         self.pending_experts = {name: predictions[name].image for name in self.names}
         return EnginePrediction(
-            image=np.rint(np.clip(prediction, 0, 255)).astype(np.uint8),
+            image=image,
             confidence=confidence,
             observed_error=observed,
             inference_ms=(time.perf_counter() - start) * 1000.0,

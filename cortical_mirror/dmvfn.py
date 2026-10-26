@@ -59,7 +59,7 @@ class DMVFNEngine:
             prediction = current.clone()
         else:
             if self.device.type == "cuda":
-                torch.cuda.synchronize(self.device)
+                torch.cuda.current_stream(self.device).synchronize()
             with (
                 torch.inference_mode(),
                 torch.autocast(
@@ -77,7 +77,7 @@ class DMVFNEngine:
         image = prediction[0].float().permute(1, 2, 0).cpu().numpy()
         observed_np = observed[0, 0].float().cpu().numpy() if observed is not None else None
         if self.device.type == "cuda":
-            torch.cuda.synchronize(self.device)
+            torch.cuda.current_stream(self.device).synchronize()
         elapsed = (time.perf_counter() - start) * 1000.0
         return EnginePrediction(
             image=np.rint(np.clip(image, 0.0, 1.0) * 255.0).astype(np.uint8),

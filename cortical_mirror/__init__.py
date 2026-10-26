@@ -3,4 +3,4 @@
 from .model import CorticalFlowNet, ModelState
 
 __all__ = ["CorticalFlowNet", "ModelState"]
-__version__ = "0.1.0"
+__version__ = "0.2.0"

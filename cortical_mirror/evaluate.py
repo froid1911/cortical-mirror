@@ -36,12 +36,38 @@ def ssim(first: np.ndarray, second: np.ndarray) -> float:
     return sum(values) / len(values)
 
 
+class Perceptual:
+    """LPIPS (Zhang et al., 2018): learned perceptual distance, lower is better.
+
+    Blur that pixel MAE rewards scores badly here, so it guards against predictors
+    that win MAE by smearing.
+    """
+
+    def __init__(self, device: str = "cpu"):
+        import lpips
+        import torch
+
+        self.torch = torch
+        self.device = device
+        self.model = lpips.LPIPS(net="alex", verbose=False).to(device).eval()
+
+    def __call__(self, prediction: np.ndarray, actual: np.ndarray) -> float:
+        def tensor(image: np.ndarray):
+            rgb = image[..., ::-1].astype(np.float32) / 127.5 - 1.0
+            return self.torch.from_numpy(rgb.transpose(2, 0, 1).copy())[None].to(self.device)
+
+        with self.torch.inference_mode():
+            return float(self.model(tensor(prediction), tensor(actual)))
+
+
 @dataclass
 class Metrics:
     frames: int = 0
     absolute_error: float = 0.0
     squared_error: float = 0.0
     structural_similarity: float = 0.0
+    perceptual_distance: float = 0.0
+    perceptual: Perceptual | None = None
 
     def add(self, prediction: np.ndarray, actual: np.ndarray) -> tuple[float, float]:
         difference = prediction.astype(np.float32) - actual.astype(np.float32)
@@ -51,18 +77,23 @@ class Metrics:
         self.absolute_error += mae
         self.squared_error += mse
         self.structural_similarity += ssim(prediction, actual)
+        if self.perceptual is not None:
+            self.perceptual_distance += self.perceptual(prediction, actual)
         return mae, mse
 
     def summary(self) -> dict[str, float | int]:
         if not self.frames:
             return {"frames": 0}
         mse = self.squared_error / self.frames
-        return {
+        summary = {
             "frames": self.frames,
             "mae": self.absolute_error / self.frames,
             "psnr_db": float(10.0 * np.log10(1.0 / max(mse, 1e-12))),
             "ssim": self.structural_similarity / self.frames,
         }
+        if self.perceptual is not None:
+            summary["lpips"] = self.perceptual_distance / self.frames
+        return summary
 
 
 def label(image: np.ndarray, text: str) -> np.ndarray:
@@ -110,6 +141,7 @@ def evaluate_video(
     output: str | Path | None = None,
     max_frames: int = 0,
     samples: int = 8,
+    perceptual: Perceptual | None = None,
 ) -> dict:
     engine.reset()
     capture = cv2.VideoCapture(str(source))
@@ -127,7 +159,8 @@ def evaluate_video(
         )
     else:
         writer = None
-    model_metrics, copy_metrics = Metrics(), Metrics()
+    model_metrics = Metrics(perceptual=perceptual)
+    copy_metrics = Metrics(perceptual=perceptual)
     wins = 0
     latencies = []
     pending: EnginePrediction | None = None
