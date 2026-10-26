@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import time
 from dataclasses import dataclass
 from pathlib import Path, PosixPath, WindowsPath
@@ -12,6 +13,17 @@ import numpy as np
 import torch
 
 from .model import CorticalFlowNet, ModelState
+from .online import OnlineLearner
+
+
+def resolve_device(device: str) -> str:
+    """Map ``auto`` to CUDA when it is usable and to the CPU otherwise."""
+
+    if device == "auto":
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    if device.startswith("cuda") and not torch.cuda.is_available():
+        raise SystemExit("CUDA requested but unavailable; use --device auto or --device cpu")
+    return device
 
 
 def load_checkpoint(path: str | Path) -> dict:
@@ -81,6 +93,37 @@ class CorticalEngine:
         self.height = int(height)
         self.mixed_precision = mixed_precision and self.device.type == "cuda"
         self.state: ModelState | None = None
+        self._previous: torch.Tensor | None = None
+        self._reset_requested = False
+        self.learner: OnlineLearner | None = None
+        self.last_flow: np.ndarray | None = None
+
+    def enable_learning(self, **options) -> OnlineLearner:
+        """Keep training on the incoming stream in a background thread."""
+
+        self.learner = OnlineLearner(self.model, **options)
+        self.learner.on_rollback = self.request_reset
+        self.learner.start()
+        return self.learner
+
+    @classmethod
+    def fresh(
+        cls,
+        device: str = "cuda",
+        width: int = 256,
+        height: int = 192,
+        mixed_precision: bool = True,
+        **model_options,
+    ) -> CorticalEngine:
+        """An untrained hierarchy: exact persistence until it learns from the camera."""
+
+        return cls(
+            CorticalFlowNet(**model_options),
+            device=device,
+            width=width,
+            height=height,
+            mixed_precision=mixed_precision,
+        )
 
     @classmethod
     def from_checkpoint(
@@ -103,6 +146,43 @@ class CorticalEngine:
 
     def reset(self) -> None:
         self.state = None
+        self._previous = None
+        self._reset_requested = False
+
+    def request_reset(self) -> None:
+        """Ask for a reset from another thread; it happens before the next frame."""
+
+        self._reset_requested = True
+
+    def _autocast(self):
+        if self.device.type == "cuda":
+            return torch.autocast("cuda", dtype=torch.bfloat16, enabled=self.mixed_precision)
+        return contextlib.nullcontext()
+
+    def _weights(self):
+        return self.learner.lock if self.learner is not None else contextlib.nullcontext()
+
+    @staticmethod
+    def _bgr(prediction: torch.Tensor) -> np.ndarray:
+        rgb = prediction[0].float().permute(1, 2, 0).cpu().numpy()
+        return cv2.cvtColor(
+            np.rint(np.clip(rgb, 0.0, 1.0) * 255.0).astype(np.uint8), cv2.COLOR_RGB2BGR
+        )
+
+    def rollout(self, first_bgr: np.ndarray, steps: int) -> np.ndarray:
+        """Imagine ``steps`` further frames by feeding predictions back as input.
+
+        The committed state is untouched; the next real frame resumes from it.
+        """
+
+        if self.state is None or steps <= 0:
+            return first_bgr
+        state, image = self.state, self._tensor(first_bgr)
+        with torch.inference_mode(), self._autocast(), self._weights():
+            for _ in range(steps):
+                output = self.model(image, state)
+                state, image = output.state, output.prediction.float()
+        return self._bgr(image)
 
     def _tensor(self, frame_bgr: np.ndarray) -> torch.Tensor:
         frame = _resize(frame_bgr, self.width, self.height)
@@ -112,16 +192,24 @@ class CorticalEngine:
 
     def predict(self, frame_bgr: np.ndarray) -> EnginePrediction:
         start = time.perf_counter()
+        if self._reset_requested:
+            self.reset()
         tensor = self._tensor(frame_bgr)
+        if self.learner is not None:
+            self.learner.observe(tensor)
         if self.device.type == "cuda":
-            torch.cuda.synchronize(self.device)
-            autocast = torch.autocast("cuda", dtype=torch.bfloat16, enabled=self.mixed_precision)
-        else:
-            autocast = torch.autocast("cpu", enabled=False)
-        with torch.inference_mode(), autocast:
+            torch.cuda.current_stream(self.device).synchronize()
+        with torch.inference_mode(), self._autocast(), self._weights():
             output = self.model(tensor, self.state)
             self.state = output.state.detached()
-        prediction = output.prediction[0].float().permute(1, 2, 0).cpu().numpy()
+        previous = self._previous
+        if self.learner is not None and output.has_ground_truth and previous is not None:
+            self.learner.observe_outcome(
+                float(output.observed_error.mean()),
+                float((tensor - previous).abs().mean()),
+            )
+        self._previous = tensor
+        self.last_flow = output.flow[0].float().permute(1, 2, 0).cpu().numpy()
         confidence = output.state.confidence[0, 0].float().cpu().numpy()
         observed = (
             output.observed_error[0, 0].float().cpu().numpy()
@@ -129,12 +217,9 @@ class CorticalEngine:
             else None
         )
         if self.device.type == "cuda":
-            torch.cuda.synchronize(self.device)
+            torch.cuda.current_stream(self.device).synchronize()
+        bgr = self._bgr(output.prediction)
         elapsed = (time.perf_counter() - start) * 1000.0
-        bgr = cv2.cvtColor(
-            np.rint(np.clip(prediction, 0.0, 1.0) * 255.0).astype(np.uint8),
-            cv2.COLOR_RGB2BGR,
-        )
         return EnginePrediction(
             image=bgr,
             confidence=confidence,
