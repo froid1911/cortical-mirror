@@ -184,7 +184,10 @@ class LiveState:
             self.running = False
             self._publish({}, self.metrics() | {"error": self.error})
             return
-        is_file = isinstance(self.source, str) and not self.source.isdigit()
+        # Only a file on disk is paced and looped. Cameras and network streams
+        # (tcp://, http://, rtsp://) deliver frames live; pacing them at their
+        # reported rate would let frames pile up behind the mirror.
+        is_file = isinstance(self.source, str) and Path(self.source).is_file()
         fps = capture.get(cv2.CAP_PROP_FPS) if is_file else 30.0
         interval = 1.0 / (fps if fps > 0 else 30.0)
         self.engine.reset()

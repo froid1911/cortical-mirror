@@ -180,6 +180,8 @@ def fetch(name: str, folder: Path) -> Path:
 
 
 def camera_available(source: str) -> bool:
+    if "://" in source:
+        return True  # a network stream; the server reports if it cannot be opened
     if not source.isdigit():
         return Path(source).exists()
     capture = cv2.VideoCapture(int(source))
