@@ -1,0 +1,14 @@
+{
+  "experiment": "From-scratch online learning on the looped sample clip (FFSb - Corona LSFB, 22.5 s at 23.976 fps, looped to 1800 frames)",
+  "config": {
+    "network": "CorticalFlowNet defaults (channels 16,32,64; strides 1,4,8), random init, seed 0",
+    "learner": "OnlineLearner(learning_rate=1e-3, anchor_weight=0, batch_size=2, burn_in=8, window=6), stepped synchronously",
+    "steps_per_frame": 0.5,
+    "resolution": "256x192",
+    "device": "RTX 3090"
+  },
+  "window_frames": 300,
+  "ratio_to_persistence_per_window": [1.06, 0.86, 0.78, 0.76, 0.73],
+  "rollbacks": 0,
+  "note": "The clip repeats every 540 frames, so windows after the first two include footage the learner has already seen. The second window (frames 300-600) is mostly first-pass footage."
+}
