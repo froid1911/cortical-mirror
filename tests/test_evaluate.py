@@ -35,3 +35,35 @@ def test_live_view_contains_both_next_and_due_predictions():
     view = comparison_view(actual, due, actual.copy(), future)
     assert view[32, 69, 0] == 20
     assert view[80, 5, 0] == 10
+
+
+def test_live_server_paces_and_loops_only_real_files(tmp_path, monkeypatch):
+    import cortical_mirror.server as server
+    from cortical_mirror.engines import CopyEngine
+
+    opened = []
+
+    class FakeCapture:
+        def __init__(self, source):
+            opened.append(source)
+
+        def isOpened(self):
+            return True
+
+        def get(self, prop):
+            return 25.0
+
+        def read(self):
+            return False, None
+
+        def set(self, *args):
+            raise AssertionError("a live stream must not be rewound")
+
+        def release(self):
+            pass
+
+    monkeypatch.setattr(server.cv2, "VideoCapture", FakeCapture)
+    state = server.LiveState(CopyEngine(64, 48), "tcp://127.0.0.1:9000", "copy", True, 0)
+    state.run()  # ends at the first missing frame instead of looping
+    assert opened == ["tcp://127.0.0.1:9000"]
+    assert not state.error
