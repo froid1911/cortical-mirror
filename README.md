@@ -6,6 +6,8 @@ A small predictive-coding hierarchy predicts the next webcam frame from the fram
 
 ![The predicted mirror](docs/images/live-demo.gif)
 
+<sub>Sample footage: “FFSb – Corona LSFB” by the Fédération Francophone des Sourds de Belgique, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:FFSb_-_Corona_LSFB.webm); shown mirrored and as predicted. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).</sub>
+
 **Scientific scope:** a functional predictive-coding architecture, not a claim of biological cortical simulation or of machine consciousness.
 
 ## What you see
@@ -98,7 +100,7 @@ uv venv && uv pip install --python .venv/bin/python -e '.[dev,eval]'
 .venv/bin/cortical-mirror demo
 ```
 
-Open **http://127.0.0.1:8080**. `demo` downloads the weights and DMVFN checkpoint to `~/.cache/cortical-mirror` on first use, opens camera 0, and turns live learning on. Without a camera it plays a sample clip. Without CUDA it runs on the CPU, routes between persistence and the hierarchy only (≈ 26 ms per frame on a 12-thread laptop CPU), and turns live learning off, because a CPU learner cannot keep up; install the CUDA build of PyTorch for DMVFN and live learning. On an RTX 3090 the full mirror with live learning runs at 30 fps with about 18 ms inference per frame.
+Open **http://127.0.0.1:8080**. `demo` downloads the weights and DMVFN checkpoint to `~/.cache/cortical-mirror` on first use, opens camera 0, and turns live learning on. Without a camera it plays a 22-second sample clip of a person signing in Belgian French Sign Language, chosen because it looks like someone standing in front of a mirror: an untrained hierarchy learns it to about 27% below persistence error within a minute of live learning. Without CUDA it runs on the CPU, routes between persistence and the hierarchy only (≈ 26 ms per frame on a 12-thread laptop CPU), and turns live learning off, because a CPU learner cannot keep up; install the CUDA build of PyTorch for DMVFN and live learning. On an RTX 3090 the full mirror with live learning runs at 30 fps with about 18 ms inference per frame.
 
 ```bash
 .venv/bin/cortical-mirror demo --from-scratch     # start untrained and watch it learn
