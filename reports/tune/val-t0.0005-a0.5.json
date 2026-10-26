@@ -1,0 +1,2969 @@
+{
+  "engine": "adaptive",
+  "config": {
+    "engine": "adaptive",
+    "checkpoint": "snapshots/G-ep1.pt",
+    "dmvfn_checkpoint": "../cortical-mirror/checkpoints/dmvfn_vimeo.pkl",
+    "device": "cuda",
+    "width": "256",
+    "height": "192",
+    "no_amp": "False",
+    "temperature": "0.0005",
+    "adaptation": "0.5",
+    "patch_size": "16",
+    "experts": "copy,cortical,dmvfn",
+    "learn": "False",
+    "from_scratch": "False",
+    "learn_rate": "0.0002",
+    "learn_steps": "0.0",
+    "anchor": "0.01",
+    "data": "/home/froid/data/ucf101/UCF-101",
+    "split": "validation",
+    "output": "reports/tune/val-t0.0005-a0.5.json",
+    "per_class": "1",
+    "frames": "32",
+    "lpips": "False"
+  },
+  "aggregate": {
+    "split": "validation",
+    "videos": 101,
+    "frames": 3131,
+    "model_mae": 0.015290075653323897,
+    "copy_mae": 0.019594973248667096,
+    "model_ssim": 0.920878761862713,
+    "copy_ssim": 0.8878554514291297,
+    "beat_copy": 0.708399872245289,
+    "inference_ms_mean": 34.16913572484839
+  },
+  "per_video": [
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/ApplyEyeMakeup/v_ApplyEyeMakeup_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.003771823400916952,
+        "psnr_db": 36.051710873043184,
+        "ssim": 0.9883161674263656
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.004353020133660926,
+        "psnr_db": 34.455890847448416,
+        "ssim": 0.9850008109564423
+      },
+      "beat_copy": 0.7741935483870968,
+      "cold_start_ms": 503.87763790786266,
+      "inference_ms_mean": 32.013675511076016,
+      "inference_ms_p95": 41.21183310635388,
+      "evaluation_wall_fps": 13.182205970778778,
+      "expert_weights": {
+        "copy": 0.32733482122421265,
+        "cortical": 0.3488917648792267,
+        "dmvfn": 0.32377341389656067
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/ApplyEyeMakeup/v_ApplyEyeMakeup_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/ApplyLipstick/v_ApplyLipstick_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.010818369686603546,
+        "psnr_db": 30.397165693096717,
+        "ssim": 0.9549527789956781
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.013392572651707357,
+        "psnr_db": 28.414095865007827,
+        "ssim": 0.9371142855254554
+      },
+      "beat_copy": 0.9032258064516129,
+      "cold_start_ms": 16.451159957796335,
+      "inference_ms_mean": 27.948378360476987,
+      "inference_ms_p95": 44.75708534009753,
+      "evaluation_wall_fps": 25.035462987322475,
+      "expert_weights": {
+        "copy": 0.26393330097198486,
+        "cortical": 0.4248131811618805,
+        "dmvfn": 0.31125351786613464
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/ApplyLipstick/v_ApplyLipstick_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Archery/v_Archery_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.0198215187467154,
+        "psnr_db": 24.775543837311325,
+        "ssim": 0.893876124453801
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.024888498137795156,
+        "psnr_db": 23.038085884018876,
+        "ssim": 0.8655550588843643
+      },
+      "beat_copy": 0.9354838709677419,
+      "cold_start_ms": 11.736174114048481,
+      "inference_ms_mean": 19.607692972981724,
+      "inference_ms_p95": 30.41681558825074,
+      "evaluation_wall_fps": 35.7579534814768,
+      "expert_weights": {
+        "copy": 0.292559951543808,
+        "cortical": 0.3555007874965668,
+        "dmvfn": 0.35193929076194763
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Archery/v_Archery_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/BabyCrawling/v_BabyCrawling_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.02497574377564653,
+        "psnr_db": 25.850149140242525,
+        "ssim": 0.7776407029039116
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.03554547794403568,
+        "psnr_db": 22.94555197850339,
+        "ssim": 0.6747495262853562
+      },
+      "beat_copy": 0.8709677419354839,
+      "cold_start_ms": 7.573028095066547,
+      "inference_ms_mean": 31.156196379391798,
+      "inference_ms_p95": 63.599347090348516,
+      "evaluation_wall_fps": 25.180475271216952,
+      "expert_weights": {
+        "copy": 0.07074383646249771,
+        "cortical": 0.2686612904071808,
+        "dmvfn": 0.6605948805809021
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/BabyCrawling/v_BabyCrawling_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/BalanceBeam/v_BalanceBeam_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.016311769644098896,
+        "psnr_db": 28.114468978188455,
+        "ssim": 0.9399418100234
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.022888167040242303,
+        "psnr_db": 25.41040373474813,
+        "ssim": 0.8982521257092877
+      },
+      "beat_copy": 0.8709677419354839,
+      "cold_start_ms": 7.148221833631396,
+      "inference_ms_mean": 33.804871872517054,
+      "inference_ms_p95": 84.39162117429072,
+      "evaluation_wall_fps": 22.51623128770779,
+      "expert_weights": {
+        "copy": 0.150221049785614,
+        "cortical": 0.698479950428009,
+        "dmvfn": 0.15129892528057098
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/BalanceBeam/v_BalanceBeam_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/BandMarching/v_BandMarching_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.03468789370550263,
+        "psnr_db": 22.979390846663556,
+        "ssim": 0.8396689077859283
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.06691327715112318,
+        "psnr_db": 18.316512031374288,
+        "ssim": 0.6173583682506314
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 19.232850056141615,
+      "inference_ms_mean": 29.3565156291528,
+      "inference_ms_p95": 47.98158705234523,
+      "evaluation_wall_fps": 24.28425556707122,
+      "expert_weights": {
+        "copy": 0.018093565478920937,
+        "cortical": 0.9175254702568054,
+        "dmvfn": 0.064380943775177
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/BandMarching/v_BandMarching_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/BaseballPitch/v_BaseballPitch_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.0038446881252081856,
+        "psnr_db": 34.71054436281469,
+        "ssim": 0.9875947980470555
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.003664427396437708,
+        "psnr_db": 34.74034377264212,
+        "ssim": 0.9876651090960349
+      },
+      "beat_copy": 0.16129032258064516,
+      "cold_start_ms": 28.24085601605475,
+      "inference_ms_mean": 26.764401491602946,
+      "inference_ms_p95": 39.35353611595927,
+      "evaluation_wall_fps": 24.750676058230937,
+      "expert_weights": {
+        "copy": 0.38668331503868103,
+        "cortical": 0.3508974015712738,
+        "dmvfn": 0.2624192535877228
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/BaseballPitch/v_BaseballPitch_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Basketball/v_Basketball_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.001834355863637381,
+        "psnr_db": 40.83864792629398,
+        "ssim": 0.9955929575427888
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.0017121577280528482,
+        "psnr_db": 40.98320038164856,
+        "ssim": 0.995663454455714
+      },
+      "beat_copy": 0.0967741935483871,
+      "cold_start_ms": 9.778947103768587,
+      "inference_ms_mean": 30.655588248166545,
+      "inference_ms_p95": 44.55121285282075,
+      "evaluation_wall_fps": 24.53091798628775,
+      "expert_weights": {
+        "copy": 0.33725857734680176,
+        "cortical": 0.3503427803516388,
+        "dmvfn": 0.3123985826969147
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Basketball/v_Basketball_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/BasketballDunk/v_BasketballDunk_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.02310119779600251,
+        "psnr_db": 24.680308464166846,
+        "ssim": 0.92328598935117
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.033755906527080846,
+        "psnr_db": 22.6360343392846,
+        "ssim": 0.8403274416923523
+      },
+      "beat_copy": 0.9354838709677419,
+      "cold_start_ms": 49.257644917815924,
+      "inference_ms_mean": 28.257919298806065,
+      "inference_ms_p95": 42.44184833951293,
+      "evaluation_wall_fps": 23.414792757822234,
+      "expert_weights": {
+        "copy": 0.07853276282548904,
+        "cortical": 0.5378011465072632,
+        "dmvfn": 0.38366612792015076
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/BasketballDunk/v_BasketballDunk_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/BenchPress/v_BenchPress_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.026373470652728312,
+        "psnr_db": 23.056187544488917,
+        "ssim": 0.8865233839199108
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.024000699688199786,
+        "psnr_db": 23.225016306108365,
+        "ssim": 0.8959192172173532
+      },
+      "beat_copy": 0.41935483870967744,
+      "cold_start_ms": 13.834496028721333,
+      "inference_ms_mean": 21.795007544730243,
+      "inference_ms_p95": 31.395718222483993,
+      "evaluation_wall_fps": 32.973396596913474,
+      "expert_weights": {
+        "copy": 0.6134819388389587,
+        "cortical": 0.2655699551105499,
+        "dmvfn": 0.12094813585281372
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/BenchPress/v_BenchPress_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Biking/v_Biking_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.033956103928146825,
+        "psnr_db": 21.626305771163135,
+        "ssim": 0.8003632560853035
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.04022688899309405,
+        "psnr_db": 20.519812690852916,
+        "ssim": 0.7692181218054986
+      },
+      "beat_copy": 0.8064516129032258,
+      "cold_start_ms": 10.057538049295545,
+      "inference_ms_mean": 34.21833866340076,
+      "inference_ms_p95": 56.03121123276651,
+      "evaluation_wall_fps": 21.18446498393228,
+      "expert_weights": {
+        "copy": 0.3654867708683014,
+        "cortical": 0.3302791118621826,
+        "dmvfn": 0.304234117269516
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Biking/v_Biking_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Billiards/v_Billiards_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.0010638639247307793,
+        "psnr_db": 44.01680073634773,
+        "ssim": 0.9981460859698635
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.0009965446677656033,
+        "psnr_db": 43.198978334509704,
+        "ssim": 0.9980102521117016
+      },
+      "beat_copy": 0.1935483870967742,
+      "cold_start_ms": 19.215448992326856,
+      "inference_ms_mean": 44.277991601747686,
+      "inference_ms_p95": 136.1214325297622,
+      "evaluation_wall_fps": 15.648155786475847,
+      "expert_weights": {
+        "copy": 0.35461804270744324,
+        "cortical": 0.3217374086380005,
+        "dmvfn": 0.32364460825920105
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Billiards/v_Billiards_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/BlowDryHair/v_BlowDryHair_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.009573932992474686,
+        "psnr_db": 29.731185460319175,
+        "ssim": 0.9493085998360827
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.01168773269220706,
+        "psnr_db": 28.244958837216917,
+        "ssim": 0.9332446539273825
+      },
+      "beat_copy": 0.8387096774193549,
+      "cold_start_ms": 12.703530956059694,
+      "inference_ms_mean": 30.429721047202573,
+      "inference_ms_p95": 61.56118731014429,
+      "evaluation_wall_fps": 21.315316706340955,
+      "expert_weights": {
+        "copy": 0.26557353138923645,
+        "cortical": 0.452221155166626,
+        "dmvfn": 0.2822053134441376
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/BlowDryHair/v_BlowDryHair_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/BlowingCandles/v_BlowingCandles_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.01941196212259632,
+        "psnr_db": 24.44035574629163,
+        "ssim": 0.8690120244538914
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.018652031534246258,
+        "psnr_db": 24.40774788722301,
+        "ssim": 0.8688933573743349
+      },
+      "beat_copy": 0.5483870967741935,
+      "cold_start_ms": 17.114165937528014,
+      "inference_ms_mean": 30.501301287962445,
+      "inference_ms_p95": 72.74164226837455,
+      "evaluation_wall_fps": 20.618634842720812,
+      "expert_weights": {
+        "copy": 0.3992842733860016,
+        "cortical": 0.516952633857727,
+        "dmvfn": 0.08376310020685196
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/BlowingCandles/v_BlowingCandles_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/BodyWeightSquats/v_BodyWeightSquats_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.015268812609475947,
+        "psnr_db": 29.277662481651756,
+        "ssim": 0.943609853585561
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.01721465854244607,
+        "psnr_db": 27.2677574169211,
+        "ssim": 0.9331199821605479
+      },
+      "beat_copy": 0.6774193548387096,
+      "cold_start_ms": 22.31512195430696,
+      "inference_ms_mean": 32.18210340830787,
+      "inference_ms_p95": 78.89446336776008,
+      "evaluation_wall_fps": 20.73784198350931,
+      "expert_weights": {
+        "copy": 0.11927220970392227,
+        "cortical": 0.6152830719947815,
+        "dmvfn": 0.26544466614723206
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/BodyWeightSquats/v_BodyWeightSquats_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Bowling/v_Bowling_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.017563895788043737,
+        "psnr_db": 27.631692626434685,
+        "ssim": 0.9147336027955495
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.020837743616392537,
+        "psnr_db": 26.09786835269731,
+        "ssim": 0.8899354697555625
+      },
+      "beat_copy": 0.8064516129032258,
+      "cold_start_ms": 10.386630892753601,
+      "inference_ms_mean": 37.135830333713315,
+      "inference_ms_p95": 74.85040556639424,
+      "evaluation_wall_fps": 21.04417169535989,
+      "expert_weights": {
+        "copy": 0.08772176504135132,
+        "cortical": 0.7170681953430176,
+        "dmvfn": 0.19521008431911469
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Bowling/v_Bowling_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/BoxingPunchingBag/v_BoxingPunchingBag_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.015770282468668396,
+        "psnr_db": 24.66514566474039,
+        "ssim": 0.9228513497178273
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.014126852575329042,
+        "psnr_db": 24.90481440883016,
+        "ssim": 0.9293678595173741
+      },
+      "beat_copy": 0.6451612903225806,
+      "cold_start_ms": 21.009210031479597,
+      "inference_ms_mean": 41.18003519573088,
+      "inference_ms_p95": 115.43777822516859,
+      "evaluation_wall_fps": 18.483678412400565,
+      "expert_weights": {
+        "copy": 0.23886947333812714,
+        "cortical": 0.33015531301498413,
+        "dmvfn": 0.43097519874572754
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/BoxingPunchingBag/v_BoxingPunchingBag_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/BoxingSpeedBag/v_BoxingSpeedBag_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.029697309548576033,
+        "psnr_db": 23.76718925050529,
+        "ssim": 0.8753568764014912
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.041977839183903506,
+        "psnr_db": 21.309768806449874,
+        "ssim": 0.7880426949711256
+      },
+      "beat_copy": 0.8709677419354839,
+      "cold_start_ms": 10.910561075434089,
+      "inference_ms_mean": 41.76019884421137,
+      "inference_ms_p95": 121.22465502470725,
+      "evaluation_wall_fps": 17.493797320922177,
+      "expert_weights": {
+        "copy": 0.4666147530078888,
+        "cortical": 0.32876619696617126,
+        "dmvfn": 0.20461905002593994
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/BoxingSpeedBag/v_BoxingSpeedBag_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/BreastStroke/v_BreastStroke_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.01974440777614232,
+        "psnr_db": 26.576817033418703,
+        "ssim": 0.8729232831667828
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.02797438078109295,
+        "psnr_db": 23.466165137435443,
+        "ssim": 0.8072664308291608
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 11.222294066101313,
+      "inference_ms_mean": 33.90561221649164,
+      "inference_ms_p95": 57.98753001727162,
+      "evaluation_wall_fps": 20.34620543581316,
+      "expert_weights": {
+        "copy": 0.15154291689395905,
+        "cortical": 0.41494786739349365,
+        "dmvfn": 0.4335092008113861
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/BreastStroke/v_BreastStroke_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/BrushingTeeth/v_BrushingTeeth_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.016451918369820042,
+        "psnr_db": 25.212766486410978,
+        "ssim": 0.9286758970188838
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.019403249956667423,
+        "psnr_db": 24.664597845669544,
+        "ssim": 0.9102237968034641
+      },
+      "beat_copy": 0.6774193548387096,
+      "cold_start_ms": 13.042584992945194,
+      "inference_ms_mean": 28.857532631734323,
+      "inference_ms_p95": 48.41937879100441,
+      "evaluation_wall_fps": 24.041677113187855,
+      "expert_weights": {
+        "copy": 0.2831100523471832,
+        "cortical": 0.29134401679039,
+        "dmvfn": 0.42554593086242676
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/BrushingTeeth/v_BrushingTeeth_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/CleanAndJerk/v_CleanAndJerk_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.012623149492297201,
+        "psnr_db": 29.15897644804078,
+        "ssim": 0.9415303154658248
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.011337663897598584,
+        "psnr_db": 29.374353913898467,
+        "ssim": 0.9465194870066898
+      },
+      "beat_copy": 0.4838709677419355,
+      "cold_start_ms": 18.631625920534134,
+      "inference_ms_mean": 39.93834258892156,
+      "inference_ms_p95": 108.28735004179174,
+      "evaluation_wall_fps": 18.23083991655481,
+      "expert_weights": {
+        "copy": 0.5828306078910828,
+        "cortical": 0.3852148950099945,
+        "dmvfn": 0.031954485923051834
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/CleanAndJerk/v_CleanAndJerk_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/CliffDiving/v_CliffDiving_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.018372148290396698,
+        "psnr_db": 25.70267731746784,
+        "ssim": 0.8906480048292426
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.04763077824346481,
+        "psnr_db": 17.88184888997939,
+        "ssim": 0.7251266593574196
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 18.372076097875834,
+      "inference_ms_mean": 36.45241776770302,
+      "inference_ms_p95": 61.490046419203274,
+      "evaluation_wall_fps": 18.254696165259055,
+      "expert_weights": {
+        "copy": 0.10152661055326462,
+        "cortical": 0.20570845901966095,
+        "dmvfn": 0.692764937877655
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/CliffDiving/v_CliffDiving_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/CricketBowling/v_CricketBowling_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.008490325285932951,
+        "psnr_db": 30.117475830914486,
+        "ssim": 0.9490919407977851
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.00803912587974581,
+        "psnr_db": 30.537686142243437,
+        "ssim": 0.9527964226661189
+      },
+      "beat_copy": 0.2903225806451613,
+      "cold_start_ms": 18.946629017591476,
+      "inference_ms_mean": 33.717499114573,
+      "inference_ms_p95": 95.03169246017933,
+      "evaluation_wall_fps": 21.774043219072034,
+      "expert_weights": {
+        "copy": 0.44000470638275146,
+        "cortical": 0.4386117458343506,
+        "dmvfn": 0.12138351052999496
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/CricketBowling/v_CricketBowling_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/CricketShot/v_CricketShot_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.004784186866374746,
+        "psnr_db": 38.76371245439757,
+        "ssim": 0.9884825553945318
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.004835580888715002,
+        "psnr_db": 38.08611050711966,
+        "ssim": 0.9880594880350174
+      },
+      "beat_copy": 0.6774193548387096,
+      "cold_start_ms": 19.443758064880967,
+      "inference_ms_mean": 34.73319394257048,
+      "inference_ms_p95": 65.01313201151788,
+      "evaluation_wall_fps": 19.12977337594567,
+      "expert_weights": {
+        "copy": 0.36068451404571533,
+        "cortical": 0.32439982891082764,
+        "dmvfn": 0.31491562724113464
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/CricketShot/v_CricketShot_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/CuttingInKitchen/v_CuttingInKitchen_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.012238817214364968,
+        "psnr_db": 27.21197589573614,
+        "ssim": 0.9403785082601734
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.010883214877873299,
+        "psnr_db": 27.53694499616584,
+        "ssim": 0.9465019799047901
+      },
+      "beat_copy": 0.45161290322580644,
+      "cold_start_ms": 14.01278399862349,
+      "inference_ms_mean": 26.60166769256366,
+      "inference_ms_p95": 48.95824738778173,
+      "evaluation_wall_fps": 24.266797941485176,
+      "expert_weights": {
+        "copy": 0.5075650215148926,
+        "cortical": 0.3469187319278717,
+        "dmvfn": 0.1455162614583969
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/CuttingInKitchen/v_CuttingInKitchen_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Diving/v_Diving_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.013558091956280893,
+        "psnr_db": 31.494357956615936,
+        "ssim": 0.955471582310174
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.013624651988427485,
+        "psnr_db": 31.04897031453616,
+        "ssim": 0.9530128003448569
+      },
+      "beat_copy": 0.5806451612903226,
+      "cold_start_ms": 57.7930030412972,
+      "inference_ms_mean": 27.491274089070743,
+      "inference_ms_p95": 50.878875935450196,
+      "evaluation_wall_fps": 24.731312340071458,
+      "expert_weights": {
+        "copy": 0.4147671163082123,
+        "cortical": 0.35722389817237854,
+        "dmvfn": 0.22800897061824799
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Diving/v_Diving_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Drumming/v_Drumming_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.011459362865876286,
+        "psnr_db": 28.95492229516501,
+        "ssim": 0.9501679360225638
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.011168521612078973,
+        "psnr_db": 29.09373396771539,
+        "ssim": 0.9500812881736347
+      },
+      "beat_copy": 0.5806451612903226,
+      "cold_start_ms": 16.20327983982861,
+      "inference_ms_mean": 31.41724658680373,
+      "inference_ms_p95": 62.0642429217696,
+      "evaluation_wall_fps": 23.066144619135684,
+      "expert_weights": {
+        "copy": 0.5084275007247925,
+        "cortical": 0.21956567466259003,
+        "dmvfn": 0.2720068395137787
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Drumming/v_Drumming_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Fencing/v_Fencing_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.020604235931269584,
+        "psnr_db": 27.678993380573324,
+        "ssim": 0.9011005643875366
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.029399159724914258,
+        "psnr_db": 24.472002026171026,
+        "ssim": 0.8335793479796377
+      },
+      "beat_copy": 0.9354838709677419,
+      "cold_start_ms": 20.006480161100626,
+      "inference_ms_mean": 46.956186214911526,
+      "inference_ms_p95": 125.00603673979636,
+      "evaluation_wall_fps": 16.91043733983142,
+      "expert_weights": {
+        "copy": 0.13962526619434357,
+        "cortical": 0.7393171191215515,
+        "dmvfn": 0.12105768918991089
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Fencing/v_Fencing_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/FieldHockeyPenalty/v_FieldHockeyPenalty_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.01301179793212683,
+        "psnr_db": 29.30235167278417,
+        "ssim": 0.9331993999019745
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.01375873970438636,
+        "psnr_db": 28.899131958270274,
+        "ssim": 0.9282909054909985
+      },
+      "beat_copy": 0.7419354838709677,
+      "cold_start_ms": 17.4453379586339,
+      "inference_ms_mean": 36.52286433197301,
+      "inference_ms_p95": 79.50122347101568,
+      "evaluation_wall_fps": 19.0980549987355,
+      "expert_weights": {
+        "copy": 0.2528522312641144,
+        "cortical": 0.5388002395629883,
+        "dmvfn": 0.20834751427173615
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/FieldHockeyPenalty/v_FieldHockeyPenalty_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/FloorGymnastics/v_FloorGymnastics_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.02401209057068392,
+        "psnr_db": 25.32346383587012,
+        "ssim": 0.9331456134396214
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.026419585578203682,
+        "psnr_db": 23.9978813315441,
+        "ssim": 0.9177907647625091
+      },
+      "beat_copy": 0.8064516129032258,
+      "cold_start_ms": 9.175572078675032,
+      "inference_ms_mean": 31.500397715717554,
+      "inference_ms_p95": 61.04675857350225,
+      "evaluation_wall_fps": 22.62876410570446,
+      "expert_weights": {
+        "copy": 0.11938565969467163,
+        "cortical": 0.7719709873199463,
+        "dmvfn": 0.10864332318305969
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/FloorGymnastics/v_FloorGymnastics_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/FrisbeeCatch/v_FrisbeeCatch_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.027987043549787375,
+        "psnr_db": 21.396572278823417,
+        "ssim": 0.8635049045726817
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.026145935506417205,
+        "psnr_db": 21.292412253911827,
+        "ssim": 0.8726249753787951
+      },
+      "beat_copy": 0.5483870967741935,
+      "cold_start_ms": 11.722733033820987,
+      "inference_ms_mean": 26.865337509661913,
+      "inference_ms_p95": 48.08905688114463,
+      "evaluation_wall_fps": 25.373850523902878,
+      "expert_weights": {
+        "copy": 0.2498822659254074,
+        "cortical": 0.625241756439209,
+        "dmvfn": 0.1248759850859642
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/FrisbeeCatch/v_FrisbeeCatch_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/FrontCrawl/v_FrontCrawl_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.01754191223411791,
+        "psnr_db": 28.237936730413008,
+        "ssim": 0.8652055833929329
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.02243653967255546,
+        "psnr_db": 25.958872871847333,
+        "ssim": 0.8136126245221783
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 13.638997916132212,
+      "inference_ms_mean": 28.451220341155242,
+      "inference_ms_p95": 40.57094817981124,
+      "evaluation_wall_fps": 22.497951980318632,
+      "expert_weights": {
+        "copy": 0.2416255623102188,
+        "cortical": 0.3871678411960602,
+        "dmvfn": 0.37120652198791504
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/FrontCrawl/v_FrontCrawl_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/GolfSwing/v_GolfSwing_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.0066941055279570606,
+        "psnr_db": 33.011753348600145,
+        "ssim": 0.9824806605615923
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.006293196981723961,
+        "psnr_db": 32.90673990809884,
+        "ssim": 0.9826554521437614
+      },
+      "beat_copy": 0.25806451612903225,
+      "cold_start_ms": 9.586928877979517,
+      "inference_ms_mean": 33.34746635037249,
+      "inference_ms_p95": 57.48359598219394,
+      "evaluation_wall_fps": 22.731835224089046,
+      "expert_weights": {
+        "copy": 0.6168773770332336,
+        "cortical": 0.21984516084194183,
+        "dmvfn": 0.16327747702598572
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/GolfSwing/v_GolfSwing_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Haircut/v_Haircut_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.026307277824549426,
+        "psnr_db": 22.658647697464968,
+        "ssim": 0.858204310940158
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.023261369559012594,
+        "psnr_db": 23.082275292443903,
+        "ssim": 0.8742857863826137
+      },
+      "beat_copy": 0.4838709677419355,
+      "cold_start_ms": 16.618954949080944,
+      "inference_ms_mean": 33.326049375444136,
+      "inference_ms_p95": 57.77738769538697,
+      "evaluation_wall_fps": 20.85392880161406,
+      "expert_weights": {
+        "copy": 0.2833073139190674,
+        "cortical": 0.6168518662452698,
+        "dmvfn": 0.09984081983566284
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Haircut/v_Haircut_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/HammerThrow/v_HammerThrow_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.016381780900466707,
+        "psnr_db": 29.3244757406006,
+        "ssim": 0.891575998516493
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.014590794524514011,
+        "psnr_db": 29.60088847384418,
+        "ssim": 0.9025114601658236
+      },
+      "beat_copy": 0.41935483870967744,
+      "cold_start_ms": 15.721091069281101,
+      "inference_ms_mean": 31.830935449949628,
+      "inference_ms_p95": 43.1133131030947,
+      "evaluation_wall_fps": 22.540314712231822,
+      "expert_weights": {
+        "copy": 0.8428446650505066,
+        "cortical": 0.15530957281589508,
+        "dmvfn": 0.0018457821570336819
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/HammerThrow/v_HammerThrow_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Hammering/v_Hammering_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.01299470170370994,
+        "psnr_db": 31.220875823243958,
+        "ssim": 0.9561600306982637
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.0196651840402234,
+        "psnr_db": 27.534711148474496,
+        "ssim": 0.9179632247135204
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 11.393989901989698,
+      "inference_ms_mean": 35.621471582622874,
+      "inference_ms_p95": 59.392403112724416,
+      "evaluation_wall_fps": 19.239570733625694,
+      "expert_weights": {
+        "copy": 0.14235137403011322,
+        "cortical": 0.4976901113986969,
+        "dmvfn": 0.3599585294723511
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Hammering/v_Hammering_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/HandstandPushups/v_HandStandPushups_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.0008675742701011439,
+        "psnr_db": 48.877591912936424,
+        "ssim": 0.9984948058282177
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.0008653703355981458,
+        "psnr_db": 47.333047146086685,
+        "ssim": 0.9981543889609716
+      },
+      "beat_copy": 0.6129032258064516,
+      "cold_start_ms": 21.19489712640643,
+      "inference_ms_mean": 42.63723526824394,
+      "inference_ms_p95": 60.564880166202784,
+      "evaluation_wall_fps": 15.056050092105464,
+      "expert_weights": {
+        "copy": 0.3482135236263275,
+        "cortical": 0.34328898787498474,
+        "dmvfn": 0.30849748849868774
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/HandstandPushups/v_HandStandPushups_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/HandstandWalking/v_HandstandWalking_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.0038498415040873714,
+        "psnr_db": 39.994311252243186,
+        "ssim": 0.98352216264253
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.005634380947618234,
+        "psnr_db": 36.36186885342257,
+        "ssim": 0.9682669870315059
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 19.048802088946104,
+      "inference_ms_mean": 37.93539829423715,
+      "inference_ms_p95": 76.06579996645449,
+      "evaluation_wall_fps": 19.013208851922155,
+      "expert_weights": {
+        "copy": 0.20060725510120392,
+        "cortical": 0.42625871300697327,
+        "dmvfn": 0.37313398718833923
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/HandstandWalking/v_HandstandWalking_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/HeadMassage/v_HeadMassage_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.0443731953179644,
+        "psnr_db": 20.471331424521942,
+        "ssim": 0.7771793174487287
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.05927718352646597,
+        "psnr_db": 18.347014075823157,
+        "ssim": 0.6785240795022698
+      },
+      "beat_copy": 0.8387096774193549,
+      "cold_start_ms": 20.322012016549706,
+      "inference_ms_mean": 35.6650291380055,
+      "inference_ms_p95": 76.60948559641832,
+      "evaluation_wall_fps": 19.84672409775799,
+      "expert_weights": {
+        "copy": 0.18217624723911285,
+        "cortical": 0.25427475571632385,
+        "dmvfn": 0.5635489821434021
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/HeadMassage/v_HeadMassage_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/HighJump/v_HighJump_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.01066646852620667,
+        "psnr_db": 28.528491474572096,
+        "ssim": 0.9514658809990012
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.02261709530026682,
+        "psnr_db": 22.770067422820883,
+        "ssim": 0.8718730576576725
+      },
+      "beat_copy": 0.9354838709677419,
+      "cold_start_ms": 10.61011920683086,
+      "inference_ms_mean": 43.28491989169912,
+      "inference_ms_p95": 107.72541966289275,
+      "evaluation_wall_fps": 17.61386777210379,
+      "expert_weights": {
+        "copy": 0.18866480886936188,
+        "cortical": 0.4240751266479492,
+        "dmvfn": 0.3872600495815277
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/HighJump/v_HighJump_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/HorseRace/v_HorseRace_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.018332435148617914,
+        "psnr_db": 28.591026233565415,
+        "ssim": 0.8871139018766344
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.027359242701242046,
+        "psnr_db": 24.82792848864053,
+        "ssim": 0.809911076740552
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 13.986843172460794,
+      "inference_ms_mean": 32.46292373133374,
+      "inference_ms_p95": 69.36854668892917,
+      "evaluation_wall_fps": 21.44428437581342,
+      "expert_weights": {
+        "copy": 0.22095857560634613,
+        "cortical": 0.3092033267021179,
+        "dmvfn": 0.46983814239501953
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/HorseRace/v_HorseRace_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/HorseRiding/v_HorseRiding_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.043657864293744485,
+        "psnr_db": 21.648096873307303,
+        "ssim": 0.7317186613236705
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.06027090297110619,
+        "psnr_db": 19.060141295774965,
+        "ssim": 0.6061270784947179
+      },
+      "beat_copy": 0.8387096774193549,
+      "cold_start_ms": 9.50407492928207,
+      "inference_ms_mean": 32.29647294361273,
+      "inference_ms_p95": 55.4030062165111,
+      "evaluation_wall_fps": 22.236326538883308,
+      "expert_weights": {
+        "copy": 0.1852157860994339,
+        "cortical": 0.12111493200063705,
+        "dmvfn": 0.693669319152832
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/HorseRiding/v_HorseRiding_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/HulaHoop/v_HulaHoop_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.010017958544795551,
+        "psnr_db": 26.646993045228463,
+        "ssim": 0.9551390588924451
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.011350905672917444,
+        "psnr_db": 25.512515442110892,
+        "ssim": 0.9479032024260489
+      },
+      "beat_copy": 0.7741935483870968,
+      "cold_start_ms": 13.283965177834034,
+      "inference_ms_mean": 37.50487510114908,
+      "inference_ms_p95": 67.06740441732109,
+      "evaluation_wall_fps": 19.34485813740139,
+      "expert_weights": {
+        "copy": 0.28016236424446106,
+        "cortical": 0.4170282781124115,
+        "dmvfn": 0.30280935764312744
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/HulaHoop/v_HulaHoop_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/IceDancing/v_IceDancing_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.021113106560322545,
+        "psnr_db": 27.023765395653776,
+        "ssim": 0.9082873418766965
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.027466507268048102,
+        "psnr_db": 23.81234605008636,
+        "ssim": 0.8678411021027513
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 19.81315203011036,
+      "inference_ms_mean": 30.1574581334817,
+      "inference_ms_p95": 44.43135200999676,
+      "evaluation_wall_fps": 21.43859975946488,
+      "expert_weights": {
+        "copy": 0.13911555707454681,
+        "cortical": 0.2956126928329468,
+        "dmvfn": 0.5652717351913452
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/IceDancing/v_IceDancing_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/JavelinThrow/v_JavelinThrow_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.01760198632555623,
+        "psnr_db": 27.459915620206623,
+        "ssim": 0.9310878733152985
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.05028095264588633,
+        "psnr_db": 19.40511019144751,
+        "ssim": 0.7203122588895984
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 23.260118905454874,
+      "inference_ms_mean": 41.16246754560491,
+      "inference_ms_p95": 100.15311343595377,
+      "evaluation_wall_fps": 18.098335456655768,
+      "expert_weights": {
+        "copy": 0.19041486084461212,
+        "cortical": 0.21466229856014252,
+        "dmvfn": 0.5949228405952454
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/JavelinThrow/v_JavelinThrow_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/JugglingBalls/v_JugglingBalls_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.006938803902988682,
+        "psnr_db": 27.999277016166943,
+        "ssim": 0.966200073560079
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.006715247584760354,
+        "psnr_db": 28.02474736987499,
+        "ssim": 0.9666677623666745
+      },
+      "beat_copy": 0.25806451612903225,
+      "cold_start_ms": 14.761782018467784,
+      "inference_ms_mean": 24.46646142172916,
+      "inference_ms_p95": 41.49797316640615,
+      "evaluation_wall_fps": 27.92851402944699,
+      "expert_weights": {
+        "copy": 0.42208269238471985,
+        "cortical": 0.3228009343147278,
+        "dmvfn": 0.25511634349823
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/JugglingBalls/v_JugglingBalls_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/JumpRope/v_JumpRope_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.006863293294314175,
+        "psnr_db": 28.99439368768201,
+        "ssim": 0.9640066078914107
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.0063188660311542695,
+        "psnr_db": 29.13660104110682,
+        "ssim": 0.9659321564500052
+      },
+      "beat_copy": 0.41935483870967744,
+      "cold_start_ms": 13.48602189682424,
+      "inference_ms_mean": 34.23467750564731,
+      "inference_ms_p95": 65.08960835635658,
+      "evaluation_wall_fps": 21.80405101877938,
+      "expert_weights": {
+        "copy": 0.373023122549057,
+        "cortical": 0.37553152441978455,
+        "dmvfn": 0.25144532322883606
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/JumpRope/v_JumpRope_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/JumpingJack/v_JumpingJack_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.008782536358921789,
+        "psnr_db": 29.28205249931903,
+        "ssim": 0.9595047472625651
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.008406506121372654,
+        "psnr_db": 29.338850225052813,
+        "ssim": 0.9605693599229219
+      },
+      "beat_copy": 0.2903225806451613,
+      "cold_start_ms": 14.785903971642256,
+      "inference_ms_mean": 32.1356605433313,
+      "inference_ms_p95": 46.28325947560368,
+      "evaluation_wall_fps": 21.706597009051567,
+      "expert_weights": {
+        "copy": 0.4866827428340912,
+        "cortical": 0.34043845534324646,
+        "dmvfn": 0.17287880182266235
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/JumpingJack/v_JumpingJack_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Kayaking/v_Kayaking_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.0209783642823177,
+        "psnr_db": 27.331714504052783,
+        "ssim": 0.8595901919949439
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.026032452080999652,
+        "psnr_db": 25.26332755401251,
+        "ssim": 0.8144511945786014
+      },
+      "beat_copy": 0.9354838709677419,
+      "cold_start_ms": 15.964800026267767,
+      "inference_ms_mean": 31.4377731129784,
+      "inference_ms_p95": 37.40359586663544,
+      "evaluation_wall_fps": 23.058150737094113,
+      "expert_weights": {
+        "copy": 0.22437383234500885,
+        "cortical": 0.38887491822242737,
+        "dmvfn": 0.386751264333725
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Kayaking/v_Kayaking_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Knitting/v_Knitting_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.023588259434027058,
+        "psnr_db": 24.29283397723858,
+        "ssim": 0.8975351581009484
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.03165235884127117,
+        "psnr_db": 21.951069854026763,
+        "ssim": 0.8596922601422955
+      },
+      "beat_copy": 0.9032258064516129,
+      "cold_start_ms": 10.123240994289517,
+      "inference_ms_mean": 42.10798370105953,
+      "inference_ms_p95": 119.4004914257675,
+      "evaluation_wall_fps": 18.82713328024707,
+      "expert_weights": {
+        "copy": 0.13002052903175354,
+        "cortical": 0.3640095293521881,
+        "dmvfn": 0.5059699416160583
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Knitting/v_Knitting_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/LongJump/v_LongJump_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.011359257187934653,
+        "psnr_db": 28.184398023135753,
+        "ssim": 0.9481467316227576
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.017316577400291158,
+        "psnr_db": 24.778388027862555,
+        "ssim": 0.9121731885017889
+      },
+      "beat_copy": 0.9354838709677419,
+      "cold_start_ms": 44.88785192370415,
+      "inference_ms_mean": 32.68174045109029,
+      "inference_ms_p95": 76.47105408832421,
+      "evaluation_wall_fps": 21.967971871846306,
+      "expert_weights": {
+        "copy": 0.25054576992988586,
+        "cortical": 0.25930488109588623,
+        "dmvfn": 0.4901493489742279
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/LongJump/v_LongJump_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Lunges/v_Lunges_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.010058828118828035,
+        "psnr_db": 30.03585128565718,
+        "ssim": 0.9462096594995068
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.009882310356554245,
+        "psnr_db": 29.5022545829471,
+        "ssim": 0.9471819484105675
+      },
+      "beat_copy": 0.3870967741935484,
+      "cold_start_ms": 19.670196808874607,
+      "inference_ms_mean": 32.9207186426582,
+      "inference_ms_p95": 58.56352462433274,
+      "evaluation_wall_fps": 22.483781912613946,
+      "expert_weights": {
+        "copy": 0.4041697680950165,
+        "cortical": 0.3068995177745819,
+        "dmvfn": 0.2889307141304016
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Lunges/v_Lunges_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/MilitaryParade/v_MilitaryParade_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.015919025596832077,
+        "psnr_db": 27.353505153898627,
+        "ssim": 0.8878157164460869
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.025194770386142117,
+        "psnr_db": 24.131069586168962,
+        "ssim": 0.8113247656053113
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 24.52937886118889,
+      "inference_ms_mean": 39.5840608097356,
+      "inference_ms_p95": 81.42004893161348,
+      "evaluation_wall_fps": 18.074181021001266,
+      "expert_weights": {
+        "copy": 0.18093569576740265,
+        "cortical": 0.3297662138938904,
+        "dmvfn": 0.4892980754375458
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/MilitaryParade/v_MilitaryParade_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Mixing/v_Mixing_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.02976239702454017,
+        "psnr_db": 24.30648331499608,
+        "ssim": 0.8177115436523191
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.02744254134144754,
+        "psnr_db": 24.380996725319516,
+        "ssim": 0.8276505028047868
+      },
+      "beat_copy": 0.5161290322580645,
+      "cold_start_ms": 8.454493945464492,
+      "inference_ms_mean": 37.99993503068028,
+      "inference_ms_p95": 88.06769605725998,
+      "evaluation_wall_fps": 19.925034784223268,
+      "expert_weights": {
+        "copy": 0.5707491040229797,
+        "cortical": 0.26002421975135803,
+        "dmvfn": 0.16922666132450104
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Mixing/v_Mixing_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/MoppingFloor/v_MoppingFloor_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.009286008579956909,
+        "psnr_db": 29.786829894729333,
+        "ssim": 0.9609188828417048
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.012509454041719437,
+        "psnr_db": 26.870180002999962,
+        "ssim": 0.9387709940633469
+      },
+      "beat_copy": 0.9354838709677419,
+      "cold_start_ms": 31.8446580786258,
+      "inference_ms_mean": 27.61955315182949,
+      "inference_ms_p95": 44.04738154262303,
+      "evaluation_wall_fps": 24.452978127664696,
+      "expert_weights": {
+        "copy": 0.28421762585639954,
+        "cortical": 0.37534937262535095,
+        "dmvfn": 0.3404330015182495
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/MoppingFloor/v_MoppingFloor_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Nunchucks/v_Nunchucks_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.009836582692279931,
+        "psnr_db": 28.654869191108617,
+        "ssim": 0.9320057335720268
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.01165327865390047,
+        "psnr_db": 27.031273578345065,
+        "ssim": 0.9201881558664384
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 13.357816962525249,
+      "inference_ms_mean": 39.43866200680877,
+      "inference_ms_p95": 81.22474937699731,
+      "evaluation_wall_fps": 18.196899429522674,
+      "expert_weights": {
+        "copy": 0.2717898190021515,
+        "cortical": 0.38141217827796936,
+        "dmvfn": 0.34679797291755676
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Nunchucks/v_Nunchucks_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/ParallelBars/v_ParallelBars_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.0027455491738604203,
+        "psnr_db": 43.805062699609174,
+        "ssim": 0.9968432931489842
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.0026526593625725756,
+        "psnr_db": 43.72689117891308,
+        "ssim": 0.9968371211841541
+      },
+      "beat_copy": 0.06451612903225806,
+      "cold_start_ms": 20.089714089408517,
+      "inference_ms_mean": 36.10205179048253,
+      "inference_ms_p95": 73.0228399857878,
+      "evaluation_wall_fps": 20.235583945643604,
+      "expert_weights": {
+        "copy": 0.43169596791267395,
+        "cortical": 0.3506142199039459,
+        "dmvfn": 0.21768979728221893
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/ParallelBars/v_ParallelBars_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PizzaTossing/v_PizzaTossing_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.02419881838103456,
+        "psnr_db": 26.157980169391678,
+        "ssim": 0.9126429660345919
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.028208213017111825,
+        "psnr_db": 24.61765448574834,
+        "ssim": 0.8880835079377696
+      },
+      "beat_copy": 0.7741935483870968,
+      "cold_start_ms": 16.18294999934733,
+      "inference_ms_mean": 50.09279300555073,
+      "inference_ms_p95": 118.61489112488921,
+      "evaluation_wall_fps": 14.758239955831087,
+      "expert_weights": {
+        "copy": 0.4700907766819,
+        "cortical": 0.3533846437931061,
+        "dmvfn": 0.1765245646238327
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PizzaTossing/v_PizzaTossing_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PlayingCello/v_PlayingCello_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.008251845900480064,
+        "psnr_db": 32.58963633625296,
+        "ssim": 0.9802822130982595
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.008102930235421104,
+        "psnr_db": 32.24201521793395,
+        "ssim": 0.9793777728593476
+      },
+      "beat_copy": 0.5161290322580645,
+      "cold_start_ms": 17.081764992326498,
+      "inference_ms_mean": 30.66626688112216,
+      "inference_ms_p95": 44.932724116370075,
+      "evaluation_wall_fps": 21.52975048023642,
+      "expert_weights": {
+        "copy": 0.4385159909725189,
+        "cortical": 0.29192665219306946,
+        "dmvfn": 0.26955732703208923
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PlayingCello/v_PlayingCello_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PlayingDaf/v_PlayingDaf_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.004734219472494817,
+        "psnr_db": 34.97467951660965,
+        "ssim": 0.9754147747511505
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.005740911376872851,
+        "psnr_db": 32.52781932958692,
+        "ssim": 0.9659459917776048
+      },
+      "beat_copy": 0.8064516129032258,
+      "cold_start_ms": 21.05247089639306,
+      "inference_ms_mean": 30.348769654038136,
+      "inference_ms_p95": 47.135479934513555,
+      "evaluation_wall_fps": 22.888592602964728,
+      "expert_weights": {
+        "copy": 0.3368150293827057,
+        "cortical": 0.32960245013237,
+        "dmvfn": 0.33358249068260193
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PlayingDaf/v_PlayingDaf_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PlayingDhol/v_PlayingDhol_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.005727523802629401,
+        "psnr_db": 33.09192997537602,
+        "ssim": 0.9888666829755229
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.006183146574204007,
+        "psnr_db": 31.869927157096207,
+        "ssim": 0.9867622006324028
+      },
+      "beat_copy": 0.7741935483870968,
+      "cold_start_ms": 17.729679821059108,
+      "inference_ms_mean": 38.12225578866642,
+      "inference_ms_p95": 70.91798209585248,
+      "evaluation_wall_fps": 18.333620590744996,
+      "expert_weights": {
+        "copy": 0.3539030849933624,
+        "cortical": 0.36744725704193115,
+        "dmvfn": 0.2786496579647064
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PlayingDhol/v_PlayingDhol_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PlayingFlute/v_PlayingFlute_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.003227636357957137,
+        "psnr_db": 39.14653047651414,
+        "ssim": 0.9929620392860905
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.0030584906109593687,
+        "psnr_db": 38.92620491404925,
+        "ssim": 0.9927847962225637
+      },
+      "beat_copy": 0.12903225806451613,
+      "cold_start_ms": 16.737421043217182,
+      "inference_ms_mean": 35.91457743936315,
+      "inference_ms_p95": 65.05883098579937,
+      "evaluation_wall_fps": 19.836739110756188,
+      "expert_weights": {
+        "copy": 0.5279240012168884,
+        "cortical": 0.27285903692245483,
+        "dmvfn": 0.19921694695949554
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PlayingFlute/v_PlayingFlute_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PlayingGuitar/v_PlayingGuitar_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.008197612189237148,
+        "psnr_db": 32.43323031303198,
+        "ssim": 0.96464321754312
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.01430341916819734,
+        "psnr_db": 27.680210690854693,
+        "ssim": 0.9199812758353447
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 22.29518094100058,
+      "inference_ms_mean": 36.44489693648085,
+      "inference_ms_p95": 70.70543169975278,
+      "evaluation_wall_fps": 20.14506094707775,
+      "expert_weights": {
+        "copy": 0.18601743876934052,
+        "cortical": 0.49740973114967346,
+        "dmvfn": 0.31657281517982483
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PlayingGuitar/v_PlayingGuitar_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PlayingPiano/v_PlayingPiano_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.0015522215145474842,
+        "psnr_db": 44.79147652878588,
+        "ssim": 0.9950201883110948
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.0015496752795673187,
+        "psnr_db": 44.24585523283338,
+        "ssim": 0.9948763398713962
+      },
+      "beat_copy": 0.5483870967741935,
+      "cold_start_ms": 19.07847309485078,
+      "inference_ms_mean": 35.55566682640848,
+      "inference_ms_p95": 108.73928768560287,
+      "evaluation_wall_fps": 21.510934257747856,
+      "expert_weights": {
+        "copy": 0.3622349798679352,
+        "cortical": 0.3254779279232025,
+        "dmvfn": 0.3122870624065399
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PlayingPiano/v_PlayingPiano_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PlayingSitar/v_PlayingSitar_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.03242182099230347,
+        "psnr_db": 22.815763173420855,
+        "ssim": 0.8277010888822618
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.03398175519560614,
+        "psnr_db": 22.266928068784807,
+        "ssim": 0.8159181549344011
+      },
+      "beat_copy": 0.7419354838709677,
+      "cold_start_ms": 21.444336976855993,
+      "inference_ms_mean": 30.8292583915694,
+      "inference_ms_p95": 51.671776408329606,
+      "evaluation_wall_fps": 22.352754968207964,
+      "expert_weights": {
+        "copy": 0.5390756726264954,
+        "cortical": 0.3480735719203949,
+        "dmvfn": 0.11285080760717392
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PlayingSitar/v_PlayingSitar_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PlayingTabla/v_PlayingTabla_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.01446092753359417,
+        "psnr_db": 27.728120299244033,
+        "ssim": 0.9399113962727207
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.015555088195176195,
+        "psnr_db": 26.989621495093697,
+        "ssim": 0.9318067739086765
+      },
+      "beat_copy": 0.7741935483870968,
+      "cold_start_ms": 18.905817065387964,
+      "inference_ms_mean": 27.172629641176297,
+      "inference_ms_p95": 62.633487209677675,
+      "evaluation_wall_fps": 25.274237740977195,
+      "expert_weights": {
+        "copy": 0.3373163640499115,
+        "cortical": 0.3183687925338745,
+        "dmvfn": 0.3443148136138916
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PlayingTabla/v_PlayingTabla_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PlayingViolin/v_PlayingViolin_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.005336997504796713,
+        "psnr_db": 37.15868918666126,
+        "ssim": 0.9853868721633826
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.005525252008209786,
+        "psnr_db": 36.043037814010326,
+        "ssim": 0.9841406127457981
+      },
+      "beat_copy": 0.6451612903225806,
+      "cold_start_ms": 19.811431877315044,
+      "inference_ms_mean": 30.141390033130502,
+      "inference_ms_p95": 55.27767096646129,
+      "evaluation_wall_fps": 24.105427564133187,
+      "expert_weights": {
+        "copy": 0.3616999089717865,
+        "cortical": 0.3956674635410309,
+        "dmvfn": 0.24263258278369904
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PlayingViolin/v_PlayingViolin_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PoleVault/v_PoleVault_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.04553978181173725,
+        "psnr_db": 21.162248494728324,
+        "ssim": 0.7637486054051306
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.09334062400364107,
+        "psnr_db": 16.3678464114512,
+        "ssim": 0.4351656404874658
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 8.78913700580597,
+      "inference_ms_mean": 24.726748289861554,
+      "inference_ms_p95": 48.45238737761972,
+      "evaluation_wall_fps": 30.452988574882518,
+      "expert_weights": {
+        "copy": 0.06222360208630562,
+        "cortical": 0.08954775333404541,
+        "dmvfn": 0.8482286334037781
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PoleVault/v_PoleVault_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PommelHorse/v_PommelHorse_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.015073308811312722,
+        "psnr_db": 28.903994773061584,
+        "ssim": 0.9199741694235031
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.01638751783438267,
+        "psnr_db": 27.87513742143457,
+        "ssim": 0.9098036737852199
+      },
+      "beat_copy": 0.7419354838709677,
+      "cold_start_ms": 7.258076220750809,
+      "inference_ms_mean": 33.07612962892343,
+      "inference_ms_p95": 48.902908712625496,
+      "evaluation_wall_fps": 21.55991302532463,
+      "expert_weights": {
+        "copy": 0.3304308354854584,
+        "cortical": 0.3313269317150116,
+        "dmvfn": 0.3382422626018524
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PommelHorse/v_PommelHorse_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PullUps/v_PullUps_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.021349698785812624,
+        "psnr_db": 27.448784879518186,
+        "ssim": 0.8591337450729903
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.0492625884831913,
+        "psnr_db": 20.491434334391613,
+        "ssim": 0.5803298684217597
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 7.73931504227221,
+      "inference_ms_mean": 37.70390129648149,
+      "inference_ms_p95": 46.2299063336104,
+      "evaluation_wall_fps": 20.24182158947494,
+      "expert_weights": {
+        "copy": 0.041357897222042084,
+        "cortical": 0.2542235851287842,
+        "dmvfn": 0.7044184803962708
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PullUps/v_PullUps_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Punch/v_Punch_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.03802447769069864,
+        "psnr_db": 22.271815281514208,
+        "ssim": 0.7719108484765534
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.04083358877969365,
+        "psnr_db": 21.54581066406823,
+        "ssim": 0.7426548590583186
+      },
+      "beat_copy": 0.7419354838709677,
+      "cold_start_ms": 46.962495893239975,
+      "inference_ms_mean": 35.223675771327365,
+      "inference_ms_p95": 64.949997048825,
+      "evaluation_wall_fps": 18.4379675721614,
+      "expert_weights": {
+        "copy": 0.48277047276496887,
+        "cortical": 0.3979627788066864,
+        "dmvfn": 0.11926674842834473
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Punch/v_Punch_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/PushUps/v_PushUps_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.01387930536387308,
+        "psnr_db": 25.787467022717042,
+        "ssim": 0.9484998282565865
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.013181993995057118,
+        "psnr_db": 25.851254931711107,
+        "ssim": 0.9500349901055776
+      },
+      "beat_copy": 0.25806451612903225,
+      "cold_start_ms": 12.900470057502389,
+      "inference_ms_mean": 29.170655388513516,
+      "inference_ms_p95": 39.88516037352383,
+      "evaluation_wall_fps": 24.344527997602274,
+      "expert_weights": {
+        "copy": 0.6493415236473083,
+        "cortical": 0.23080231249332428,
+        "dmvfn": 0.11985615640878677
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/PushUps/v_PushUps_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Rafting/v_Rafting_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.031158869004537983,
+        "psnr_db": 24.147396893009333,
+        "ssim": 0.8206374337596278
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.03966684676256151,
+        "psnr_db": 21.977269695782347,
+        "ssim": 0.7459489222495786
+      },
+      "beat_copy": 0.8709677419354839,
+      "cold_start_ms": 15.803614864125848,
+      "inference_ms_mean": 31.031983061533037,
+      "inference_ms_p95": 43.54409715160726,
+      "evaluation_wall_fps": 23.041444557537268,
+      "expert_weights": {
+        "copy": 0.6389222741127014,
+        "cortical": 0.2915172278881073,
+        "dmvfn": 0.06956050544977188
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Rafting/v_Rafting_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/RockClimbingIndoor/v_RockClimbingIndoor_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.004670566789084865,
+        "psnr_db": 40.32695907152651,
+        "ssim": 0.9836108806312726
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.005067261442872545,
+        "psnr_db": 38.97504791772499,
+        "ssim": 0.9809504503844885
+      },
+      "beat_copy": 0.8709677419354839,
+      "cold_start_ms": 11.80823682807386,
+      "inference_ms_mean": 41.23080693634933,
+      "inference_ms_p95": 87.08212859928595,
+      "evaluation_wall_fps": 18.41004170436776,
+      "expert_weights": {
+        "copy": 0.20471811294555664,
+        "cortical": 0.4250054359436035,
+        "dmvfn": 0.37027645111083984
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/RockClimbingIndoor/v_RockClimbingIndoor_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/RopeClimbing/v_RopeClimbing_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.004930932889692485,
+        "psnr_db": 34.04386553666966,
+        "ssim": 0.9783178708886588
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.004639942392391423,
+        "psnr_db": 34.382536105095866,
+        "ssim": 0.9795669182654347
+      },
+      "beat_copy": 0.22580645161290322,
+      "cold_start_ms": 16.846264014020562,
+      "inference_ms_mean": 39.94083014348971,
+      "inference_ms_p95": 93.51265239529305,
+      "evaluation_wall_fps": 17.91452863022046,
+      "expert_weights": {
+        "copy": 0.40791597962379456,
+        "cortical": 0.31481730937957764,
+        "dmvfn": 0.2772667109966278
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/RopeClimbing/v_RopeClimbing_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Rowing/v_Rowing_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.010488290955582935,
+        "psnr_db": 30.30342489218978,
+        "ssim": 0.945015882292101
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.024333759901985046,
+        "psnr_db": 23.541670312282868,
+        "ssim": 0.8214687000038802
+      },
+      "beat_copy": 0.9354838709677419,
+      "cold_start_ms": 24.062181124463677,
+      "inference_ms_mean": 34.1150079420286,
+      "inference_ms_p95": 64.45753243751821,
+      "evaluation_wall_fps": 19.234075213660244,
+      "expert_weights": {
+        "copy": 0.18288017809391022,
+        "cortical": 0.40669068694114685,
+        "dmvfn": 0.41042909026145935
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Rowing/v_Rowing_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/SalsaSpin/v_SalsaSpin_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.004023676557886985,
+        "psnr_db": 36.03541103365486,
+        "ssim": 0.9861429481096167
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.005517880935522337,
+        "psnr_db": 31.794351903167126,
+        "ssim": 0.9759207406351643
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 11.887860018759966,
+      "inference_ms_mean": 36.824290496136605,
+      "inference_ms_p95": 75.20704739727071,
+      "evaluation_wall_fps": 19.859200834063195,
+      "expert_weights": {
+        "copy": 0.292853444814682,
+        "cortical": 0.36071744561195374,
+        "dmvfn": 0.34642910957336426
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/SalsaSpin/v_SalsaSpin_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/ShavingBeard/v_ShavingBeard_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.015838880737822865,
+        "psnr_db": 26.730179191050695,
+        "ssim": 0.9175139454103284
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.019732048960342523,
+        "psnr_db": 24.864227815194965,
+        "ssim": 0.8865535675838432
+      },
+      "beat_copy": 0.8064516129032258,
+      "cold_start_ms": 15.177610097452998,
+      "inference_ms_mean": 34.34794797594177,
+      "inference_ms_p95": 46.35605039075016,
+      "evaluation_wall_fps": 20.725581748147082,
+      "expert_weights": {
+        "copy": 0.07315831631422043,
+        "cortical": 0.5745514035224915,
+        "dmvfn": 0.35229024291038513
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/ShavingBeard/v_ShavingBeard_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Shotput/v_Shotput_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.0011281376280221007,
+        "psnr_db": 46.32865377999512,
+        "ssim": 0.997250008967615
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.0010944205362560047,
+        "psnr_db": 45.58921866446964,
+        "ssim": 0.9968470315779411
+      },
+      "beat_copy": 0.4838709677419355,
+      "cold_start_ms": 67.98355397768319,
+      "inference_ms_mean": 35.46195179384587,
+      "inference_ms_p95": 68.9020853489637,
+      "evaluation_wall_fps": 19.829972288575725,
+      "expert_weights": {
+        "copy": 0.3598652780056,
+        "cortical": 0.38316258788108826,
+        "dmvfn": 0.25697219371795654
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Shotput/v_Shotput_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/SkateBoarding/v_SkateBoarding_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.02696275369981454,
+        "psnr_db": 23.20750654654759,
+        "ssim": 0.8488894521549182
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.02539353788644451,
+        "psnr_db": 23.112040729630507,
+        "ssim": 0.8531291606605693
+      },
+      "beat_copy": 0.7096774193548387,
+      "cold_start_ms": 9.485595161095262,
+      "inference_ms_mean": 33.636065055455624,
+      "inference_ms_p95": 80.53623056039204,
+      "evaluation_wall_fps": 22.778355665429903,
+      "expert_weights": {
+        "copy": 0.26511263847351074,
+        "cortical": 0.45804691314697266,
+        "dmvfn": 0.2768404185771942
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/SkateBoarding/v_SkateBoarding_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Skiing/v_Skiing_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.017094306632756226,
+        "psnr_db": 28.9640128133599,
+        "ssim": 0.8496273179208077
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.01754771861728401,
+        "psnr_db": 28.333904934243908,
+        "ssim": 0.8460025742489805
+      },
+      "beat_copy": 0.5483870967741935,
+      "cold_start_ms": 20.226998953148723,
+      "inference_ms_mean": 43.550947119064375,
+      "inference_ms_p95": 72.4643273744732,
+      "evaluation_wall_fps": 16.447940506775577,
+      "expert_weights": {
+        "copy": 0.39430543780326843,
+        "cortical": 0.563664972782135,
+        "dmvfn": 0.04202954098582268
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Skiing/v_Skiing_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Skijet/v_Skijet_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.02535965896001266,
+        "psnr_db": 27.490240419727815,
+        "ssim": 0.7766694323990933
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.029103741722909974,
+        "psnr_db": 25.835612634426752,
+        "ssim": 0.7295609417782035
+      },
+      "beat_copy": 0.7741935483870968,
+      "cold_start_ms": 22.796209901571274,
+      "inference_ms_mean": 29.25261748344477,
+      "inference_ms_p95": 52.938282024115324,
+      "evaluation_wall_fps": 24.601378557730083,
+      "expert_weights": {
+        "copy": 0.07418885082006454,
+        "cortical": 0.13461188971996307,
+        "dmvfn": 0.7911992073059082
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Skijet/v_Skijet_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/SkyDiving/v_SkyDiving_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.01579299457972088,
+        "psnr_db": 28.311710267794513,
+        "ssim": 0.8958628530143408
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.02393573813981587,
+        "psnr_db": 25.653187141887045,
+        "ssim": 0.8031887738935412
+      },
+      "beat_copy": 0.9354838709677419,
+      "cold_start_ms": 12.636458966881037,
+      "inference_ms_mean": 36.65280127737286,
+      "inference_ms_p95": 95.7994790747761,
+      "evaluation_wall_fps": 21.135561836536837,
+      "expert_weights": {
+        "copy": 0.14287149906158447,
+        "cortical": 0.6874900460243225,
+        "dmvfn": 0.16963844001293182
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/SkyDiving/v_SkyDiving_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/SoccerJuggling/v_SoccerJuggling_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.02223826079599319,
+        "psnr_db": 26.21445576251743,
+        "ssim": 0.8362933006337895
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.03168703982185933,
+        "psnr_db": 23.301052411275975,
+        "ssim": 0.7394866811972792
+      },
+      "beat_copy": 0.9354838709677419,
+      "cold_start_ms": 48.93274302594364,
+      "inference_ms_mean": 25.656610823653896,
+      "inference_ms_p95": 59.80944773182271,
+      "evaluation_wall_fps": 26.493592676105745,
+      "expert_weights": {
+        "copy": 0.06040861830115318,
+        "cortical": 0.441610723733902,
+        "dmvfn": 0.49798068404197693
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/SoccerJuggling/v_SoccerJuggling_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/SoccerPenalty/v_SoccerPenalty_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.004951736041074318,
+        "psnr_db": 38.14578233691755,
+        "ssim": 0.988169410536366
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.0056360813098088386,
+        "psnr_db": 35.93409225285417,
+        "ssim": 0.9852743635895431
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 21.20708697475493,
+      "inference_ms_mean": 39.930656664715755,
+      "inference_ms_p95": 65.4844630509615,
+      "evaluation_wall_fps": 18.24519045577177,
+      "expert_weights": {
+        "copy": 0.2545437812805176,
+        "cortical": 0.4833225905895233,
+        "dmvfn": 0.2621336281299591
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/SoccerPenalty/v_SoccerPenalty_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/StillRings/v_StillRings_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.011902372713290876,
+        "psnr_db": 30.455361908355833,
+        "ssim": 0.9423511105199013
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.015846889270769972,
+        "psnr_db": 27.95374535898688,
+        "ssim": 0.9117723927702956
+      },
+      "beat_copy": 0.8709677419354839,
+      "cold_start_ms": 17.215589992702007,
+      "inference_ms_mean": 30.89096968800857,
+      "inference_ms_p95": 40.16304961405694,
+      "evaluation_wall_fps": 23.219356628862982,
+      "expert_weights": {
+        "copy": 0.2441195398569107,
+        "cortical": 0.452160507440567,
+        "dmvfn": 0.3037199378013611
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/StillRings/v_StillRings_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/SumoWrestling/v_SumoWrestling_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.016529428389584346,
+        "psnr_db": 24.25797276558791,
+        "ssim": 0.9650347271273213
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.018704993071995916,
+        "psnr_db": 23.23101685065305,
+        "ssim": 0.9559235912497325
+      },
+      "beat_copy": 0.8709677419354839,
+      "cold_start_ms": 15.203579794615507,
+      "inference_ms_mean": 34.6932631981527,
+      "inference_ms_p95": 81.88597317785016,
+      "evaluation_wall_fps": 20.745465977132582,
+      "expert_weights": {
+        "copy": 0.4026303291320801,
+        "cortical": 0.3304424285888672,
+        "dmvfn": 0.26692721247673035
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/SumoWrestling/v_SumoWrestling_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Surfing/v_Surfing_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.005974748562420568,
+        "psnr_db": 38.17927311253993,
+        "ssim": 0.9653443123704646
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.009446224453107964,
+        "psnr_db": 34.172305502924544,
+        "ssim": 0.9256404612653998
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 11.709603015333414,
+      "inference_ms_mean": 26.694642941884954,
+      "inference_ms_p95": 40.618294198065996,
+      "evaluation_wall_fps": 25.130704933495128,
+      "expert_weights": {
+        "copy": 0.1478288173675537,
+        "cortical": 0.524049699306488,
+        "dmvfn": 0.32812145352363586
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Surfing/v_Surfing_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Swing/v_Swing_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.02240507364753754,
+        "psnr_db": 26.315763805926533,
+        "ssim": 0.909606340751853
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.027962322857591412,
+        "psnr_db": 23.71024402003407,
+        "ssim": 0.8732369753622242
+      },
+      "beat_copy": 0.8709677419354839,
+      "cold_start_ms": 14.291156083345413,
+      "inference_ms_mean": 30.672875899371917,
+      "inference_ms_p95": 44.58904047496616,
+      "evaluation_wall_fps": 23.450718258287505,
+      "expert_weights": {
+        "copy": 0.38226738572120667,
+        "cortical": 0.34086862206459045,
+        "dmvfn": 0.2768639326095581
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Swing/v_Swing_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/TableTennisShot/v_TableTennisShot_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.018660781848725053,
+        "psnr_db": 25.05864392237784,
+        "ssim": 0.8851069147868824
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.018959998295852733,
+        "psnr_db": 24.36994055386534,
+        "ssim": 0.8766808522644864
+      },
+      "beat_copy": 0.5806451612903226,
+      "cold_start_ms": 10.752773843705654,
+      "inference_ms_mean": 39.71747184525533,
+      "inference_ms_p95": 90.94820320606225,
+      "evaluation_wall_fps": 19.003490713826473,
+      "expert_weights": {
+        "copy": 0.5295876860618591,
+        "cortical": 0.3774515688419342,
+        "dmvfn": 0.09296072274446487
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/TableTennisShot/v_TableTennisShot_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/TaiChi/v_TaiChi_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.008929335812647496,
+        "psnr_db": 34.55072237388329,
+        "ssim": 0.9735725188768037
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.008521744820867636,
+        "psnr_db": 34.51685253039261,
+        "ssim": 0.97366121251096
+      },
+      "beat_copy": 0.3870967741935484,
+      "cold_start_ms": 15.598485944792628,
+      "inference_ms_mean": 35.16353085508634,
+      "inference_ms_p95": 79.9443174153566,
+      "evaluation_wall_fps": 21.256597172311743,
+      "expert_weights": {
+        "copy": 0.4654141366481781,
+        "cortical": 0.32914742827415466,
+        "dmvfn": 0.20543842017650604
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/TaiChi/v_TaiChi_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/TennisSwing/v_TennisSwing_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.023343392976394463,
+        "psnr_db": 22.807799369442257,
+        "ssim": 0.858916493513251
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.022108878452150572,
+        "psnr_db": 22.846685905779438,
+        "ssim": 0.8624374892122002
+      },
+      "beat_copy": 0.41935483870967744,
+      "cold_start_ms": 10.702983010560274,
+      "inference_ms_mean": 36.7180320418215,
+      "inference_ms_p95": 60.77963202260434,
+      "evaluation_wall_fps": 20.0687068613535,
+      "expert_weights": {
+        "copy": 0.6236804127693176,
+        "cortical": 0.2895064055919647,
+        "dmvfn": 0.08681323379278183
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/TennisSwing/v_TennisSwing_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/ThrowDiscus/v_ThrowDiscus_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.006455023810567875,
+        "psnr_db": 34.83539766084459,
+        "ssim": 0.972904775091397
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.007336414569327908,
+        "psnr_db": 33.144779185703605,
+        "ssim": 0.9669076229936334
+      },
+      "beat_copy": 0.7419354838709677,
+      "cold_start_ms": 17.651916947215796,
+      "inference_ms_mean": 44.80350576341152,
+      "inference_ms_p95": 130.82205341197545,
+      "evaluation_wall_fps": 17.086623496261797,
+      "expert_weights": {
+        "copy": 0.22659485042095184,
+        "cortical": 0.4801490008831024,
+        "dmvfn": 0.29325613379478455
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/ThrowDiscus/v_ThrowDiscus_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/TrampolineJumping/v_TrampolineJumping_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.040279937140087804,
+        "psnr_db": 21.164690145673624,
+        "ssim": 0.7202516525022444
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.03685527810410995,
+        "psnr_db": 21.437115179306527,
+        "ssim": 0.7373382522854756
+      },
+      "beat_copy": 0.5483870967741935,
+      "cold_start_ms": 106.97815613821149,
+      "inference_ms_mean": 36.16818745524205,
+      "inference_ms_p95": 73.16854964010416,
+      "evaluation_wall_fps": 17.931831224251543,
+      "expert_weights": {
+        "copy": 0.34640464186668396,
+        "cortical": 0.5438949465751648,
+        "dmvfn": 0.10970041900873184
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/TrampolineJumping/v_TrampolineJumping_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/Typing/v_Typing_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.005648424758786155,
+        "psnr_db": 34.52081766107021,
+        "ssim": 0.9853213064132198
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.005814408237535146,
+        "psnr_db": 33.4592523904844,
+        "ssim": 0.9841172945114876
+      },
+      "beat_copy": 0.4838709677419355,
+      "cold_start_ms": 25.365311186760664,
+      "inference_ms_mean": 39.15459663478722,
+      "inference_ms_p95": 99.55732761882246,
+      "evaluation_wall_fps": 17.419913393475515,
+      "expert_weights": {
+        "copy": 0.38804587721824646,
+        "cortical": 0.28967294096946716,
+        "dmvfn": 0.3222811818122864
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/Typing/v_Typing_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/UnevenBars/v_UnevenBars_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.013186482186879843,
+        "psnr_db": 29.908705579292885,
+        "ssim": 0.9476760523293607
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.01760829896515896,
+        "psnr_db": 26.919905355152945,
+        "ssim": 0.9126128913253866
+      },
+      "beat_copy": 0.9032258064516129,
+      "cold_start_ms": 13.847596012055874,
+      "inference_ms_mean": 32.2685147202092,
+      "inference_ms_p95": 58.85775173082948,
+      "evaluation_wall_fps": 22.711601884950134,
+      "expert_weights": {
+        "copy": 0.0942690297961235,
+        "cortical": 0.1724557876586914,
+        "dmvfn": 0.7332751750946045
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/UnevenBars/v_UnevenBars_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/VolleyballSpiking/v_VolleyballSpiking_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.0020327593759453346,
+        "psnr_db": 43.40735968593577,
+        "ssim": 0.9942932699316291
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.002154127067525781,
+        "psnr_db": 41.68957152377905,
+        "ssim": 0.9932290565583013
+      },
+      "beat_copy": 0.7096774193548387,
+      "cold_start_ms": 16.41934784129262,
+      "inference_ms_mean": 32.054785229586834,
+      "inference_ms_p95": 49.93467046879229,
+      "evaluation_wall_fps": 20.670039136864986,
+      "expert_weights": {
+        "copy": 0.33653220534324646,
+        "cortical": 0.3309217691421509,
+        "dmvfn": 0.33254602551460266
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/VolleyballSpiking/v_VolleyballSpiking_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/WalkingWithDog/v_WalkingWithDog_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.011255798290573781,
+        "psnr_db": 32.20504988785685,
+        "ssim": 0.961827995315675
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.01822497485385787,
+        "psnr_db": 28.149782774825255,
+        "ssim": 0.9227591650460355
+      },
+      "beat_copy": 0.967741935483871,
+      "cold_start_ms": 79.65100603178144,
+      "inference_ms_mean": 33.10063257331735,
+      "inference_ms_p95": 60.778563795611255,
+      "evaluation_wall_fps": 18.99077422185888,
+      "expert_weights": {
+        "copy": 0.11105494946241379,
+        "cortical": 0.2646477520465851,
+        "dmvfn": 0.6242973208427429
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/WalkingWithDog/v_WalkingWithDog_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/WallPushups/v_WallPushups_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.000833047300411929,
+        "psnr_db": 47.36716530007874,
+        "ssim": 0.99784807748692
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.0009167069525104917,
+        "psnr_db": 44.53505735826021,
+        "ssim": 0.9972320442558619
+      },
+      "beat_copy": 0.5483870967741935,
+      "cold_start_ms": 20.330192986875772,
+      "inference_ms_mean": 37.28632252374343,
+      "inference_ms_p95": 65.51317442208529,
+      "evaluation_wall_fps": 19.10366341930966,
+      "expert_weights": {
+        "copy": 0.3130267560482025,
+        "cortical": 0.3699667453765869,
+        "dmvfn": 0.3170064389705658
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/WallPushups/v_WallPushups_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/WritingOnBoard/v_WritingOnBoard_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.0026284666176164344,
+        "psnr_db": 38.21121036915287,
+        "ssim": 0.9924086370775776
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.0030494449479926016,
+        "psnr_db": 35.80146471690629,
+        "ssim": 0.9897002404735934
+      },
+      "beat_copy": 0.8064516129032258,
+      "cold_start_ms": 20.143945002928376,
+      "inference_ms_mean": 41.27897056429808,
+      "inference_ms_p95": 101.28909200429909,
+      "evaluation_wall_fps": 17.559031693231866,
+      "expert_weights": {
+        "copy": 0.3400533199310303,
+        "cortical": 0.33470359444618225,
+        "dmvfn": 0.32524311542510986
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/WritingOnBoard/v_WritingOnBoard_g08_c01.avi"
+    },
+    {
+      "source": "/home/froid/data/ucf101/UCF-101/YoYo/v_YoYo_g08_c01.avi",
+      "width": 256,
+      "height": 192,
+      "frames_read": 32,
+      "model": {
+        "frames": 31,
+        "mae": 0.009913620959606862,
+        "psnr_db": 30.570758369805358,
+        "ssim": 0.9629716885987147
+      },
+      "copy": {
+        "frames": 31,
+        "mae": 0.01240864681500581,
+        "psnr_db": 27.675424635967772,
+        "ssim": 0.9478924415444814
+      },
+      "beat_copy": 0.9032258064516129,
+      "cold_start_ms": 12.022444978356361,
+      "inference_ms_mean": 39.17573312104776,
+      "inference_ms_p95": 113.04496643133454,
+      "evaluation_wall_fps": 18.887189404947705,
+      "expert_weights": {
+        "copy": 0.22848927974700928,
+        "cortical": 0.4321692883968353,
+        "dmvfn": 0.33934149146080017
+      },
+      "video": "/home/froid/data/ucf101/UCF-101/YoYo/v_YoYo_g08_c01.avi"
+    }
+  ]
+}
