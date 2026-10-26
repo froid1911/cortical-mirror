@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import random
+import re
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,22 +26,85 @@ class ClipConfig:
     clips_per_video: int = 4
 
 
-def split_videos(root: str | Path, validation_percent: int = 5) -> tuple[list[Path], list[Path]]:
+UCF101_NAME = re.compile(r"^v_(?P<action>[A-Za-z]+)_g(?P<group>\d+)_c\d+$")
+# Official UCF101 split 1 tests on groups 1-7. Clips in one group are cut from the
+# same source video, so groups, never clips, are assigned to a split.
+UCF101_TEST_GROUPS = frozenset(range(1, 8))
+UCF101_VALIDATION_GROUPS = frozenset({8, 9})
+
+
+@dataclass(frozen=True)
+class VideoSplit:
+    train: list[Path]
+    validation: list[Path]
+    test: list[Path]
+
+
+def source_group(path: Path) -> str:
+    """Identify the source recording a clip was cut from."""
+
+    match = UCF101_NAME.match(path.stem)
+    if match:
+        return f"{match['action']}/g{int(match['group']):02d}"
+    return str(path.with_suffix(""))
+
+
+def split_videos(
+    root: str | Path, validation_percent: int = 5, test_percent: int = 5
+) -> VideoSplit:
+    """Assign whole source recordings to train, validation, or test.
+
+    UCF101 uses the official split-1 test groups and two held-back training groups
+    for validation. Other folders are split by hashing each file's source group.
+    Checkpoints and routing settings may be chosen on validation, never on test.
+    """
+
     root = Path(root)
     videos = sorted(path for path in root.rglob("*") if path.suffix.lower() in VIDEO_SUFFIXES)
     if not videos:
         raise FileNotFoundError(f"no video files found under {root}")
-    train, validation = [], []
+    split = VideoSplit([], [], [])
     for path in videos:
-        relative = str(path.relative_to(root)).encode()
+        match = UCF101_NAME.match(path.stem)
+        if match:
+            group = int(match["group"])
+            if group in UCF101_TEST_GROUPS:
+                split.test.append(path)
+            elif group in UCF101_VALIDATION_GROUPS:
+                split.validation.append(path)
+            else:
+                split.train.append(path)
+            continue
+        relative = source_group(path.relative_to(root)).encode()
         bucket = int.from_bytes(hashlib.sha256(relative).digest()[:2], "big") % 100
-        (validation if bucket < validation_percent else train).append(path)
-    if not validation:
-        validation.append(train.pop())
-    return train, validation
+        if bucket < test_percent:
+            split.test.append(path)
+        elif bucket < test_percent + validation_percent:
+            split.validation.append(path)
+        else:
+            split.train.append(path)
+    if not split.validation and len(split.train) > 1:
+        split.validation.append(split.train.pop())
+    return split
 
 
-def read_clip(path: Path, config: ClipConfig, start: int) -> torch.Tensor:
+def teacher_flow(frames: np.ndarray) -> np.ndarray:
+    """Classical flow behind each transition, in the renderer's warp convention.
+
+    ``frames`` is ``[T, H, W, 3]`` uint8 RGB. Returns ``[T-1, 2, H, W]`` such that
+    ``warp_forward(frame[t], flow[t])`` approximates ``frame[t+1]``.
+    """
+
+    gray = [cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY) for frame in frames]
+    flows = []
+    for current, following in zip(gray, gray[1:], strict=False):
+        # following(x) ~= current(x + backward(x)); the renderer samples x - flow.
+        backward = cv2.calcOpticalFlowFarneback(following, current, None, 0.5, 3, 15, 3, 5, 1.1, 0)
+        flows.append(-backward.transpose(2, 0, 1))
+    return np.stack(flows).astype(np.float32)
+
+
+def read_clip(path: Path, config: ClipConfig, start: int) -> np.ndarray:
     capture = cv2.VideoCapture(str(path))
     if not capture.isOpened():
         raise RuntimeError(f"cannot open video {path}")
@@ -58,15 +122,26 @@ def read_clip(path: Path, config: ClipConfig, start: int) -> torch.Tensor:
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         frames.append(frame)
     capture.release()
-    array = np.stack(frames).astype(np.float32) / 255.0
+    return np.stack(frames)
+
+
+def to_tensor(frames: np.ndarray) -> torch.Tensor:
+    array = frames.astype(np.float32) / 255.0
     return torch.from_numpy(array.transpose(0, 3, 1, 2).copy())
 
 
 class VideoClipDataset(Dataset):
-    def __init__(self, videos: list[Path], config: ClipConfig, deterministic: bool = False):
+    def __init__(
+        self,
+        videos: list[Path],
+        config: ClipConfig,
+        deterministic: bool = False,
+        with_flow: bool = False,
+    ):
         self.videos = videos
         self.config = config
         self.deterministic = deterministic
+        self.with_flow = with_flow
         self.unreadable: set[Path] = set()
         if not videos:
             raise ValueError("dataset needs at least one video")
@@ -74,7 +149,16 @@ class VideoClipDataset(Dataset):
     def __len__(self) -> int:
         return len(self.videos) * self.config.clips_per_video
 
-    def __getitem__(self, index: int) -> torch.Tensor:
+    def __getitem__(self, index: int) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
+        frames = self._frames(index)
+        if not self.deterministic and random.random() < 0.5:
+            # A mirrored clip is equally plausible physics, and the demo is a mirror.
+            frames = np.ascontiguousarray(frames[:, :, ::-1])
+        if self.with_flow:
+            return to_tensor(frames), torch.from_numpy(teacher_flow(frames))
+        return to_tensor(frames)
+
+    def _frames(self, index: int) -> np.ndarray:
         last_error = None
         for offset in range(min(3, len(self.videos))):
             video_index = (index + offset) % len(self.videos)
