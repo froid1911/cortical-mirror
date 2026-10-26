@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cortical Mirror</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --black: #000;
+  --glass: rgba(26, 29, 36, 0.58);
+  --silver: #e9ecef;
+  --pewter: #9aa3ad;
+  --expect: #8fb8ff;
+  --surprise: #ffb347;
+  --dmvfn: #d58bff;
+  --rule: rgba(233, 236, 239, 0.14);
+  --font: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--black); color: var(--silver); }
+body { font: 400 15px/1.45 var(--font); overflow: hidden; }
+button { font: inherit; color: inherit; }
+/* Streams connect lazily; never flash alt text (still read by screen readers). */
+img[data-stream] { color: transparent; }
+:focus-visible { outline: 2px solid var(--expect); outline-offset: 3px; }
+
+/* Mirror: the predicted next frame fills the screen, flipped like a mirror. */
+.mirror { position: fixed; inset: 0; }
+.mirror .stage { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.mirror .stage.overlay { opacity: 0; transition: opacity 240ms ease; }
+body.show-overlay .mirror .stage.overlay { opacity: 1; }
+
+.inset {
+  position: absolute; top: 20px; left: 20px; width: min(22vw, 260px);
+  border-radius: 6px; overflow: hidden; background: var(--glass);
+  box-shadow: 0 0 0 1px var(--rule);
+}
+.inset img { display: block; width: 100%; transform: scaleX(-1); transition: opacity 600ms ease; }
+.inset p { margin: 0; padding: 6px 10px 8px; font-size: 12px; color: var(--pewter); }
+body.dreaming .inset img { opacity: 0; }
+
+.state {
+  position: absolute; left: 28px; bottom: 22px; max-width: calc(100vw - 460px);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.7);
+}
+.state .word {
+  margin: 0; font-size: clamp(64px, 11vw, 168px); line-height: 0.86;
+  font-stretch: 125%; font-weight: 300; letter-spacing: -0.035em;
+  transition: color 600ms ease, font-weight 600ms ease;
+}
+body.dreaming .state .word { color: var(--expect); font-weight: 200; }
+.state .detail { margin: 10px 0 0 4px; font-size: 18px; font-stretch: 87%; color: var(--silver); }
+.state .detail span { color: var(--pewter); }
+
+.curve {
+  position: absolute; right: 20px; bottom: 20px; width: min(400px, 40vw);
+  padding: 14px 16px 12px; border-radius: 6px; background: var(--glass);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 0 0 1px var(--rule);
+}
+.curve h2 { margin: 0; font-size: 14px; font-weight: 600; font-stretch: 100%; }
+.curve .verdict { margin: 2px 0 8px; font-size: 13px; color: var(--pewter); }
+.curve .verdict strong { color: var(--silver); font-weight: 600; }
+.curve canvas { display: block; width: 100%; height: 110px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 12px; color: var(--pewter); }
+.legend i { display: inline-block; width: 14px; height: 2px; margin-right: 6px; vertical-align: middle; }
+
+.keys {
+  position: absolute; top: 20px; right: 20px; padding: 12px 16px; border-radius: 6px;
+  background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 0 0 1px var(--rule); font-size: 13px; display: none;
+}
+body.show-keys .keys { display: block; }
+.keys dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; }
+.keys dt { font-weight: 600; text-align: right; }
+.keys dd { margin: 0; color: var(--pewter); }
+.hint { position: absolute; top: 24px; right: 24px; font-size: 13px; color: var(--pewter); }
+body.show-keys .hint { display: none; }
+
+.legend-trust { position: absolute; top: 20px; left: calc(min(22vw, 260px) + 36px); display: none; }
+body.show-overlay .legend-trust { display: flex; }
+
+/* Lab: every internal signal side by side. */
+.lab { display: none; height: 100%; overflow: auto; padding: 24px clamp(16px, 3vw, 40px) 40px; }
+body.lab-mode .mirror { display: none; }
+body.lab-mode .lab { display: block; }
+body.lab-mode { overflow: auto; }
+.lab header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+.lab h1 { margin: 0; font-size: 34px; font-stretch: 125%; font-weight: 300; letter-spacing: -0.02em; }
+.lab header p { margin: 0; color: var(--pewter); max-width: 62ch; }
+.lab-body {
+  display: grid; justify-content: center; gap: 28px; margin: 22px auto 0;
+  /* Two rows of 4:3 images fill the height left under the header. */
+  grid-template-columns: minmax(0, calc((100vh - 260px) * 4 / 3 + 18px)) minmax(260px, 340px);
+}
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-content: start; }
+.grid figure { margin: 0; }
+.grid img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #0d0f13; border-radius: 4px; transform: scaleX(-1); }
+.grid figcaption { margin-top: 8px; font-size: 14px; }
+.grid figcaption span { display: block; color: var(--pewter); font-size: 13px; }
+.numbers { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 0; }
+.numbers div { padding: 0 16px 14px 0; }
+.numbers dt { font-size: 13px; color: var(--pewter); }
+.numbers dd { margin: 2px 0 0; font-size: 26px; font-stretch: 87%; font-variant-numeric: tabular-nums; }
+.lab .curve { position: static; width: auto; margin: 8px 0 0; }
+.lab .curve canvas { height: 160px; }
+.problem { color: var(--surprise); margin: 12px auto 0; max-width: 1280px; }
+
+@media (max-width: 720px) {
+  .state { max-width: calc(100vw - 40px); bottom: 250px; }
+  .mirror .curve canvas { height: 72px; }
+  .curve { left: 16px; right: 16px; width: auto; }
+  .inset { width: 34vw; }
+  .grid, .lab-body { grid-template-columns: 1fr; }
+  .hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body class="">
+<main class="mirror" aria-label="Predicted mirror">
+  <img class="stage" id="mirror-prediction" alt="The predicted next camera frame, mirrored" data-stream="prediction" data-mode="mirror">
+  <img class="stage overlay" id="mirror-overlay" alt="Overlay of what the model relies on" data-stream="overlay" data-mode="mirror-overlay">
+  <div class="inset"><img id="inset-camera" data-stream="camera" data-mode="mirror" alt="The actual camera frame, mirrored"><p id="inset-label">What the camera sees now</p></div>
+  <div class="legend legend-trust" id="legend-overlay"></div>
+  <section class="state" aria-live="polite">
+    <p class="word" id="word">seeing</p>
+    <p class="detail" id="detail">connecting to the camera</p>
+  </section>
+  <p class="hint">Press ? for controls</p>
+  <aside class="keys" aria-label="Keyboard controls">
+    <dl>
+      <dt>Space</dt><dd>Close or open its eyes</dd>
+      <dt>T</dt><dd>Show what it relies on</dd>
+      <dt>1 to 5</dt><dd>Look that many frames ahead</dd>
+      <dt>L</dt><dd>Pause or resume learning</dd>
+      <dt>R</dt><dd>Forget what it learned here</dd>
+      <dt>Tab</dt><dd>Switch to the lab view</dd>
+      <dt>F</dt><dd>Full screen</dd>
+    </dl>
+  </aside>
+  <section class="curve" id="mirror-curve"></section>
+</main>
+
+<div class="lab">
+  <header>
+    <h1>Cortical Mirror</h1>
+    <p>Every image is generated before its frame arrives. Each prediction is scored only against the frame it was made for.</p>
+  </header>
+  <div class="lab-body">
+  <div class="grid">
+    <figure><img data-stream="camera" data-mode="lab" alt="Camera"><figcaption>Camera<span>The frame that just arrived</span></figcaption></figure>
+    <figure><img data-stream="prediction" data-mode="lab" alt="Prediction"><figcaption>Predicted next frame<span id="lab-prediction-caption">Issued before that frame exists</span></figcaption></figure>
+    <figure><img data-stream="error" data-mode="lab" alt="Prediction error"><figcaption>Surprise<span>Where the prediction for this frame was wrong</span></figcaption></figure>
+    <figure><img data-stream="overlay" data-mode="lab" alt="Overlay"><figcaption id="lab-overlay-title">Trust<span id="lab-overlay-caption">Which predictor each region relies on</span></figcaption></figure>
+  </div>
+  <aside>
+  <dl class="numbers">
+    <div><dt>Prediction error</dt><dd id="n-model">–</dd></div>
+    <div><dt>Repeating the last frame</dt><dd id="n-copy">–</dd></div>
+    <div><dt>Frames beating repetition</dt><dd id="n-wins">–</dd></div>
+    <div><dt>Learning steps</dt><dd id="n-steps">–</dd></div>
+    <div><dt>Inference</dt><dd id="n-latency">–</dd></div>
+    <div><dt>Camera rate</dt><dd id="n-fps">–</dd></div>
+  </dl>
+  <section class="curve" id="lab-curve"></section>
+  <p class="problem" id="problem"></p>
+  </aside>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const css = getComputedStyle(document.documentElement);
+const colour = (name) => css.getPropertyValue(name).trim();
+const EXPERTS = {
+  copy: ["Repeat last frame", "--pewter"],
+  cortical: ["Cortical hierarchy", "--expect"],
+  dmvfn: ["Pretrained motion (DMVFN)", "--dmvfn"],
+};
+let metrics = {};
+let history = [];
+
+function curveMarkup() {
+  return `<h2>Surprise per frame</h2><p class="verdict"></p><canvas></canvas>
+  <div class="legend"><span><i style="background:${colour("--expect")}"></i>Its prediction</span>
+  <span><i style="background:${colour("--pewter")}"></i>Repeating the last frame</span>
+  <span class="cortical-only" hidden><i style="background:${colour("--expect")};opacity:.45"></i>Cortical hierarchy alone</span></div>`;
+}
+$("mirror-curve").innerHTML = curveMarkup();
+$("lab-curve").innerHTML = curveMarkup();
+
+function drawCurve(section) {
+  const canvas = section.querySelector("canvas");
+  const ratio = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth, height = canvas.clientHeight;
+  canvas.width = width * ratio; canvas.height = height * ratio;
+  const g = canvas.getContext("2d");
+  g.scale(ratio, ratio);
+  g.clearRect(0, 0, width, height);
+  const points = history.slice(-600);
+  const adaptive = (metrics.experts || []).includes("cortical") && (metrics.experts || []).length > 1;
+  section.querySelector(".cortical-only").hidden = !adaptive;
+  const verdict = section.querySelector(".verdict");
+  if (points.length < 2) { verdict.textContent = "Collecting the first seconds of predictions"; return; }
+  const smooth = (key) => points.map((p, i) => {
+    const window = points.slice(Math.max(0, i - 4), i + 1);
+    return window.reduce((s, q) => s + q[key], 0) / window.length;
+  });
+  const series = { model: smooth("model"), copy: smooth("copy"), cortical: smooth("cortical") };
+  const top = Math.max(...series.copy, ...series.model, ...(adaptive ? series.cortical : [])) * 1.1 || 1;
+  const x = (i) => (i / (points.length - 1)) * width;
+  const y = (v) => height - (v / top) * (height - 6) - 3;
+  // Shade the seconds when its eyes were closed.
+  g.fillStyle = "rgba(143, 184, 255, 0.10)";
+  points.forEach((p, i) => { if (p.dreaming) g.fillRect(x(i) - width / points.length / 2, 0, width / points.length + 1, height); });
+  const line = (values, stroke, alpha = 1, w = 2) => {
+    g.beginPath(); g.globalAlpha = alpha; g.strokeStyle = stroke; g.lineWidth = w; g.lineJoin = "round";
+    values.forEach((v, i) => (i ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v))));
+    g.stroke(); g.globalAlpha = 1;
+  };
+  line(series.copy, colour("--pewter"), 1, 1.5);
+  if (adaptive) line(series.cortical, colour("--expect"), 0.45, 1.5);
+  line(series.model, colour("--expect"), 1, 2.25);
+  const recent = (key) => { const v = series[key].slice(-30); return v.reduce((a, b) => a + b, 0) / v.length; };
+  const gain = 1 - recent("model") / recent("copy");
+  const minutes = points[points.length - 1].t - points[0].t;
+  const span = minutes >= 120 ? `${Math.round(minutes / 60)} minutes` : `${Math.round(minutes)} seconds`;
+  verdict.innerHTML = gain >= 0
+    ? `<strong>${Math.round(gain * 100)}% less</strong> than repeating the last frame, over the last 30 seconds. Showing ${span}.`
+    : `<strong>${Math.round(-gain * 100)}% more</strong> than repeating the last frame, over the last 30 seconds. Showing ${span}.`;
+}
+
+function render() {
+  const m = metrics;
+  const learner = m.learner;
+  const dreaming = !!m.eyes_closed;
+  document.body.classList.toggle("dreaming", dreaming);
+  const fps = m.fps > 1 ? m.fps : 30;
+  const ahead = Math.round((m.horizon || 1) * 1000 / fps);
+  $("word").textContent = dreaming ? "dreaming" : "seeing";
+  let detail = dreaming
+    ? `eyes closed for ${m.dream_frames} ${m.dream_frames === 1 ? "frame" : "frames"} <span>and running on its own predictions</span>`
+    : `${ahead} ms ahead of the camera`;
+  if (!dreaming && learner) {
+    detail += learner.paused
+      ? ` <span>with learning paused</span>`
+      : ` <span>and learning from ${learner.steps.toLocaleString()} steps here</span>`;
+  }
+  $("detail").innerHTML = detail;
+  $("inset-label").textContent = dreaming ? "Not looking" : "What the camera sees now";
+  const overlay = m.overlay;
+  $("lab-overlay-title").firstChild.textContent = overlay === "motion" ? "Expected motion" : "Trust";
+  $("lab-overlay-caption").textContent = overlay === "motion"
+    ? "Colour is direction, brightness is speed"
+    : "Which predictor each region relies on, set by its recent errors";
+  $("lab-prediction-caption").textContent = m.horizon > 1
+    ? `Imagined ${m.horizon} frames ahead` : "Issued before that frame exists";
+  const legend = $("legend-overlay");
+  legend.innerHTML = overlay === "trust"
+    ? (m.experts || []).map((e) => `<span><i style="background:${colour((EXPERTS[e] || [e, "--silver"])[1])}"></i>${(EXPERTS[e] || [e])[0]}</span>`).join("")
+    : overlay === "motion" ? "<span>Colour is direction, brightness is speed</span>" : "";
+  $("n-model").textContent = m.scored ? m.model_mae.toFixed(4) : "–";
+  $("n-copy").textContent = m.scored ? m.copy_mae.toFixed(4) : "–";
+  $("n-wins").textContent = m.scored ? `${(100 * m.beat_copy).toFixed(1)}%` : "–";
+  $("n-steps").textContent = learner ? learner.steps.toLocaleString() : "Off";
+  $("n-latency").textContent = `${(m.inference_ms || 0).toFixed(1)} ms`;
+  $("n-fps").textContent = m.fps ? `${m.fps.toFixed(0)} fps` : "–";
+  $("problem").textContent = m.error
+    ? `The mirror stopped: ${m.error}`
+    : learner && learner.error ? `Learning stopped: ${learner.error}` : "";
+  drawCurve($("mirror-curve"));
+  drawCurve($("lab-curve"));
+}
+
+// Each MJPEG stream holds a connection open, and browsers allow about six per
+// host, so only the streams of the visible mode are connected.
+const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+function connectStreams() {
+  const lab = document.body.classList.contains("lab-mode");
+  const overlay = document.body.classList.contains("show-overlay");
+  document.querySelectorAll("img[data-stream]").forEach((img) => {
+    const mode = img.dataset.mode;
+    const wanted = lab ? mode === "lab" : mode === "mirror" || (mode === "mirror-overlay" && overlay);
+    const url = `/stream/${img.dataset.stream}.mjpg`;
+    if (wanted && !img.src.endsWith(url)) img.src = url;
+    if (!wanted && !img.src.startsWith("data:")) img.src = BLANK;
+  });
+}
+
+async function poll() {
+  try {
+    const state = await fetch("/state.json", { cache: "no-store" }).then((r) => r.json());
+    metrics = state.metrics; history = state.history; render();
+  } catch (error) {
+    $("detail").textContent = "Lost the connection to the mirror server. Check that it is still running.";
+  }
+}
+
+async function control(command) {
+  const r = await fetch("/control", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(command) });
+  if (r.ok) poll();
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+  const key = event.key.toLowerCase();
+  if (key === " ") { event.preventDefault(); control({ eyes_closed: !metrics.eyes_closed }); }
+  else if (key === "t") { document.body.classList.toggle("show-overlay"); connectStreams(); }
+  else if (key === "l" && metrics.learner) control({ learning: metrics.learner.paused });
+  else if (key === "r") control({ reset_learning: true });
+  else if (key >= "1" && key <= "5") control({ horizon: Number(key) });
+  else if (key === "tab") { event.preventDefault(); document.body.classList.toggle("lab-mode"); connectStreams(); }
+  else if (key === "f") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  else if (key === "?" || key === "h") document.body.classList.toggle("show-keys");
+  else if (key === "escape") document.body.classList.remove("show-keys");
+});
+// ?view=lab, ?overlay=1 and ?keys=1 open a mode directly, e.g. on a second screen.
+const params = new URLSearchParams(location.search);
+document.body.classList.toggle("lab-mode", params.get("view") === "lab");
+document.body.classList.toggle("show-overlay", params.get("overlay") === "1");
+document.body.classList.toggle("show-keys", params.get("keys") === "1");
+connectStreams();
+window.addEventListener("resize", render);
+setInterval(poll, 500);
+poll();
+</script>
+</body>
+</html>

@@ -1,52 +1,81 @@
-"""Headless live demo served as MJPEG plus small JSON metrics."""
+"""Headless live mirror served as MJPEG views plus small JSON metrics and controls."""
 
 from __future__ import annotations
 
 import json
 import threading
 import time
+from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 import cv2
 import numpy as np
 
 from .engines import EnginePrediction, PredictiveEngine
-from .evaluate import comparison_view, label
 
-INDEX_HTML = """<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cortical Mirror</title><style>
-:root{color-scheme:dark;--bg:#0c1015;--panel:#151b23;--text:#e7edf5;--muted:#91a0b3;--accent:#70e1b0}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,sans-serif}
-main{max-width:1200px;margin:auto;padding:28px 20px}header{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
-h1{font-size:28px;letter-spacing:-.03em;margin:0}#engine{color:var(--accent);font-weight:600}
-.stream{margin-top:20px;background:#000;border:1px solid #2a3542;border-radius:12px;overflow:hidden}
-img{display:block;width:100%;height:auto}.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-top:16px}
-.card{background:var(--panel);border:1px solid #25303c;border-radius:10px;padding:14px}.name{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
-.value{font-size:24px;font-variant-numeric:tabular-nums;margin-top:4px}.hint{color:var(--muted);margin-top:16px;max-width:780px}
-#error{color:#ff8d8d}footer{margin-top:18px;color:var(--muted);font-size:13px}
-</style></head><body><main><header><div><h1>Cortical Mirror</h1><div class="hint">The future is generated from frames already observed. The lower-left panel is the forecast issued for the frame arriving now.</div></div><div id="engine">connecting…</div></header>
-<div class="stream"><img src="/stream.mjpg" alt="Live camera, next-frame prediction, prediction due now, and prediction error"></div>
-<section class="metrics">
-<div class="card"><div class="name">Prediction MAE</div><div class="value" id="mae">—</div></div>
-<div class="card"><div class="name">Persistence MAE</div><div class="value" id="copy">—</div></div>
-<div class="card"><div class="name">Frames beating copy</div><div class="value" id="wins">—</div></div>
-<div class="card"><div class="name">Inference</div><div class="value" id="latency">—</div></div>
-<div class="card"><div class="name">Scored frames</div><div class="value" id="frames">0</div></div>
-</section><div id="error"></div><footer>MAE is normalized pixel error; lower is better. Timing includes host transfer and synchronization.</footer>
-</main><script>
-async function update(){try{const r=await fetch('/metrics.json',{cache:'no-store'});const m=await r.json();
-const text=(id,v)=>document.getElementById(id).textContent=v;
-text('engine',m.engine);text('mae',m.model_mae.toFixed(4));text('copy',m.copy_mae.toFixed(4));
-text('wins',(100*m.beat_copy).toFixed(1)+'%');text('latency',m.inference_ms.toFixed(1)+' ms');text('frames',m.scored);
-text('error',m.error||'');}catch(e){document.getElementById('error').textContent=String(e)}}
-setInterval(update,500);update();
-</script></body></html>"""
+INDEX_HTML = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
+VIEWS = ("camera", "prediction", "error", "overlay")
+# BGR. Blue is the model's expectation, violet the pretrained motion expert, pewter
+# persistence; the page legend uses the same colours.
+EXPERT_COLOURS = {
+    "copy": (173, 163, 154),
+    "cortical": (255, 184, 143),
+    "dmvfn": (255, 139, 213),
+}
+
+
+def error_view(due: np.ndarray, actual: np.ndarray) -> np.ndarray:
+    error = np.mean(np.abs(due.astype(np.float32) - actual.astype(np.float32)), axis=2)
+    error = np.clip(error / 64.0, 0.0, 1.0)
+    return cv2.applyColorMap(np.rint(error * 255).astype(np.uint8), cv2.COLORMAP_INFERNO)
+
+
+def trust_view(prediction: np.ndarray, routing: np.ndarray, names: tuple[str, ...]) -> np.ndarray:
+    """Tint each region by the predictor the router trusts there."""
+
+    palette = np.array([EXPERT_COLOURS.get(name, (255, 255, 255)) for name in names], np.float32)
+    colour = routing @ palette
+    gray = cv2.cvtColor(cv2.cvtColor(prediction, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
+    return np.clip(0.45 * gray + 0.55 * colour, 0, 255).astype(np.uint8)
+
+
+def flow_view(prediction: np.ndarray, flow: np.ndarray, full_scale: float = 6.0) -> np.ndarray:
+    """Hue shows where the model expects things to move, brightness how fast."""
+
+    magnitude, angle = cv2.cartToPolar(flow[..., 0], flow[..., 1], angleInDegrees=True)
+    hsv = np.zeros((*flow.shape[:2], 3), np.uint8)
+    hsv[..., 0] = np.rint(angle / 2).astype(np.uint8)
+    hsv[..., 1] = 255
+    hsv[..., 2] = np.rint(np.clip(magnitude / full_scale, 0, 1) * 255).astype(np.uint8)
+    colour = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR).astype(np.float32)
+    gray = cv2.cvtColor(cv2.cvtColor(prediction, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
+    return np.clip(0.35 * gray + colour, 0, 255).astype(np.uint8)
+
+
+def overlay_view(engine: PredictiveEngine, prediction: np.ndarray) -> tuple[np.ndarray, str]:
+    routing = getattr(engine, "routing", None)
+    if routing is not None:
+        return trust_view(prediction, routing, engine.names), "trust"
+    flow = getattr(engine, "last_flow", None)
+    if flow is not None:
+        return flow_view(prediction, flow), "motion"
+    return prediction, "none"
+
+
+def find_learner(engine: PredictiveEngine):
+    return getattr(engine, "learner", None)
 
 
 class LiveState:
     def __init__(
-        self, engine: PredictiveEngine, source: str, engine_name: str, loop: bool, max_frames: int
+        self,
+        engine: PredictiveEngine,
+        source: str,
+        engine_name: str,
+        loop: bool,
+        max_frames: int,
+        horizon: int = 1,
     ):
         self.engine = engine
         self.source = int(source) if source.isdigit() else source
@@ -55,9 +84,13 @@ class LiveState:
         self.max_frames = max_frames
         self.running = True
         self.error = ""
+        self.eyes_closed = False
+        self.horizon = max(1, int(horizon))
+        self._learning_before_dream = True
         self._condition = threading.Condition()
-        self._jpeg = b""
+        self._views: dict[str, bytes] = {}
         self._version = 0
+        self._history: deque[dict] = deque(maxlen=1800)
         self._metrics = {
             "engine": engine_name,
             "scored": 0,
@@ -67,35 +100,89 @@ class LiveState:
             "inference_ms": 0.0,
             "inference_ms_p95": 0.0,
             "frames_read": 0,
+            "fps": 0.0,
+            "eyes_closed": False,
+            "dream_frames": 0,
+            "horizon": self.horizon,
+            "overlay": "none",
+            "experts": list(getattr(engine, "names", ())),
+            "learner": None,
             "error": "",
         }
 
-    def latest(self) -> tuple[int, bytes]:
+    def latest(self, view: str) -> tuple[int, bytes]:
         with self._condition:
-            return self._version, self._jpeg
+            return self._version, self._views.get(view, b"")
 
-    def wait_for_change(self, version: int, timeout: float = 1.0) -> tuple[int, bytes]:
+    def wait_for_change(self, view: str, version: int, timeout: float = 1.0):
         with self._condition:
             self._condition.wait_for(lambda: self._version != version or not self.running, timeout)
-            return self._version, self._jpeg
+            return self._version, self._views.get(view, b"")
 
     def metrics(self) -> dict:
         with self._condition:
             return dict(self._metrics)
 
-    def _publish(self, jpeg: bytes, metrics: dict) -> None:
+    def history(self) -> list[dict]:
         with self._condition:
-            self._jpeg = jpeg
+            return list(self._history)
+
+    def control(self, command: dict) -> dict:
+        learner = find_learner(self.engine)
+        if "eyes_closed" in command:
+            closed = bool(command["eyes_closed"])
+            if closed and not self.eyes_closed and learner is not None:
+                # Never learn from its own dreams.
+                self._learning_before_dream = not learner.paused
+                learner.paused = True
+            opening = not closed and self.eyes_closed
+            # Stop dreaming before learning resumes, so no imagined frame is learned.
+            self.eyes_closed = closed
+            if opening and learner is not None:
+                learner.paused = not self._learning_before_dream
+        if "learning" in command and learner is not None and not self.eyes_closed:
+            learner.paused = not bool(command["learning"])
+        if command.get("reset_learning") and learner is not None:
+            learner.reset()
+            with self._condition:
+                self._history.clear()
+        if "horizon" in command:
+            self.horizon = int(np.clip(int(command["horizon"]), 1, 8))
+        return {
+            "eyes_closed": self.eyes_closed,
+            "horizon": self.horizon,
+            "learning": learner is not None and not learner.paused,
+        }
+
+    def _publish(self, views: dict[str, bytes], metrics: dict) -> None:
+        with self._condition:
+            if views:
+                self._views = views
             self._metrics = metrics
             self._version += 1
             self._condition.notify_all()
+
+    def _learner_metrics(self) -> dict | None:
+        learner = find_learner(self.engine)
+        if learner is None:
+            return None
+        stats = learner.stats()
+        return {
+            "steps": stats.steps,
+            "frames_seen": stats.frames_seen,
+            "paused": stats.paused,
+            "rollbacks": stats.rollbacks,
+            "error": stats.error,
+            "replay_mae": None if np.isnan(stats.prediction_mae) else stats.prediction_mae,
+            "replay_copy_mae": None if np.isnan(stats.copy_mae) else stats.copy_mae,
+        }
 
     def run(self) -> None:
         capture = cv2.VideoCapture(self.source)
         if not capture.isOpened():
             self.error = f"cannot open source {self.source!r}"
             self.running = False
-            self._publish(b"", self.metrics() | {"error": self.error})
+            self._publish({}, self.metrics() | {"error": self.error})
             return
         is_file = isinstance(self.source, str) and not self.source.isdigit()
         fps = capture.get(cv2.CAP_PROP_FPS) if is_file else 30.0
@@ -103,9 +190,13 @@ class LiveState:
         self.engine.reset()
         pending: EnginePrediction | None = None
         previous_actual = None
-        scored = wins = 0
+        scored = wins = dream_frames = 0
         model_error = copy_error = 0.0
-        latencies = []
+        latencies: deque[float] = deque(maxlen=256)
+        frame_times: deque[float] = deque(maxlen=60)
+        bucket = {"model": [], "copy": [], "cortical": []}
+        bucket_start = time.perf_counter()
+        started = bucket_start
         frame_count = 0
         next_tick = time.perf_counter()
         try:
@@ -116,45 +207,63 @@ class LiveState:
                         capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
                         continue
                     break
+                frame_times.append(time.perf_counter())
                 actual = cv2.resize(
                     frame, (self.engine.width, self.engine.height), interpolation=cv2.INTER_AREA
                 )
-                current = self.engine.predict(actual)
+                dreaming = self.eyes_closed and pending is not None
+                dream_frames = dream_frames + 1 if dreaming else 0
+                # With eyes closed the model sees only its own last prediction.
+                current = self.engine.predict(pending.image if dreaming else actual)
                 latencies.append(current.inference_ms)
-                latencies = latencies[-256:]
                 if pending is not None:
-                    difference = pending.image.astype(np.float32) - actual.astype(np.float32)
-                    copy_difference = previous_actual.astype(np.float32) - actual.astype(np.float32)
-                    model_mae = float(np.mean(np.abs(difference)) / 255.0)
-                    copy_mae = float(np.mean(np.abs(copy_difference)) / 255.0)
+                    model_mae = float(
+                        np.mean(np.abs(pending.image.astype(np.float32) - actual)) / 255.0
+                    )
+                    copy_mae = float(
+                        np.mean(np.abs(previous_actual.astype(np.float32) - actual)) / 255.0
+                    )
                     model_error += model_mae
                     copy_error += copy_mae
                     wins += int(model_mae < copy_mae)
                     scored += 1
-                    view = comparison_view(actual, pending, previous_actual, current)
+                    bucket["model"].append(model_mae)
+                    bucket["copy"].append(copy_mae)
+                    experts = getattr(self.engine, "last_expert_errors", {})
+                    bucket["cortical"].append(experts.get("cortical", model_mae))
+                    error = error_view(pending.image, actual)
                 else:
-                    blank = np.zeros_like(actual)
-                    view = np.vstack(
-                        (
-                            np.hstack(
-                                (
-                                    label(actual, "camera now"),
-                                    label(current.image, "predicted next"),
-                                )
-                            ),
-                            np.hstack(
-                                (
-                                    label(blank, "waiting for due prediction"),
-                                    label(blank, "waiting for error"),
-                                )
-                            ),
+                    error = np.zeros_like(actual)
+                shown = current.image
+                if self.horizon > 1 and hasattr(self.engine, "rollout"):
+                    shown = self.engine.rollout(current.image, self.horizon - 1)
+                overlay, overlay_kind = overlay_view(self.engine, shown)
+                images = {"camera": actual, "prediction": shown, "error": error, "overlay": overlay}
+                views = {}
+                for name, image in images.items():
+                    ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 92])
+                    if not ok:
+                        raise RuntimeError("JPEG encoding failed")
+                    views[name] = encoded.tobytes()
+                now = time.perf_counter()
+                if now - bucket_start >= 1.0 and bucket["model"]:
+                    learner = self._learner_metrics()
+                    with self._condition:
+                        self._history.append(
+                            {
+                                "t": round(now - started, 1),
+                                "model": float(np.mean(bucket["model"])),
+                                "copy": float(np.mean(bucket["copy"])),
+                                "cortical": float(np.mean(bucket["cortical"])),
+                                "dreaming": self.eyes_closed,
+                                "steps": learner["steps"] if learner else 0,
+                            }
                         )
-                    )
-                ok, encoded = cv2.imencode(".jpg", view, [cv2.IMWRITE_JPEG_QUALITY, 90])
-                if not ok:
-                    raise RuntimeError("JPEG encoding failed")
+                    bucket = {key: [] for key in bucket}
+                    bucket_start = now
+                span = frame_times[-1] - frame_times[0] if len(frame_times) > 1 else 0.0
                 self._publish(
-                    encoded.tobytes(),
+                    views,
                     {
                         "engine": self.engine_name,
                         "scored": scored,
@@ -164,6 +273,13 @@ class LiveState:
                         "inference_ms": float(np.mean(latencies)),
                         "inference_ms_p95": float(np.percentile(latencies, 95)),
                         "frames_read": frame_count + 1,
+                        "fps": (len(frame_times) - 1) / span if span else 0.0,
+                        "eyes_closed": self.eyes_closed,
+                        "dream_frames": dream_frames,
+                        "horizon": self.horizon,
+                        "overlay": overlay_kind,
+                        "experts": list(getattr(self.engine, "names", ())),
+                        "learner": self._learner_metrics(),
                         "error": "",
                     },
                 )
@@ -175,7 +291,7 @@ class LiveState:
                     time.sleep(max(0.0, next_tick - time.perf_counter()))
         except Exception as error:
             self.error = f"{type(error).__name__}: {error}"
-            self._publish(self.latest()[1], self.metrics() | {"error": self.error})
+            self._publish({}, self.metrics() | {"error": self.error})
         finally:
             capture.release()
             self.running = False
@@ -192,6 +308,9 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _json(self, value) -> None:
+        self._bytes(200, "application/json", json.dumps(value).encode())
+
     def do_GET(self):
         state: LiveState = self.server.state
         path = self.path.split("?")[0]
@@ -199,16 +318,21 @@ class Handler(BaseHTTPRequestHandler):
             self._bytes(200, "text/html; charset=utf-8", INDEX_HTML.encode())
             return
         if path == "/health":
-            self._bytes(
-                200,
-                "application/json",
-                json.dumps({"ok": state.running, "error": state.error}).encode(),
-            )
+            self._json({"ok": state.running, "error": state.error})
             return
         if path == "/metrics.json":
-            self._bytes(200, "application/json", json.dumps(state.metrics()).encode())
+            self._json(state.metrics())
             return
-        if path == "/stream.mjpg":
+        if path == "/history.json":
+            self._json(state.history())
+            return
+        if path == "/state.json":
+            # One poll for the page, so streams and polls fit the browser's
+            # six-connection limit per host.
+            self._json({"metrics": state.metrics(), "history": state.history()})
+            return
+        view = path.removeprefix("/stream/").removesuffix(".mjpg")
+        if path.startswith("/stream/") and view in VIEWS:
             self.send_response(200)
             self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
             self.send_header("Cache-Control", "no-store")
@@ -216,7 +340,7 @@ class Handler(BaseHTTPRequestHandler):
             version = -1
             try:
                 while state.running:
-                    version, jpeg = state.wait_for_change(version)
+                    version, jpeg = state.wait_for_change(view, version)
                     if not jpeg:
                         continue
                     self.wfile.write(
@@ -227,6 +351,20 @@ class Handler(BaseHTTPRequestHandler):
                 return
             return
         self._bytes(404, "text/plain; charset=utf-8", b"not found")
+
+    def do_POST(self):
+        if self.path.split("?")[0] != "/control":
+            self._bytes(404, "text/plain; charset=utf-8", b"not found")
+            return
+        length = min(int(self.headers.get("Content-Length") or 0), 4096)
+        try:
+            command = json.loads(self.rfile.read(length) or b"{}")
+            if not isinstance(command, dict):
+                raise ValueError("expected a JSON object")
+        except ValueError as error:
+            self._bytes(400, "text/plain; charset=utf-8", str(error).encode())
+            return
+        self._json(self.server.state.control(command))
 
     def log_message(self, *_):
         return
@@ -240,8 +378,9 @@ def serve(
     port: int,
     loop: bool,
     max_frames: int,
+    horizon: int = 1,
 ) -> None:
-    state = LiveState(engine, source, engine_name, loop, max_frames)
+    state = LiveState(engine, source, engine_name, loop, max_frames, horizon)
     server = ThreadingHTTPServer((host, port), Handler)
     server.state = state
     server.daemon_threads = True
@@ -258,5 +397,8 @@ def serve(
             state._condition.notify_all()
         capture_thread.join(timeout=5)
         server.server_close()
+        learner = find_learner(engine)
+        if learner is not None:
+            learner.stop()
     if state.error:
         raise RuntimeError(state.error)
