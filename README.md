@@ -110,7 +110,7 @@ Open **http://127.0.0.1:8080**. `demo` downloads the weights and DMVFN checkpoin
 
 Append `?view=lab` to the URL to open the lab view directly, for example on a second screen.
 
-Until the v0.2.0 release assets are published, place `cortical.pt` (the trained hierarchy) and `dmvfn_vimeo.pkl` in `~/.cache/cortical-mirror` yourself, or run `demo --from-scratch` (which still needs `dmvfn_vimeo.pkl` on CUDA; the v0.1.0 release has it).
+The weights and sample clip come from the [v0.2.0 release](https://github.com/froid1911/cortical-mirror/releases/tag/v0.2.0), which lists their SHA-256 checksums.
 
 ### Controls
 
