@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cortical-mirror"
-version = "0.1.0"
+version = "0.2.0"
 description = "Live causal video prediction with hierarchical predictive coding"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,6 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.8"]
 dmvfn = ["gdown>=5"]
+eval = ["lpips>=0.1.4"]
 
 [project.scripts]
 cortical-mirror = "cortical_mirror.cli:main"
@@ -27,6 +28,9 @@ cortical-train = "cortical_mirror.train:main"
 
 [tool.setuptools.packages.find]
 include = ["cortical_mirror*"]
+
+[tool.setuptools.package-data]
+cortical_mirror = ["static/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

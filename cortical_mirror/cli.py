@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import sys
+import urllib.request
 from pathlib import Path
+
+import cv2
 
 from . import __version__
 from .classical import OpticalFlowEngine
 from .dmvfn import DMVFNEngine
-from .engines import CopyEngine, CorticalEngine
+from .engines import CopyEngine, CorticalEngine, resolve_device
 from .ensemble import AdaptiveEngine
 from .evaluate import evaluate_video
 from .server import serve
@@ -25,46 +30,107 @@ def add_engine_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--dmvfn-checkpoint", type=Path, help="DMVFN checkpoint used by --engine adaptive"
     )
-    parser.add_argument("--device", default="cuda")
+    parser.add_argument("--device", default="auto", help="auto, cuda, cuda:N, or cpu")
     parser.add_argument("--width", type=int, default=256)
     parser.add_argument("--height", type=int, default=192)
     parser.add_argument("--no-amp", action="store_true")
-    parser.add_argument("--temperature", type=float, default=0.001)
-    parser.add_argument("--adaptation", type=float, default=0.3)
+    # Chosen on the validation split (reports/tune/); the test split was never used.
+    parser.add_argument("--temperature", type=float, default=0.002)
+    parser.add_argument("--adaptation", type=float, default=0.1)
     parser.add_argument("--patch-size", type=int, default=16)
+    parser.add_argument(
+        "--experts",
+        default="copy,cortical,dmvfn",
+        help="predictors the adaptive engine routes between (for ablations)",
+    )
+    learning = parser.add_argument_group("online learning")
+    learning.add_argument(
+        "--learn", action="store_true", help="keep training the cortical network on the stream"
+    )
+    learning.add_argument(
+        "--from-scratch",
+        action="store_true",
+        help="start the cortical network untrained (implies --learn; no checkpoint needed)",
+    )
+    learning.add_argument("--learn-rate", type=float, default=2e-4)
+    learning.add_argument(
+        "--learn-steps", type=float, default=0.0, help="gradient steps per frame (0 = auto)"
+    )
+    learning.add_argument(
+        "--anchor",
+        type=float,
+        default=1e-2,
+        help="pull toward the starting weights; ignored with --from-scratch",
+    )
+
+
+def cortical_engine(args, mixed_precision: bool) -> CorticalEngine:
+    if args.from_scratch:
+        engine = CorticalEngine.fresh(
+            device=args.device,
+            width=args.width,
+            height=args.height,
+            mixed_precision=mixed_precision,
+        )
+    else:
+        engine = CorticalEngine.from_checkpoint(
+            args.checkpoint, device=args.device, mixed_precision=mixed_precision
+        )
+    if args.learn or args.from_scratch:
+        # 0 = as fast as the duty cycle allows; a positive value caps steps per frame.
+        steps = args.learn_steps or 10.0
+        engine.enable_learning(
+            learning_rate=args.learn_rate * (5.0 if args.from_scratch else 1.0),
+            steps_per_frame=steps,
+            anchor_weight=0.0 if args.from_scratch else args.anchor,
+        )
+    return engine
 
 
 def create_engine(args):
-    if args.engine in ("cortical", "dmvfn", "adaptive") and not args.checkpoint:
-        raise SystemExit(f"--engine {args.engine} requires --checkpoint")
+    args.device = resolve_device(args.device)
+    uses_cortical = args.engine == "cortical" or (
+        args.engine == "adaptive" and "cortical" in args.experts
+    )
+    needs_cortical_checkpoint = uses_cortical and not args.from_scratch
+    if (needs_cortical_checkpoint or args.engine == "dmvfn") and not args.checkpoint:
+        raise SystemExit(f"--engine {args.engine} requires --checkpoint (or --from-scratch)")
+    if (args.learn or args.from_scratch) and not uses_cortical:
+        raise SystemExit("online learning needs the cortical network in the engine")
     if args.engine == "adaptive":
-        if not args.dmvfn_checkpoint:
-            raise SystemExit("--engine adaptive requires --dmvfn-checkpoint")
-        # Alternating these small models was faster in FP32 than BF16 on RTX 3090.
-        cortical = CorticalEngine.from_checkpoint(
-            args.checkpoint, device=args.device, mixed_precision=False
-        )
-        dmvfn = DMVFNEngine(
-            args.dmvfn_checkpoint,
-            device=args.device,
-            width=cortical.width,
-            height=cortical.height,
-            mixed_precision=False,
-        )
+        names = [name.strip() for name in args.experts.split(",") if name.strip()]
+        unknown = set(names) - {"copy", "cortical", "dmvfn", "flow"}
+        if unknown or not names:
+            raise SystemExit(f"--experts must name copy, cortical, dmvfn or flow; got {unknown}")
+        if "dmvfn" in names and not args.dmvfn_checkpoint:
+            raise SystemExit("--experts dmvfn requires --dmvfn-checkpoint")
+        experts = {}
+        if "cortical" in names:
+            # Alternating these small models was faster in FP32 than BF16 on RTX 3090.
+            experts["cortical"] = cortical_engine(args, mixed_precision=False)
+        width = experts["cortical"].width if experts else args.width
+        height = experts["cortical"].height if experts else args.height
+        for name in names:
+            if name == "copy":
+                experts["copy"] = CopyEngine(width, height)
+            elif name == "dmvfn":
+                experts["dmvfn"] = DMVFNEngine(
+                    args.dmvfn_checkpoint,
+                    device=args.device,
+                    width=width,
+                    height=height,
+                    mixed_precision=False,
+                )
+            elif name == "flow":
+                experts["flow"] = OpticalFlowEngine(width=width, height=height)
         return AdaptiveEngine(
-            {
-                "copy": CopyEngine(cortical.width, cortical.height),
-                "cortical": cortical,
-                "dmvfn": dmvfn,
-            },
+            {name: experts[name] for name in names},
             temperature=args.temperature,
             adaptation=args.adaptation,
             patch_size=args.patch_size,
         )
     if args.engine == "cortical":
-        return CorticalEngine.from_checkpoint(
-            args.checkpoint, device=args.device, mixed_precision=not args.no_amp
-        )
+        return cortical_engine(args, mixed_precision=not args.no_amp)
     if args.engine == "dmvfn":
         return DMVFNEngine(
             args.checkpoint,
@@ -78,10 +144,93 @@ def create_engine(args):
     return CopyEngine(width=args.width, height=args.height)
 
 
+RELEASE = "https://github.com/froid1911/cortical-mirror/releases/download/v0.2.0"
+DEMO_ASSETS = {
+    "cortical.pt": f"{RELEASE}/cortical-mirror-v0.2.0.pt",
+    "dmvfn_vimeo.pkl": f"{RELEASE}/dmvfn_vimeo.pkl",
+    "sample.mp4": f"{RELEASE}/sample.mp4",
+}
+
+
+def fetch(name: str, folder: Path) -> Path:
+    path = folder / name
+    if not path.exists():
+        folder.mkdir(parents=True, exist_ok=True)
+        print(f"downloading {name} to {folder}", file=sys.stderr, flush=True)
+        temporary = path.with_suffix(path.suffix + ".part")
+        try:
+            with (
+                urllib.request.urlopen(DEMO_ASSETS[name]) as response,
+                temporary.open("wb") as out,
+            ):
+                shutil.copyfileobj(response, out)
+        except OSError as error:
+            temporary.unlink(missing_ok=True)
+            alternative = (
+                "pass --source with a video path"
+                if name == "sample.mp4"
+                else "start untrained with --from-scratch"
+            )
+            raise SystemExit(
+                f"could not download {name} from {DEMO_ASSETS[name]} ({error}). "
+                f"Place the file at {path} yourself, or {alternative}."
+            ) from error
+        temporary.replace(path)
+    return path
+
+
+def camera_available(source: str) -> bool:
+    if not source.isdigit():
+        return Path(source).exists()
+    capture = cv2.VideoCapture(int(source))
+    try:
+        return capture.isOpened() and capture.read()[0]
+    finally:
+        capture.release()
+
+
+def demo_arguments(args) -> None:
+    """Fill in everything `cortical-mirror demo` needs, downloading on first use."""
+
+    folder = args.assets
+    args.device = resolve_device(args.device)
+    if not args.from_scratch:
+        args.checkpoint = fetch("cortical.pt", folder)
+    args.engine = "adaptive"
+    args.learn = True
+    if args.device == "cpu":
+        # DMVFN alone would hold a laptop CPU near 10 fps; keep the mirror fluid.
+        args.experts = "copy,cortical"
+        print("no CUDA device: routing between persistence and the hierarchy", file=sys.stderr)
+        if args.from_scratch:
+            print("learning on the CPU is slow: expect minutes, not seconds", file=sys.stderr)
+        else:
+            # A CPU learner managed ~0.5 steps/s and cut the mirror to ~18 fps.
+            args.learn = False
+            print("live learning needs a CUDA GPU to keep up; it is off", file=sys.stderr)
+    else:
+        args.dmvfn_checkpoint = fetch("dmvfn_vimeo.pkl", folder)
+    if not camera_available(args.source):
+        print(f"no camera at {args.source!r}; playing the sample clip", file=sys.stderr)
+        args.source = str(fetch("sample.mp4", folder))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="cortical-mirror", description=__doc__)
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command", required=True)
+
+    demo = commands.add_parser(
+        "demo", help="one command: download weights, open the camera, learn live"
+    )
+    demo.set_defaults(engine="adaptive")
+    demo.add_argument("--source", default="0", help="camera index or video path")
+    demo.add_argument("--host", default="127.0.0.1")
+    demo.add_argument("--port", type=int, default=8080)
+    demo.add_argument("--assets", type=Path, default=Path.home() / ".cache" / "cortical-mirror")
+    demo.add_argument("--from-scratch", action="store_true", help="start the hierarchy untrained")
+    demo.add_argument("--horizon", type=int, default=1, help="frames ahead to show (1-8)")
+    demo.add_argument("--device", default="auto")
 
     live = commands.add_parser("serve", help="serve the live mirror in a browser")
     add_engine_arguments(live)
@@ -90,6 +239,9 @@ def main() -> None:
     live.add_argument("--port", type=int, default=8080)
     live.add_argument("--no-loop", action="store_true", help="stop at the end of a video source")
     live.add_argument("--max-frames", type=int, default=0)
+    live.add_argument(
+        "--horizon", type=int, default=1, help="frames ahead to show in the mirror (1-8)"
+    )
 
     offline = commands.add_parser(
         "evaluate", help="evaluate predictions against their exact target frames"
@@ -101,8 +253,13 @@ def main() -> None:
     offline.add_argument("--samples", type=int, default=8)
     args = parser.parse_args()
 
+    if args.command == "demo":
+        defaults = parser.parse_args(["serve", "--engine", "adaptive"])
+        args = argparse.Namespace(**(vars(defaults) | vars(args)))
+        args.loop, args.no_loop, args.max_frames = True, False, 0
+        demo_arguments(args)
     engine = create_engine(args)
-    if args.command == "serve":
+    if args.command in ("serve", "demo"):
         serve(
             engine,
             source=args.source,
@@ -111,6 +268,7 @@ def main() -> None:
             port=args.port,
             loop=not args.no_loop,
             max_frames=args.max_frames,
+            horizon=args.horizon,
         )
     else:
         result = evaluate_video(
