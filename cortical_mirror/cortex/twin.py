@@ -11,16 +11,16 @@ from .engine import CortexEngine
 
 
 class _Surprise:
-    """Prediction error relative to persistence, over the last ~second."""
+    """Prediction error relative to the cortex expecting nothing to change, over ~1 s."""
 
     def __init__(self, frames: int = 30):
         self.model: deque[float] = deque(maxlen=frames)
         self.copy: deque[float] = deque(maxlen=frames)
 
     def add(self, engine: CortexEngine) -> None:
-        if np.isfinite(engine.last_code_error) and np.isfinite(engine.last_persistence_error):
+        if np.isfinite(engine.last_code_error) and np.isfinite(engine.last_stillness_error):
             self.model.append(engine.last_code_error)
-            self.copy.append(engine.last_persistence_error)
+            self.copy.append(engine.last_stillness_error)
 
     def ratio(self) -> float | None:
         total = sum(self.copy)
@@ -68,7 +68,11 @@ class TwinEngine:
         return {
             "mode": "twins",
             "twins": {
-                name: {"age_frames": engine.age_frames, "surprise": self._surprise[name].ratio()}
+                name: {
+                    "age_frames": engine.age_frames,
+                    "experience_frames": engine.experience_frames,
+                    "surprise": self._surprise[name].ratio(),
+                }
                 for name, engine in (("newborn", self.newborn), ("adult", self.adult))
             },
         }

@@ -59,6 +59,7 @@ def main() -> None:
     split = split_videos(args.data)
     videos = split.train or split.validation
     engine = CortexEngine(device=args.device, learn=True, phase=args.phase, seed=args.seed)
+    engine.streams = args.streams
     streams = Streams(videos, args.streams, args.seed)
     args.log.parent.mkdir(parents=True, exist_ok=True)
     started = time.time()
@@ -81,6 +82,8 @@ def main() -> None:
                     ),
                     "prediction_over_persistence": result.code_error
                     / max(result.persistence_error, 1e-12),
+                    "prediction_over_stillness": result.code_error
+                    / max(result.stillness_error, 1e-12),
                     "mean_rate": float((activity > 0).float().mean()),
                     "median_osi": tuning["median_osi"],
                     "fraction_selective": tuning["fraction_selective"],

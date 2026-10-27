@@ -51,3 +51,13 @@ def test_save_and_load_round_trip(tmp_path):
     assert loaded.age_frames == engine.age_frames
     assert torch.equal(loaded.hierarchy.levels[0].W, engine.hierarchy.levels[0].W)
     assert not loaded.learn
+
+
+def test_experience_counts_every_stream_and_survives_saving(tmp_path):
+    engine = CortexEngine()
+    engine.streams = 16
+    for frame in FRAMES[:5]:
+        engine.predict(frame)
+    assert engine.experience_frames == 80
+    engine.save(tmp_path / "adult.pt")
+    assert CortexEngine.load(tmp_path / "adult.pt").experience_frames == 80

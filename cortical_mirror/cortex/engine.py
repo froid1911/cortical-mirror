@@ -36,7 +36,7 @@ def render_prediction(
     coarse = cv2.GaussianBlur(gray / 255.0, (0, 0), 3.0)
     contrast = (code_next[0, 0] - code_next[0, 1]).float().cpu().numpy()
     contrast = cv2.resize(contrast, (width, height), interpolation=cv2.INTER_LINEAR)
-    image = np.clip(coarse + 0.25 * contrast, 0.0, 1.0)
+    image = np.clip(coarse + 0.6 * contrast, 0.0, 1.0)
     return cv2.cvtColor(np.rint(image * 255).astype(np.uint8), cv2.COLOR_GRAY2BGR)
 
 
@@ -57,10 +57,17 @@ class CortexEngine:
         self.hierarchy = Hierarchy(self.retina.channels, phase_levels(phase), self.device, seed)
         self.last_code_error = float("nan")
         self.last_persistence_error = float("nan")
+        self.last_stillness_error = float("nan")
+        # Frames seen per learning step: 1 live, more when an adult trains on parallel streams.
+        self.streams = 1
 
     @property
     def age_frames(self) -> int:
         return self.hierarchy.age_frames
+
+    @property
+    def experience_frames(self) -> int:
+        return self.hierarchy.age_frames * self.streams
 
     def reset(self) -> None:
         self.retina.reset()
@@ -78,6 +85,7 @@ class CortexEngine:
         result = self.hierarchy.step(self.retina.encode(gray), learn=self.learn)
         self.last_code_error = result.code_error
         self.last_persistence_error = result.persistence_error
+        self.last_stillness_error = result.stillness_error
         image = render_prediction(result.predicted_next, frame_bgr, self.width, self.height)
         error = result.errors[0].abs().mean(dim=1)[0].cpu().numpy()
         return EnginePrediction(
@@ -109,6 +117,7 @@ class CortexEngine:
     def save(self, path: str | Path) -> None:
         state = {
             "engine": {"phase": self.phase, "width": self.width, "height": self.height},
+            "streams": self.streams,
             "hierarchy": self.hierarchy.state_dict(),
         }
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -119,4 +128,5 @@ class CortexEngine:
         state = torch.load(path, map_location="cpu", weights_only=True)
         engine = cls(device=device, learn=learn, **state["engine"])
         engine.hierarchy.load_state_dict(state["hierarchy"])
+        engine.streams = int(state.get("streams", 1))
         return engine
