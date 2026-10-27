@@ -18,8 +18,10 @@ from cortical_mirror.cortex.engine import CortexEngine
 from cortical_mirror.cortex.phenomena import (
     direction_selectivity,
     end_stopping,
+    habituation_of_orienting,
     oddball_adaptation,
     orientation_tuning,
+    predictive_remapping,
     size_tuning,
 )
 
@@ -29,9 +31,17 @@ PROTOCOLS = {
     "direction": direction_selectivity,
     "size": size_tuning,
     "endstopping": end_stopping,
+    "remapping": predictive_remapping,
+    "orienting": habituation_of_orienting,
 }
+# Phase 3 protocols need the whole engine (eye, periphery), not just the hierarchy.
+ENGINE_PROTOCOLS = {"remapping", "orienting"}
 # The protocols that apply from each phase on.
-PHASE_PROTOCOLS = {1: ["orientation", "oddball"], 2: ["direction", "size", "endstopping"]}
+PHASE_PROTOCOLS = {
+    1: ["orientation", "oddball"],
+    2: ["direction", "size", "endstopping"],
+    3: ["remapping", "orienting"],
+}
 
 
 def summarise(result: dict) -> dict:
@@ -116,7 +126,8 @@ def main() -> None:
     )
     for name in names:
         started = time.time()
-        report[name] = PROTOCOLS[name](engine.hierarchy)
+        subject = engine if name in ENGINE_PROTOCOLS else engine.hierarchy
+        report[name] = PROTOCOLS[name](subject)
         report[name]["seconds"] = round(time.time() - started, 1)
         summary = summarise(report[name])
         print(name, json.dumps(summary), flush=True)

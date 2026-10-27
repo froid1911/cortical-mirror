@@ -308,6 +308,11 @@ class Hierarchy:
     def predict_next_code(self) -> torch.Tensor | None:
         return self._predicted_code
 
+    def predicted_activity(self, level: int = 0) -> torch.Tensor | None:
+        """The activity a level expects on the next frame."""
+
+        return None if self._predicted_activities is None else self._predicted_activities[level]
+
     def predicted_change(self) -> torch.Tensor | None:
         """What the network expects to change in its input: its forecast minus its
         own 'nothing changes' rendering. Zero until temporal learning has happened."""
