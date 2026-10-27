@@ -66,28 +66,35 @@ class Eye:
             value *= 1.0 - self.inhibition * closeness
         return value
 
-    def look(self, world: torch.Tensor, surprise: torch.Tensor | None) -> tuple[torch.Tensor, int]:
-        """Possibly saccade, then return the foveal window ``[1, 1, h, w]`` and the command."""
+    def crop(self, world: torch.Tensor) -> torch.Tensor:
+        """The foveal window ``[1, 1, h, w]`` at the current gaze."""
 
-        self._frame += 1
-        command = 0
-        if surprise is not None and self._frame % self.period_frames == 0:
-            best, best_score = 0, -1.0
-            for index, (dx, dy) in enumerate(COMMANDS[1:], start=1):
-                target = (self.gaze[0] + dx * self.saccade_px, self.gaze[1] + dy * self.saccade_px)
-                if not self._inside(*target):
-                    continue
-                score = self._score(target, surprise)
-                if score > best_score:
-                    best, best_score = index, score
-            if best:
-                dx, dy = COMMANDS[best]
-                self.gaze = (
-                    self.gaze[0] + dx * self.saccade_px,
-                    self.gaze[1] + dy * self.saccade_px,
-                )
-                self.history.append(self.gaze)
-                command = best
         x, y = self.gaze
         half_w, half_h = self.fovea[0] // 2, self.fovea[1] // 2
-        return world[..., y - half_h : y + half_h, x - half_w : x + half_w], command
+        return world[..., y - half_h : y + half_h, x - half_w : x + half_w]
+
+    def decide(self, surprise: torch.Tensor | None) -> int:
+        """Choose the movement made before the next frame and move the gaze; 0 stays."""
+
+        self._frame += 1
+        if surprise is None or self._frame % self.period_frames:
+            return 0
+        best, best_score = 0, -1.0
+        for index, (dx, dy) in enumerate(COMMANDS[1:], start=1):
+            target = (self.gaze[0] + dx * self.saccade_px, self.gaze[1] + dy * self.saccade_px)
+            if not self._inside(*target):
+                continue
+            score = self._score(target, surprise)
+            if score > best_score:
+                best, best_score = index, score
+        if best:
+            dx, dy = COMMANDS[best]
+            self.gaze = (self.gaze[0] + dx * self.saccade_px, self.gaze[1] + dy * self.saccade_px)
+            self.history.append(self.gaze)
+        return best
+
+    def look(self, world: torch.Tensor, surprise: torch.Tensor | None) -> tuple[torch.Tensor, int]:
+        """Decide, then return the window at the new gaze with the command that moved it."""
+
+        command = self.decide(surprise)
+        return self.crop(world), command

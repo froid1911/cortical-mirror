@@ -15,7 +15,7 @@ from pathlib import Path
 import cv2
 import torch
 
-from cortical_mirror.cortex.engine import RETINA_SIZE, CortexEngine
+from cortical_mirror.cortex.engine import CortexEngine
 from cortical_mirror.cortex.phenomena import orientation_tuning
 from cortical_mirror.cortex.retina import frame_to_gray
 from cortical_mirror.data import split_videos
@@ -30,7 +30,7 @@ class Streams:
     def _open(self):
         return cv2.VideoCapture(str(self.rng.choice(self.videos)))
 
-    def frames(self, device) -> torch.Tensor:
+    def frames(self, device, size: tuple[int, int]) -> torch.Tensor:
         out = []
         for index, capture in enumerate(self.captures):
             ok, frame = capture.read()
@@ -38,7 +38,7 @@ class Streams:
                 capture.release()
                 capture = self.captures[index] = self._open()
                 ok, frame = capture.read()
-            out.append(frame_to_gray(frame, *RETINA_SIZE, device))
+            out.append(frame_to_gray(frame, *size, device))
         return torch.cat(out)
 
 
@@ -67,8 +67,11 @@ def main() -> None:
     step = 0
     with args.log.open("w", encoding="utf-8") as log:
         while (args.frames and step < args.frames) or (not args.frames and time.time() < deadline):
-            code = engine.retina.encode(streams.frames(engine.device))
-            result = engine.hierarchy.step(code, learn=True)
+            world = streams.frames(engine.device, engine.input_size)
+            result = engine.observe(world)
+            code = (
+                engine.retina.encode(world) if engine.periphery is None else result.predicted_next
+            )
             step += 1
             if step % args.log_every == 0 or step == args.frames:
                 activity = result.activities[0]

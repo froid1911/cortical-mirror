@@ -308,6 +308,14 @@ class Hierarchy:
     def predict_next_code(self) -> torch.Tensor | None:
         return self._predicted_code
 
+    def predicted_change(self) -> torch.Tensor | None:
+        """What the network expects to change in its input: its forecast minus its
+        own 'nothing changes' rendering. Zero until temporal learning has happened."""
+
+        if self._predicted_code is None:
+            return None
+        return self._predicted_code - self._still_code
+
     def architecture(self) -> dict:
         return {
             "in_channels": self.in_channels,
