@@ -12,6 +12,7 @@ import math
 import random
 
 import torch
+from torch.nn import functional as F
 
 from .hierarchy import Hierarchy
 from .retina import Retina
@@ -291,3 +292,159 @@ def end_stopping(network: Hierarchy, lengths=(2, 4, 6, 8, 12, 16, 24)) -> dict:
         "with_feedback": _tuning(network, bar, lengths, feedback=True),
         "without_feedback": _tuning(network, bar, lengths, feedback=False),
     }
+
+
+def _texture(height: int, width: int, seed: int) -> torch.Tensor:
+    """Natural-statistics (1/f) texture, luminance ``[1, 1, H, W]`` in [0, 1]."""
+
+    generator = torch.Generator().manual_seed(seed)
+    image = torch.zeros(1, 1, height, width)
+    for scale in (1, 2, 4, 8, 16):
+        size = (max(2, height // scale), max(2, width // scale))
+        noise = torch.rand(1, 1, *size, generator=generator)
+        image += scale * F.interpolate(
+            noise, size=(height, width), mode="bilinear", align_corners=False
+        )
+    image -= image.min()
+    return image / image.max()
+
+
+@torch.no_grad()
+def predictive_remapping(engine, worlds: int = 8) -> dict:
+    """Protocol 6. V1 activity before a saccade, carried through the movement's learned
+    kernel (told) or the no-movement kernel (not told), against V1's actual activity
+    after the saccade. Every activity is settled from rest the same way."""
+
+    from .eye import COMMANDS, Eye
+
+    network = engine.hierarchy
+    level = network.levels[0]
+    with_copy = [0.0] * len(COMMANDS)
+    without = [0.0] * len(COMMANDS)
+    opposite = [0.0] * len(COMMANDS)
+    for seed in range(worlds):
+        world = _texture(192, 256, seed).to(engine.device)
+        for command in range(1, len(COMMANDS)):
+            retina = Retina(WIDTH, HEIGHT, lagged=engine.retina.lagged, device=engine.device)
+            eye = Eye(256, 192, fovea=(WIDTH, HEIGHT))
+            view = eye.crop(world)
+            retina.encode(view)  # a steady view: the lag holds the same image
+            before = network.settle(retina.encode(view))[0]
+            dx, dy = COMMANDS[command]
+            eye.gaze = (eye.gaze[0] + dx * eye.saccade_px, eye.gaze[1] + dy * eye.saccade_px)
+            after = network.settle(retina.encode(eye.crop(world)))[0]
+            told = level.forecast(before, torch.tensor([command], device=engine.device))
+            untold = level.forecast(before, torch.tensor([0], device=engine.device))
+            # Direction control: the kernel of the opposite movement on the same
+            # transition. A kernel that merely damps activity after any saccade
+            # does as well with the wrong direction as with the right one.
+            reverse = COMMANDS.index((-dx, -dy))
+            wrong = level.forecast(before, torch.tensor([reverse], device=engine.device))
+            with_copy[command] += float((told - after).square().mean())
+            without[command] += float((untold - after).square().mean())
+            opposite[command] += float((wrong - after).square().mean())
+    per_direction = {
+        str(COMMANDS[c]): with_copy[c] / without[c] if without[c] else float("nan")
+        for c in range(1, len(COMMANDS))
+    }
+    total_without, total_opposite = sum(without), sum(opposite)
+    return {
+        "remapping_ratio": sum(with_copy) / total_without if total_without else float("nan"),
+        "direction_specificity": sum(with_copy) / total_opposite
+        if total_opposite
+        else float("nan"),
+        "per_direction": per_direction,
+        "worlds": worlds,
+    }
+
+
+def _orienting_world(frames: int, seed: int = 0):
+    """Left: texture panning predictably. Right: static texture with random flashes."""
+
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    pan = (_texture(192, 128 + 2 * frames, seed + 1)[0, 0].numpy() * 200 + 25).astype(np.uint8)
+    still = (_texture(192, 128, seed + 2)[0, 0].numpy() * 200 + 25).astype(np.uint8)
+    flash_until, flash = -1, (0, 0)
+    for t in range(frames):
+        frame = np.empty((192, 256), np.uint8)
+        frame[:, :128] = pan[:, 2 * t : 2 * t + 128]
+        frame[:, 128:] = still
+        if t > flash_until and rng.random() < 1 / 15:
+            flash_until, flash = t + 2, (int(rng.integers(0, 180)), int(rng.integers(128, 244)))
+        if t <= flash_until:
+            y, x = flash
+            frame[y : y + 12, x : x + 12] = 255
+        yield np.repeat(frame[..., None], 3, axis=2)
+
+
+def _gaze_statistics(decisions: list[dict]) -> dict:
+    """The plan's statistic and inhibition of return, from an eye's decision log.
+
+    chosen_surprise_percentile: where the chosen target's surprise ranks among the
+    possible targets (0 lowest, 1 highest; a random choice averages 0.5). The eye is
+    built to seek surprise, so this is a sanity check, not a learned phenomenon.
+    revisit_rate vs random_revisit_rate: how often a saccade returns to a recent
+    fixation, against the rate a random choice among the same targets would give.
+    """
+
+    percentiles, revisits, chance = [], [], []
+    for decision in decisions:
+        raw, revisit = decision["raw"], decision["revisit"]
+        if not raw:
+            continue
+        chance.append(sum(revisit.values()) / len(revisit))
+        chosen = decision["chosen"]
+        if not chosen:
+            continue
+        revisits.append(float(revisit[chosen]))
+        if len(raw) > 1:
+            below = sum(value < raw[chosen] for value in raw.values())
+            percentiles.append(below / (len(raw) - 1))
+
+    def mean(values):
+        return sum(values) / len(values) if values else 0.0
+
+    return {
+        "chosen_surprise_percentile": mean(percentiles),
+        "revisit_rate": mean(revisits),
+        "random_revisit_rate": mean(chance),
+        "saccades": len(revisits),
+    }
+
+
+def habituation_of_orienting(
+    engine, frames: int = 900, first: int = 200, last: int = 300, seeds: int = 3
+) -> dict:
+    """Protocol 7. Dwell of the gaze on the unpredictable-onset half, with the
+    periphery learning (habituation possible) and frozen (no habituation), averaged
+    over seeds. Dwell is measured instead of saccade direction counts: those are
+    bounded by where the eye stands, so an eye that reached the onsets could only
+    move back."""
+
+    report = {}
+    for condition, learn in (("learning", True), ("frozen", False)):
+        first_dwell, last_dwell, mean_x, decisions = [], [], [], []
+        for seed in range(seeds):
+            subject = copy.deepcopy(engine)
+            subject.learn = learn
+            subject.eyes = []
+            subject.reset()
+            positions = []
+            for frame in _orienting_world(frames, seed):
+                subject.predict(frame)
+                positions.append(subject.eyes[0].gaze[0])
+            centre = 128
+            first_dwell.append(sum(x > centre for x in positions[:first]) / first)
+            last_dwell.append(sum(x > centre for x in positions[-last:]) / last)
+            mean_x.append(sum(positions[-last:]) / last)
+            decisions.extend(subject.eyes[0].decisions)
+        report[condition] = {
+            "dwell_on_onsets_first": sum(first_dwell) / seeds,
+            "dwell_on_onsets_last": sum(last_dwell) / seeds,
+            "mean_gaze_x_last": sum(mean_x) / seeds,
+            "per_seed_dwell_last": last_dwell,
+            "gaze": _gaze_statistics(decisions),
+        }
+    return report

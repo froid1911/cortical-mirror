@@ -48,6 +48,8 @@ class LevelConfig:
     target_rate: float = 0.05
     temporal_kernel: int = 9
     temporal_rate: float = 0.5
+    # Phase 3: one temporal kernel per eye movement, chosen by the efference copy.
+    motor_commands: int = 1
 
 
 @dataclass
@@ -78,8 +80,11 @@ class Level:
         self.theta = torch.full((1, config.cells, 1, 1), config.sparsity, device=device)
         # Temporal predictor starts as persistence: each cell expects itself to continue.
         k = config.temporal_kernel
-        self.V = torch.zeros(config.cells, config.cells, k, k, device=device)
-        self.V[torch.arange(config.cells), torch.arange(config.cells), k // 2, k // 2] = 1.0
+        identity = torch.zeros(config.cells, config.cells, k, k, device=device)
+        identity[torch.arange(config.cells), torch.arange(config.cells), k // 2, k // 2] = 1.0
+        # Even with an eye, every movement starts out expected to change nothing.
+        commands = config.motor_commands
+        self.V = identity if commands == 1 else identity.repeat(commands, 1, 1, 1, 1)
         self.step_size = 0.05
 
     def render(self, activity: torch.Tensor) -> torch.Tensor:
@@ -90,8 +95,22 @@ class Level:
         c = self.config
         return F.conv2d(error, self.B, stride=c.stride, padding=c.padding)
 
-    def forecast(self, activity: torch.Tensor) -> torch.Tensor:
-        return F.conv2d(activity, self.V, padding=self.config.temporal_kernel // 2).clamp(0.0, 1.0)
+    def _linear(self, activity: torch.Tensor, commands: torch.Tensor | None) -> torch.Tensor:
+        pad = self.config.temporal_kernel // 2
+        if self.V.dim() == 4:
+            return F.conv2d(activity, self.V, padding=pad)
+        if commands is None:
+            commands = torch.zeros(activity.shape[0], dtype=torch.long, device=activity.device)
+        out = torch.empty_like(activity)
+        for command in commands.unique().tolist():
+            rows = (commands == command).nonzero().flatten()
+            out[rows] = F.conv2d(activity[rows], self.V[command], padding=pad)
+        return out
+
+    def forecast(
+        self, activity: torch.Tensor, commands: torch.Tensor | None = None
+    ) -> torch.Tensor:
+        return self._linear(activity, commands).clamp(0.0, 1.0)
 
     def settle(self, x: torch.Tensor, activity: torch.Tensor, iterations: int) -> torch.Tensor:
         for _ in range(iterations):
@@ -116,7 +135,7 @@ class Level:
             vector = vector / norm.clamp_min(1e-8)
         return float(norm)
 
-    def learn(self, x, activity, error, previous) -> None:
+    def learn(self, x, activity, error, previous, commands=None) -> None:
         c = self.config
         positions = activity.shape[0] * activity.shape[2] * activity.shape[3]
         hebb = conv2d_weight(error, self.W.shape, activity, stride=c.stride, padding=c.padding)
@@ -131,12 +150,28 @@ class Level:
         if previous is not None:
             # Learn against the linear prediction: the clamp is for output only, and a
             # rule that learns against a saturated output has no fixed point.
-            linear = F.conv2d(previous, self.V, padding=c.temporal_kernel // 2)
-            delta = conv2d_weight(
-                previous, self.V.shape, activity - linear, padding=c.temporal_kernel // 2
-            )
-            energy = previous.square().mean() * c.cells * c.temporal_kernel**2
-            self.V = self.V + c.temporal_rate * delta / positions / energy.clamp_min(1e-6)
+            if self.V.dim() == 4:
+                self.V = self.V + self._temporal_update(previous, activity, self.V)
+                return
+            if commands is None:
+                commands = torch.zeros(activity.shape[0], dtype=torch.long, device=activity.device)
+            for command in commands.unique().tolist():
+                rows = (commands == command).nonzero().flatten()
+                kernel = self.V[command]
+                self.V[command] = kernel + self._temporal_update(
+                    previous[rows], activity[rows], kernel
+                )
+
+    def _temporal_update(self, previous, activity, kernel) -> torch.Tensor:
+        """Normalised delta rule for one temporal kernel."""
+
+        c = self.config
+        pad = c.temporal_kernel // 2
+        positions = activity.shape[0] * activity.shape[2] * activity.shape[3]
+        linear = F.conv2d(previous, kernel, padding=pad)
+        delta = conv2d_weight(previous, kernel.shape, activity - linear, padding=pad)
+        energy = previous.square().mean() * c.cells * c.temporal_kernel**2
+        return c.temporal_rate * delta / positions / energy.clamp_min(1e-6)
 
 
 class Hierarchy:
@@ -164,6 +199,7 @@ class Hierarchy:
         self._predicted_code: torch.Tensor | None = None
         self._previous_code: torch.Tensor | None = None
         self._still_code: torch.Tensor | None = None
+        self._commands: torch.Tensor | None = None
 
     def _refresh_step_sizes(self, code: torch.Tensor) -> None:
         shape = code.shape
@@ -219,7 +255,15 @@ class Hierarchy:
         return activities
 
     @torch.no_grad()
-    def step(self, code: torch.Tensor, learn: bool = True, iterations: int = 20) -> StepResult:
+    def step(
+        self,
+        code: torch.Tensor,
+        learn: bool = True,
+        iterations: int = 20,
+        commands: torch.Tensor | None = None,
+    ) -> StepResult:
+        """Observe one frame per stream. ``commands`` are the eye movements about to be
+        made, one per stream (the efference copy); the forecast uses them."""
         code = code.to(self.device)
         if self.age_frames % 100 == 0 or self.levels[0].step_size <= 0:
             self._refresh_step_sizes(code)
@@ -239,11 +283,15 @@ class Hierarchy:
             for level, x, a, e, p in zip(
                 self.levels, inputs, activities, errors, previous, strict=True
             ):
-                level.learn(x, a, e, p)
+                # The transition just observed followed the commands issued last frame.
+                level.learn(x, a, e, p, self._commands)
             self.age_frames += 1
         self._activities = activities
+        if commands is not None:
+            commands = commands.to(self.device)
+        self._commands = commands
         self._predicted_activities = [
-            level.forecast(a) for level, a in zip(self.levels, activities, strict=True)
+            level.forecast(a, commands) for level, a in zip(self.levels, activities, strict=True)
         ]
         self._predicted_code = self.levels[0].render(self._predicted_activities[0])
         self._still_code = self.levels[0].render(activities[0])
@@ -259,6 +307,19 @@ class Hierarchy:
 
     def predict_next_code(self) -> torch.Tensor | None:
         return self._predicted_code
+
+    def predicted_activity(self, level: int = 0) -> torch.Tensor | None:
+        """The activity a level expects on the next frame."""
+
+        return None if self._predicted_activities is None else self._predicted_activities[level]
+
+    def predicted_change(self) -> torch.Tensor | None:
+        """What the network expects to change in its input: its forecast minus its
+        own 'nothing changes' rendering. Zero until temporal learning has happened."""
+
+        if self._predicted_code is None:
+            return None
+        return self._predicted_code - self._still_code
 
     def architecture(self) -> dict:
         return {
@@ -278,7 +339,12 @@ class Hierarchy:
         }
 
     def load_state_dict(self, state: dict) -> None:
-        if state["architecture"] != self.architecture():
+        saved = dict(state["architecture"])
+        # Fields added later take their defaults, so older checkpoints still load.
+        saved["levels"] = [
+            {**dataclasses.asdict(LevelConfig()), **level} for level in saved["levels"]
+        ]
+        if saved != self.architecture():
             raise ValueError(
                 "checkpoint architecture does not match this network: "
                 f"{state['architecture']} vs {self.architecture()}"
