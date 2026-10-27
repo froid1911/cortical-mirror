@@ -27,11 +27,17 @@ def raise_on(engine: CortexEngine, video: Path, frames: int) -> dict:
     """Let the engine learn from `frames` consecutive frames, looping the video."""
 
     capture = cv2.VideoCapture(str(video))
+    if not capture.isOpened():
+        raise SystemExit(f"cannot read video {video}")
     seen, loops, code_errors, persistence = 0, 0, [], []
+    seen_at_loop_start = 0
     while seen < frames:
         ok, frame = capture.read()
         if not ok:
+            if seen == seen_at_loop_start:
+                raise SystemExit(f"cannot read any frame from {video}")
             loops += 1
+            seen_at_loop_start = seen
             capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
             continue
         engine.predict(frame)
@@ -53,7 +59,7 @@ def main() -> None:
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--untrained", action="store_true")
     source.add_argument("--checkpoint", type=Path)
-    parser.add_argument("--phase", type=int, default=1)
+    parser.add_argument("--phase", type=int, help="default 1; must match a --checkpoint")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--experience", type=Path, help="raise the network on this video first")
     parser.add_argument("--experience-frames", type=int, default=3600)
@@ -64,8 +70,10 @@ def main() -> None:
 
     if args.checkpoint:
         engine = CortexEngine.load(args.checkpoint, device=args.device, learn=True)
+        if args.phase is not None and args.phase != engine.phase:
+            parser.error(f"--phase {args.phase} contradicts the checkpoint's phase {engine.phase}")
     else:
-        engine = CortexEngine(device=args.device, learn=True, phase=args.phase, seed=args.seed)
+        engine = CortexEngine(device=args.device, learn=True, phase=args.phase or 1, seed=args.seed)
     report = {
         "config": {k: str(v) for k, v in vars(args).items()},
         "age_frames_before": engine.age_frames,
