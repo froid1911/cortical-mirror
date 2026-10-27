@@ -57,3 +57,31 @@ def test_checkpoint_architecture_mismatch_is_reported():
     phase2 = Hierarchy(4, [LevelConfig()])
     with pytest.raises(ValueError, match="architecture"):
         phase2.load_state_dict(phase1.state_dict())
+
+
+def test_stillness_baseline_isolates_what_the_temporal_predictor_learned():
+    newborn = Hierarchy(2, [LevelConfig(temporal_rate=0.0)])
+    still = run(newborn, pan(30, 2))
+    # A predictor that never learned expects nothing to change: identical errors.
+    assert all(abs(r.code_error - r.stillness_error) < 1e-9 for r in still[2:])
+    learner = Hierarchy(2, [LevelConfig()])
+    results = run(learner, pan(3000, 2))
+    model = sum(r.code_error for r in results[-200:])
+    stillness = sum(r.stillness_error for r in results[-200:])
+    assert model < 0.8 * stillness
+
+
+def test_newborn_on_a_still_scene_keeps_diverse_living_cells():
+    # A single stream of one unchanging image is the worst case: every frame
+    # pushes the same update. Cells must stay different and keep firing.
+    from tests.cortex_fixtures import texture
+
+    network = Hierarchy(2, [LevelConfig()])
+    still = texture(48, 64, seed=5)
+    results = run(network, [still] * 150)
+    weights = network.levels[0].W.flatten(1)
+    weights = weights / weights.norm(dim=1, keepdim=True)
+    similarity = weights @ weights.T
+    off_diagonal = similarity[~torch.eye(len(similarity), dtype=bool)].abs().mean()
+    assert float(off_diagonal) < 0.5
+    assert float((results[-1].activities[0] > 0).float().mean()) > 0.005

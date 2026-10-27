@@ -27,6 +27,15 @@ from torch.nn import functional as F
 from torch.nn.grad import conv2d_weight
 
 
+# A newborn's feedback weights start unrelated to its generative weights, which
+# makes the settling operator weak and the computed step large; uncapped, every
+# cell saturates at once and the shared Hebbian update makes all cells identical.
+MAX_SETTLING_STEP = 0.1
+# No single frame may move a cell's weights by more than this fraction of their
+# (unit) length: plasticity is bounded per cell, locally.
+MAX_WEIGHT_CHANGE = 0.05
+
+
 @dataclass(frozen=True)
 class LevelConfig:
     cells: int = 32
@@ -47,6 +56,9 @@ class StepResult:
     code_error: float
     persistence_error: float
     predicted_next: torch.Tensor
+    # The cortex's own "nothing changes" expectation: its current representation,
+    # rendered unchanged. Comparing against it isolates what temporal learning added.
+    stillness_error: float = float("nan")
 
 
 def _normalise(weights: torch.Tensor) -> torch.Tensor:
@@ -103,9 +115,11 @@ class Level:
         c = self.config
         positions = activity.shape[0] * activity.shape[2] * activity.shape[3]
         hebb = conv2d_weight(error, self.W.shape, activity, stride=c.stride, padding=c.padding)
-        hebb = hebb / positions
-        self.W = _normalise(self.W + c.learning_rate * hebb)
-        self.B = _normalise(self.B + c.learning_rate * hebb)
+        update = c.learning_rate * hebb / positions
+        size = update.flatten(1).norm(dim=1).clamp_min(1e-12)
+        update = update * (MAX_WEIGHT_CHANGE / size).clamp(max=1.0)[:, None, None, None]
+        self.W = _normalise(self.W + update)
+        self.B = _normalise(self.B + update)
         rate = (activity > 0).float().mean((0, 2, 3), keepdim=True)
         adjust = torch.exp(0.002 * (rate / c.target_rate - 1.0).clamp(-1.0, 1.0))
         self.theta = (self.theta * adjust).clamp(c.sparsity / 10, c.sparsity * 10)
@@ -144,17 +158,20 @@ class Hierarchy:
         self._predicted_activity: torch.Tensor | None = None
         self._predicted_code: torch.Tensor | None = None
         self._previous_code: torch.Tensor | None = None
+        self._still_code: torch.Tensor | None = None
 
     @torch.no_grad()
     def step(self, code: torch.Tensor, learn: bool = True, iterations: int = 20) -> StepResult:
         level = self.levels[0]
         code = code.to(self.device)
         if self.age_frames % 100 == 0 or level.step_size <= 0:
-            level.step_size = 0.9 / max(level.stability_limit(code.shape), 1e-6)
-        code_error = persistence_error = float("nan")
+            limit = max(level.stability_limit(code.shape), 1e-6)
+            level.step_size = min(0.9 / limit, MAX_SETTLING_STEP)
+        code_error = persistence_error = stillness_error = float("nan")
         if self._predicted_code is not None and self._predicted_code.shape == code.shape:
             code_error = float((self._predicted_code - code).square().mean())
             persistence_error = float((self._previous_code - code).square().mean())
+            stillness_error = float((self._still_code - code).square().mean())
         # Warm start from what the level expected to see.
         start = self._predicted_activity
         if start is None or start.shape[0] != code.shape[0]:
@@ -173,6 +190,7 @@ class Hierarchy:
         self._activity = activity
         self._predicted_activity = level.forecast(activity)
         self._predicted_code = level.render(self._predicted_activity)
+        self._still_code = level.render(activity)
         self._previous_code = code
         return StepResult(
             activities=[activity],
@@ -180,6 +198,7 @@ class Hierarchy:
             code_error=code_error,
             persistence_error=persistence_error,
             predicted_next=self._predicted_code,
+            stillness_error=stillness_error,
         )
 
     def predict_next_code(self) -> torch.Tensor | None:
