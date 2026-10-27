@@ -24,3 +24,6 @@ out_*/
 # Local deployment
 .env
 *.log
+
+# Local brainstorming companion
+.superpowers/
