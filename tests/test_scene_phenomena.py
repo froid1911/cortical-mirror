@@ -94,3 +94,20 @@ def test_permanence_keeps_a_hidden_object_only_with_a_long_persistence():
     assert patient["kept"] == 1.0 and forgetful["kept"] == 0.0
     for report in (patient, forgetful):
         assert report["surprise_vanish"] >= 0 and report["surprise_reappear"] >= 0
+
+
+def test_training_the_motor_map_returns_one_shift_per_command():
+    motor = phenomena.train_motor(seeds=[400], frames=60)
+    assert motor.shape == (9, 2)
+
+
+def test_a_true_motor_map_sees_its_own_saccades_as_still_and_a_zero_map_does_not():
+    from cortical_mirror.cortex.eye import COMMANDS
+    from cortical_mirror.scene.eye import SACCADE
+
+    true = np.array(COMMANDS, float) * SACCADE
+    adult = phenomena.self_and_world(true, seeds=[4000])
+    newborn = phenomena.self_and_world(np.zeros((9, 2)), seeds=[4000])
+    assert adult["commanded"] <= 0.1 and adult["uncommanded"] >= 0.8
+    assert newborn["commanded"] >= 0.8
+    assert adult["prediction_ratio"] < newborn["prediction_ratio"]

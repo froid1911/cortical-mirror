@@ -302,3 +302,90 @@ def object_permanence(persistence: float, seeds=range(3000, 3020), frames: int =
         "violation_ratio": vanish_mean / reappear_mean if reappear_mean else float("nan"),
         "trials": len(kept),
     }
+
+
+EYE_WORLD = (384, 288)
+EYE_VIEW = (256, 192)
+
+
+def _eye_world(seed: int) -> SpriteWorld:
+    return SpriteWorld(seed=seed, width=EYE_WORLD[0], height=EYE_WORLD[1], objects=2)
+
+
+def _saccade(gaze, command: int):
+    from ..cortex.eye import COMMANDS
+    from .eye import SACCADE
+
+    dx, dy = COMMANDS[command]
+    return gaze[0] + dx * SACCADE, gaze[1] + dy * SACCADE
+
+
+def _inside(gaze) -> bool:
+    w, h = EYE_VIEW
+    return w / 2 <= gaze[0] <= EYE_WORLD[0] - w / 2 and h / 2 <= gaze[1] <= EYE_WORLD[1] - h / 2
+
+
+def train_motor(seeds=range(400, 440), frames: int = 600, every: int = 5) -> np.ndarray:
+    """Protocol 12's training: random saccades that keep the view in the world."""
+
+    import random
+
+    from .eye import EyeGraph, look
+
+    graph = EyeGraph(EYE_VIEW)
+    for seed in seeds:
+        rng = random.Random(seed)
+        world, gaze = _eye_world(seed), (EYE_WORLD[0] / 2, EYE_WORLD[1] / 2)
+        graph.reset_scene()
+        for t in range(frames):
+            command = 0
+            if t >= 20 and t % every == every - 1:
+                command = rng.choice([c for c in range(1, 9) if _inside(_saccade(gaze, c))])
+                gaze = _saccade(gaze, command)
+            world.step()
+            graph.observe(look(world.render(), gaze, EYE_VIEW), command)
+    return graph.motor.copy()
+
+
+def self_and_world(motor: np.ndarray, seeds=range(4000, 4020), settle: int = 30) -> dict:
+    """Protocol 12, for one motor map."""
+
+    import copy
+    import random
+
+    from .eye import EyeGraph, look
+
+    fractions = {"commanded": [], "uncommanded": []}
+    from_memory, unchanged = [], []
+    for seed in seeds:
+        rng = random.Random(seed)
+        world, gaze = _eye_world(seed), (EYE_WORLD[0] / 2, EYE_WORLD[1] / 2)
+        graph = EyeGraph(EYE_VIEW, motor=motor, learn_motor=False)
+        for _ in range(settle):
+            world.step()
+            graph.observe(look(world.render(), gaze, EYE_VIEW), 0)
+        current = look(world.render(), gaze, EYE_VIEW)
+        command = rng.choice([c for c in range(1, 9) if _inside(_saccade(gaze, c))])
+        target = _saccade(gaze, command)
+        length = math.hypot(target[0] - gaze[0], target[1] - gaze[1])
+        predicted, sure = graph.predict_view(command)
+        world.step()
+        view = look(world.render(), target, EYE_VIEW)
+        if sure.any():
+            from_memory.append(float(np.mean((predicted[sure] - view[sure]) ** 2)))
+            unchanged.append(float(np.mean((current[sure] - view[sure]) ** 2)))
+        for name, told in (("commanded", command), ("uncommanded", 0)):
+            subject = copy.deepcopy(graph)
+            before = subject.world_shift.copy()
+            subject.observe(view, told)
+            moved = subject.world_shift - before
+            fractions[name].append(float(np.hypot(*moved)) / length)
+    memory, still = float(np.mean(from_memory)), float(np.mean(unchanged))
+    return {
+        "commanded": float(np.mean(fractions["commanded"])),
+        "uncommanded": float(np.mean(fractions["uncommanded"])),
+        "prediction_error_from_memory": memory,
+        "prediction_error_unchanged": still,
+        "prediction_ratio": memory / still if still else float("nan"),
+        "trials": len(fractions["commanded"]),
+    }

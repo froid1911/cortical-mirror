@@ -84,16 +84,22 @@ class EyeGraph:
         x, y = origin
         return a[y : y + self.view[1], x : x + self.view[0]]
 
-    def _register(self, image: np.ndarray, origin) -> tuple[int, int]:
+    def _register(self, image: np.ndarray, origin) -> tuple[int, int] | None:
         """The shift (dx, dy) at which the canvas around ``origin`` best matches the
-        view, weighted by how sure the canvas is; (0, 0) if it knows too little."""
+        view, weighted by how sure the canvas is; None if that is not clear: too
+        little is known, or the best match is at the edge of the search, or it is
+        not much better than a typical shift."""
 
         x, y = origin
         w, h = self.view
+        if not (
+            REACH <= x and REACH <= y and x + w + REACH <= CANVAS[0] and y + h + REACH <= CANVAS[1]
+        ):
+            return None
         region = (slice(y - REACH, y + h + REACH), slice(x - REACH, x + w + REACH))
         known, sure = self.background[region], self.confidence[region]
         if sure.mean() < 0.1:
-            return 0, 0
+            return None
 
         def search(view, known, sure, reach, step):
             windows = sliding_window_view(known, view.shape)[::step, ::step]
@@ -102,10 +108,17 @@ class EyeGraph:
             cost = (weights * (windows - view) ** 2).sum((-1, -2)) / np.maximum(mass, 1e-6)
             cost[mass < 0.25 * view.size] = np.inf
             best = np.unravel_index(int(np.argmin(cost)), cost.shape)
-            return best[1] * step - reach, best[0] * step - reach, float(cost[best])
+            finite = cost[np.isfinite(cost)]
+            typical = float(np.median(finite)) if finite.size else np.inf
+            return best[1] * step - reach, best[0] * step - reach, float(cost[best]), typical
 
         small = (slice(None, None, COARSE), slice(None, None, COARSE))
-        coarse_x, coarse_y, _ = search(image[small], known[small], sure[small], REACH // COARSE, 1)
+        coarse_x, coarse_y, cost, typical = search(
+            image[small], known[small], sure[small], REACH // COARSE, 1
+        )
+        edge = REACH // COARSE
+        if not np.isfinite(cost) or cost > 0.5 * typical or edge in (abs(coarse_x), abs(coarse_y)):
+            return None
         coarse_x, coarse_y = coarse_x * COARSE, coarse_y * COARSE
         fine = 3
         fx, fy = REACH + coarse_x - fine, REACH + coarse_y - fine
@@ -117,7 +130,7 @@ class EyeGraph:
         ):
             return coarse_x, coarse_y
         part = (slice(fy, fy + h + 2 * fine), slice(fx, fx + w + 2 * fine))
-        dx, dy, _ = search(image, known[part], sure[part], fine, 1)
+        dx, dy, _, _ = search(image, known[part], sure[part], fine, 1)
         return coarse_x + dx, coarse_y + dy
 
     def observe(self, image: np.ndarray, command: int = 0) -> dict:
@@ -132,7 +145,10 @@ class EyeGraph:
         remainder = (0, 0)
         if self.inner.background is not None:
             remainder = self._register(image, origin)
-            if self.learn_motor:
+            if remainder is None:
+                # Not known well enough to tell: nothing is attributed, nothing learned.
+                remainder = (0, 0)
+            elif self.learn_motor:
                 self.motor[command] += 0.5 * np.asarray(remainder, float)
             # The remainder is the world moving: the view's content now sits where
             # the canvas had it at origin + remainder, so the canvas moves back by it.
@@ -176,6 +192,17 @@ class EyeGraph:
         if self.inner.previous is not None:
             seen = _shift(np.ones_like(self.inner.previous), dx, dy) > 0
             self.inner.previous = np.where(seen, _shift(self.inner.previous, dx, dy), image)
+
+    def predict_view(self, command: int) -> tuple[np.ndarray, np.ndarray]:
+        """What the graph expects to see after ``command``, from its canvas alone, and
+        where it is sure of that."""
+
+        planned = self.motor[command]
+        origin = self._origin((self.gaze[0] + planned[0], self.gaze[1] + planned[1]))
+        return (
+            self._window(self.background, origin).copy(),
+            self._window(self.confidence, origin) > 0.5,
+        )
 
     def world_positions(self) -> list[tuple[int, float, float]]:
         """Every object node's position on the canvas: where it is in the world."""

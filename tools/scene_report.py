@@ -10,6 +10,8 @@ from cortical_mirror.scene.phenomena import (
     manipulation,
     object_discovery,
     object_permanence,
+    self_and_world,
+    train_motor,
     train_persistence,
 )
 
@@ -35,10 +37,26 @@ def permanence() -> dict:
     }
 
 
+def self_world() -> dict:
+    """Protocol 12: learn a motor map, then test newborn and adult."""
+
+    import numpy as np
+    import torch
+
+    motor = train_motor()
+    torch.save({"motor": torch.tensor(motor)}, ADULT.with_name("scene-adult-eye.pt"))
+    return {
+        "adult_motor": motor.round(2).tolist(),
+        "newborn": self_and_world(np.zeros_like(motor)),
+        "adult": self_and_world(motor),
+    }
+
+
 PROTOCOLS = {
     "discovery": object_discovery,
     "manipulation": manipulation,
     "permanence": permanence,
+    "self_world": self_world,
 }
 
 
