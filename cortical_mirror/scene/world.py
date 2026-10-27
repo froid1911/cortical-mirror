@@ -102,15 +102,17 @@ class SpriteWorld:
             )
 
     def step(self) -> None:
+        # Objects bounce before their centre reaches the edge, so most of them stays in view.
+        margin = SPRITE // 2 - 4
         for thing in self.objects:
             thing.x += thing.vx
             thing.y += thing.vy
-            if not 0 <= thing.x <= self.width:
+            if not margin <= thing.x <= self.width - margin:
                 thing.vx = -thing.vx
-                thing.x = min(max(thing.x, 0.0), float(self.width))
-            if not 0 <= thing.y <= self.height:
+                thing.x = min(max(thing.x, margin), self.width - margin)
+            if not margin <= thing.y <= self.height - margin:
                 thing.vy = -thing.vy
-                thing.y = min(max(thing.y, 0.0), float(self.height))
+                thing.y = min(max(thing.y, margin), self.height - margin)
 
     def _stamp(self, thing: Thing, offset=(0, 0)) -> tuple[np.ndarray, np.ndarray]:
         """The thing's texture and mask placed in world coordinates."""
