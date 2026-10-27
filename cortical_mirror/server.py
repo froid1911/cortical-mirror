@@ -15,7 +15,7 @@ import numpy as np
 from .engines import EnginePrediction, PredictiveEngine
 
 INDEX_HTML = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
-VIEWS = ("camera", "prediction", "error", "overlay")
+VIEWS = ("camera", "prediction", "error", "overlay", "cortex")
 # BGR. Blue is the model's expectation, violet the pretrained motion expert, pewter
 # persistence; the page legend uses the same colours.
 EXPERT_COLOURS = {
@@ -61,6 +61,32 @@ def overlay_view(engine: PredictiveEngine, prediction: np.ndarray) -> tuple[np.n
     if flow is not None:
         return flow_view(prediction, flow), "motion"
     return prediction, "none"
+
+
+def cortex_view(engine: PredictiveEngine, width: int, height: int) -> np.ndarray:
+    """Each hierarchy level side by side: expectation on top, surprise below.
+
+    Coarse levels are enlarged with nearest-neighbour sampling so that their real
+    resolution stays visible. Each tile is mirrored on its own, so the page can
+    show the composite unflipped and level 1 stays on the left.
+    """
+
+    levels = getattr(engine, "last_levels", None) or []
+    if not levels:
+        return np.zeros((2 * height, 3 * width, 3), np.uint8)
+    columns = []
+    for expected, surprise in levels:
+        image = cv2.cvtColor(
+            np.rint(np.clip(expected, 0.0, 1.0) * 255).astype(np.uint8), cv2.COLOR_RGB2BGR
+        )
+        heat = np.rint(np.clip(surprise / 0.15, 0.0, 1.0) * 255).astype(np.uint8)
+        heat = cv2.applyColorMap(heat, cv2.COLORMAP_INFERNO)
+        tiles = [
+            cv2.flip(cv2.resize(tile, (width, height), interpolation=cv2.INTER_NEAREST), 1)
+            for tile in (image, heat)
+        ]
+        columns.append(np.vstack(tiles))
+    return np.hstack(columns)
 
 
 def find_learner(engine: PredictiveEngine):
@@ -241,7 +267,13 @@ class LiveState:
                 if self.horizon > 1 and hasattr(self.engine, "rollout"):
                     shown = self.engine.rollout(current.image, self.horizon - 1)
                 overlay, overlay_kind = overlay_view(self.engine, shown)
-                images = {"camera": actual, "prediction": shown, "error": error, "overlay": overlay}
+                images = {
+                    "camera": actual,
+                    "prediction": shown,
+                    "error": error,
+                    "overlay": overlay,
+                    "cortex": cortex_view(self.engine, self.engine.width, self.engine.height),
+                }
                 views = {}
                 for name, image in images.items():
                     ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 92])

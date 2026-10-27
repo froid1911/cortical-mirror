@@ -56,6 +56,10 @@ class AdaptiveEngine:
         self.last_expert_errors: dict[str, float] = {}
 
     @property
+    def last_levels(self):
+        return getattr(self.engines.get("cortical"), "last_levels", [])
+
+    @property
     def learner(self):
         return getattr(self.engines.get("cortical"), "learner", None)
 
