@@ -3,7 +3,8 @@
 Every few frames the eye picks one of the saccade commands. Each possible target
 is described by a few features of what the scene graph knows about the place the
 fovea would land on: how unknown its background is, how badly the graph has been
-predicting it, and how new the objects there are. A target's value is a weighted
+predicting it, how new the objects there are, and how long the fovea has
+already spent there. A target's value is a weighted
 sum of its features. After the fixation, the weights change by a three-factor
 rule: the features of the fixation just made (presynaptic) times a global signal,
 the learning progress it brought (how much the graph's prediction error in the
@@ -22,10 +23,11 @@ import numpy as np
 
 from ..cortex.eye import COMMANDS
 
-FEATURES = ("unknown", "error", "novelty", "bias")
+FEATURES = ("unknown", "error", "novelty", "familiar", "bias")
 # The prediction error (mean squared, luminance) that counts as fully surprising.
 ERROR_SCALE = 0.02
-# Fixations a node takes to lose most of its novelty.
+# Frames in the fovea a node takes to lose most of its novelty, and a place to
+# count as fully familiar.
 FAMILIAR = 30.0
 
 
@@ -77,6 +79,7 @@ class Attention:
                 float(np.mean(1.0 - graph.confidence[area])),
                 min(1.0, float(np.mean(graph.error[area])) / ERROR_SCALE),
                 min(1.0, novelty),
+                min(1.0, float(np.mean(graph.visits[area])) / FAMILIAR),
                 1.0,
             )
         return out

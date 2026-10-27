@@ -42,6 +42,8 @@ def _shift(a: np.ndarray, dx: int, dy: int, fill: float = 0.0) -> np.ndarray:
 
     out = np.full_like(a, fill)
     h, w = a.shape
+    if abs(dx) >= w or abs(dy) >= h:
+        return out
     out[max(dy, 0) : h + min(dy, 0), max(dx, 0) : w + min(dx, 0)] = a[
         max(-dy, 0) : h + min(-dy, 0), max(-dx, 0) : w + min(-dx, 0)
     ]
@@ -81,6 +83,8 @@ class EyeGraph:
         # How badly the graph has been predicting each place, and the error in the
         # fovea frame by frame (what attention learns from).
         self.error = np.zeros(CANVAS[::-1], np.float32)
+        # Frames the fovea has spent on each place.
+        self.visits = np.zeros(CANVAS[::-1], np.float32)
         self.fovea_errors: list[float] = []
 
     # Where the view lies on the canvas.
@@ -198,6 +202,7 @@ class EyeGraph:
             half = self.fovea_size // 2
             centre = (slice(h // 2 - half, h // 2 + half), slice(w // 2 - half, w // 2 + half))
             self.fovea_errors.append(float(miss[centre].mean()))
+            self._window(self.visits, origin)[centre] += 1.0
         result = self.inner.observe(image)
         cx, cy = self.view[0] / 2, self.view[1] / 2
         for node in self.inner.nodes:

@@ -156,3 +156,9 @@ def test_learned_persistence_survives_saving_and_a_new_scene(tmp_path):
     assert loaded.persistence == 7.5 and loaded.learn_persistence
     loaded.reset()
     assert loaded.persistence == 7.5
+
+
+def test_shifting_by_more_than_the_size_leaves_nothing():
+    from cortical_mirror.scene.graph import _shift
+
+    assert not _shift(np.ones((4, 4)), 5, 0).any()

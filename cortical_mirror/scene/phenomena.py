@@ -389,3 +389,110 @@ def self_and_world(motor: np.ndarray, seeds=range(4000, 4020), settle: int = 30)
         "prediction_ratio": memory / still if still else float("nan"),
         "trials": len(fractions["commanded"]),
     }
+
+
+# Gaze positions that keep the view inside the world: the noise and the newcomer
+# are placed at their corners, where a fixation can cover them fully.
+CORNERS = [(128, 96), (256, 96), (128, 192), (256, 192)]
+FOVEA = 96
+
+
+class AttentionTrial:
+    """Protocol 11's world: moving objects, a patch of TV noise, and a newcomer."""
+
+    def __init__(self, seed: int, novel_at: int = 300):
+        self.world = SpriteWorld(seed=seed, width=EYE_WORLD[0], height=EYE_WORLD[1], objects=4)
+        self.newcomer = self.world.objects.pop()
+        self.noise = CORNERS[seed % 4]
+        self.novel_at = novel_at
+        self.rng = np.random.default_rng(seed)
+
+    def frame(self, t: int, gaze=(192, 144)) -> np.ndarray:
+        if t == self.novel_at:
+            # Where the gaze is not, and the noise is not.
+            far = max(
+                (c for c in CORNERS if c != self.noise),
+                key=lambda c: math.hypot(c[0] - gaze[0], c[1] - gaze[1]),
+            )
+            self.newcomer.x, self.newcomer.y = float(far[0]), float(far[1])
+            self.world.objects.append(self.newcomer)
+        self.world.step()
+        image = self.world.render()
+        x, y = self.noise
+        half = FOVEA // 2
+        image[y - half : y + half, x - half : x + half] = self.rng.random((FOVEA, FOVEA))
+        return image
+
+
+def _fovea_overlap(gaze, centre) -> float:
+    dx = max(0.0, FOVEA - abs(gaze[0] - centre[0]))
+    dy = max(0.0, FOVEA - abs(gaze[1] - centre[1]))
+    return dx * dy / FOVEA**2
+
+
+def _attention_run(seed: int, attention, frames: int, novel_at: int):
+    from ..cortex.eye import COMMANDS
+    from .eye import SACCADE, EyeGraph, look
+
+    motor = np.array(COMMANDS, float) * SACCADE
+    graph = EyeGraph(EYE_VIEW, motor=motor, learn_motor=False, fovea=FOVEA)
+    trial = AttentionTrial(seed, novel_at)
+    gaze = (EYE_WORLD[0] / 2, EYE_WORLD[1] / 2)
+    fixations, found = [], None
+    attention.reset()
+    for t in range(frames):
+        command = 0
+        if graph.inner.background is not None:
+            command = attention.step(graph, t, allowed=lambda c, g=gaze: _inside(_saccade(g, c)))
+        gaze = _saccade(gaze, command)
+        if command:
+            fixations.append(gaze)
+        image = trial.frame(t, gaze)
+        graph.observe(look(image, gaze, EYE_VIEW), command)
+        newcomer = trial.newcomer
+        if found is None and t >= novel_at and _fovea_overlap(gaze, (newcomer.x, newcomer.y)) > 0:
+            if abs(gaze[0] - newcomer.x) < FOVEA / 2 and abs(gaze[1] - newcomer.y) < FOVEA / 2:
+                found = t - novel_at
+    return graph, trial, fixations, found
+
+
+def attention_trials(
+    policy: str, weights=None, seeds=range(5000, 5020), frames: int = 600, novel_at: int = 300
+) -> dict:
+    """Protocol 11, for one way of choosing where to look."""
+
+    from .attention import Attention
+
+    captured, errors, novelty = [], [], []
+    for seed in seeds:
+        attention = Attention(weights=weights, policy=policy, seed=seed)
+        graph, trial, fixations, found = _attention_run(seed, attention, frames, novel_at)
+        captured.extend(_fovea_overlap(g, trial.noise) >= 0.5 for g in fixations)
+        # The graph's canvas, laid over the world (its gaze began at the world's centre).
+        ox = graph.start[0] - EYE_WORLD[0] // 2
+        oy = graph.start[1] - EYE_WORLD[1] // 2
+        known = graph.background[oy : oy + EYE_WORLD[1], ox : ox + EYE_WORLD[0]]
+        outside = np.ones(known.shape, bool)
+        x, y = trial.noise
+        outside[y - FOVEA // 2 : y + FOVEA // 2, x - FOVEA // 2 : x + FOVEA // 2] = False
+        errors.append(float(np.mean((known - trial.world.background)[outside] ** 2)))
+        novelty.append(frames - novel_at if found is None else found)
+    return {
+        "policy": policy,
+        "noise_capture": float(np.mean(captured)) if captured else 0.0,
+        "world_error": float(np.mean(errors)),
+        "time_to_novelty": float(np.median(novelty)),
+        "trials": len(errors),
+    }
+
+
+def train_attention(seeds=range(500, 540), frames: int = 600, explore: float = 0.2) -> np.ndarray:
+    """Protocol 11's training: one eye learning across all training worlds."""
+
+    from .attention import Attention
+
+    attention = Attention(learn=True, explore=explore)
+    for seed in seeds:
+        attention.rng.seed(seed)
+        _attention_run(seed, attention, frames, novel_at=frames // 2)
+    return attention.weights.copy()

@@ -693,6 +693,8 @@ def _shift(a: np.ndarray, dx: int, dy: int) -> np.ndarray:
 
     out = np.zeros_like(a)
     h, w = a.shape
+    if abs(dx) >= w or abs(dy) >= h:
+        return out
     out[max(dy, 0) : h + min(dy, 0), max(dx, 0) : w + min(dx, 0)] = a[
         max(-dy, 0) : h + min(-dy, 0), max(-dx, 0) : w + min(-dx, 0)
     ]

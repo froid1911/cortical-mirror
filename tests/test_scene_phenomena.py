@@ -111,3 +111,29 @@ def test_a_true_motor_map_sees_its_own_saccades_as_still_and_a_zero_map_does_not
     assert adult["commanded"] <= 0.1 and adult["uncommanded"] >= 0.8
     assert newborn["commanded"] >= 0.8
     assert adult["prediction_ratio"] < newborn["prediction_ratio"]
+
+
+def test_the_attention_world_has_fresh_noise_in_one_place_and_a_late_newcomer():
+    trial = phenomena.AttentionTrial(5000, novel_at=5)
+    first, second = trial.frame(0), trial.frame(1)
+    x, y = trial.noise
+    patch = (slice(y - 48, y + 48), slice(x - 48, x + 48))
+    assert not np.allclose(first[patch], second[patch])
+    assert len(trial.world.objects) == 3
+    for t in range(2, 7):
+        trial.frame(t, gaze=(192, 144))
+    assert len(trial.world.objects) == 4
+
+
+def test_attention_measures_report_noise_capture_world_error_and_novelty():
+    report = phenomena.attention_trials("random", seeds=[5000], frames=60, novel_at=30)
+    assert 0.0 <= report["noise_capture"] <= 1.0
+    assert report["world_error"] > 0.0
+    assert 0 <= report["time_to_novelty"] <= 30
+
+
+def test_training_attention_returns_one_weight_per_feature():
+    from cortical_mirror.scene.attention import FEATURES
+
+    weights = phenomena.train_attention(seeds=[500], frames=60)
+    assert weights.shape == (len(FEATURES),)
