@@ -1,14 +1,193 @@
 {
-  "experiment": "From-scratch online learning on the looped sample clip (FFSb - Corona LSFB, 22.5 s at 23.976 fps, looped to 1800 frames)",
   "config": {
-    "network": "CorticalFlowNet defaults (channels 16,32,64; strides 1,4,8), random init, seed 0",
-    "learner": "OnlineLearner(learning_rate=1e-3, anchor_weight=0, batch_size=2, burn_in=8, window=6), stepped synchronously",
-    "steps_per_frame": 0.5,
-    "resolution": "256x192",
-    "device": "RTX 3090"
+    "data": "None",
+    "video": "[PosixPath('snapshots/sample.mp4')]",
+    "loop": "3",
+    "checkpoint": "None",
+    "scenes": "6",
+    "offset": "0",
+    "frames": "1800",
+    "bucket": "150",
+    "steps_per_frame": "0.5",
+    "learn_rate": "None",
+    "anchor": "0.01",
+    "batch_size": "2",
+    "burn_in": "8",
+    "no_guard": "False",
+    "device": "auto",
+    "output": "reports/live-scratch-sample.json",
+    "learning_rate": 0.001
   },
-  "window_frames": 300,
-  "ratio_to_persistence_per_window": [1.06, 0.86, 0.78, 0.76, 0.73],
-  "rollbacks": 0,
-  "note": "The clip repeats every 540 frames, so windows after the first two include footage the learner has already seen. The second window (frames 300-600) is mostly first-pass footage."
+  "scenes": [
+    {
+      "scene": "sample",
+      "clips": 3,
+      "fps": 23.976023976023978,
+      "loop": 3,
+      "frozen": [
+        {
+          "frame": 150,
+          "seconds": 6.3,
+          "model": 0.010643280950801758,
+          "copy": 0.010643280950801758,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.55,
+          "model": 0.01070639085645477,
+          "copy": 0.01070639085645477,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.81,
+          "model": 0.011414291230030358,
+          "copy": 0.011414291230030358,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 25.07,
+          "model": 0.009987818980395484,
+          "copy": 0.009987818980395484,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 31.32,
+          "model": 0.010343430206800501,
+          "copy": 0.010343430206800501,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 37.58,
+          "model": 0.009910453927392761,
+          "copy": 0.009910453927392761,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 43.84,
+          "model": 0.012809357894584537,
+          "copy": 0.012809357894584537,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1200,
+          "seconds": 50.09,
+          "model": 0.009567397700739094,
+          "copy": 0.009567397700739094,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1350,
+          "seconds": 56.35,
+          "model": 0.010603789389133454,
+          "copy": 0.010603789389133454,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1500,
+          "seconds": 62.6,
+          "model": 0.010624614542660614,
+          "copy": 0.010624614542660614,
+          "steps": 0,
+          "rollbacks": 0
+        }
+      ],
+      "learning": [
+        {
+          "frame": 150,
+          "seconds": 6.3,
+          "model": 0.01182091519954459,
+          "copy": 0.010643280950801758,
+          "steps": 73,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.55,
+          "model": 0.010237841395040354,
+          "copy": 0.01070639085645477,
+          "steps": 148,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.81,
+          "model": 0.009883508329900603,
+          "copy": 0.011414291230030358,
+          "steps": 223,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 25.07,
+          "model": 0.0082680614797088,
+          "copy": 0.009987818980395484,
+          "steps": 298,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 31.32,
+          "model": 0.008020215430296957,
+          "copy": 0.010343430206800501,
+          "steps": 373,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 37.58,
+          "model": 0.007463401973557969,
+          "copy": 0.009910453927392761,
+          "steps": 448,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 43.84,
+          "model": 0.009651680470754704,
+          "copy": 0.012809357894584537,
+          "steps": 523,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1200,
+          "seconds": 50.09,
+          "model": 0.007231748681903506,
+          "copy": 0.009567397700739094,
+          "steps": 598,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1350,
+          "seconds": 56.35,
+          "model": 0.007587750754319131,
+          "copy": 0.010603789389133454,
+          "steps": 673,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1500,
+          "seconds": 62.6,
+          "model": 0.00793693563590447,
+          "copy": 0.010624614542660614,
+          "steps": 748,
+          "rollbacks": 0
+        }
+      ]
+    }
+  ]
 }

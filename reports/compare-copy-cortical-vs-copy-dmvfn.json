@@ -1,0 +1,12 @@
+{
+  "first": "test-G-final-router-copy-cortical.json",
+  "second": "test-router-copy-dmvfn.json",
+  "videos": 202,
+  "difference_points": 1.15,
+  "interval_95": [
+    -0.07,
+    2.37
+  ],
+  "first_better_on_videos": 123,
+  "bootstrap_samples": 10000
+}

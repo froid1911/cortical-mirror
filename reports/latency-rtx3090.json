@@ -1,0 +1,46 @@
+{
+  "device": "cuda",
+  "hardware": "NVIDIA GeForce RTX 3090",
+  "cpu_threads": 24,
+  "video": "sample.mp4",
+  "fps": 23.976023976023978,
+  "seconds": 20.0,
+  "results": [
+    {
+      "configuration": "pretrained, no learning",
+      "experts": [
+        "copy",
+        "cortical",
+        "dmvfn"
+      ],
+      "inference_ms_mean": 11.3,
+      "inference_ms_p95": 14.9,
+      "learner_steps_per_second": 0.0,
+      "learner_steps_per_frame": 0.0
+    },
+    {
+      "configuration": "pretrained, learning",
+      "experts": [
+        "copy",
+        "cortical",
+        "dmvfn"
+      ],
+      "inference_ms_mean": 17.1,
+      "inference_ms_p95": 20.3,
+      "learner_steps_per_second": 14.2,
+      "learner_steps_per_frame": 0.6
+    },
+    {
+      "configuration": "from scratch, learning",
+      "experts": [
+        "copy",
+        "cortical",
+        "dmvfn"
+      ],
+      "inference_ms_mean": 16.7,
+      "inference_ms_p95": 21.4,
+      "learner_steps_per_second": 17.2,
+      "learner_steps_per_frame": 0.72
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 A live mirror that shows what the camera will see next — and keeps learning to see while you stand in front of it.
 
-A small predictive-coding hierarchy predicts the next webcam frame from the frames it has already seen. Every prediction is scored only against the frame it was issued for, and that error is the only teaching signal: offline on natural video, and online, continuously, on the camera stream in front of it. Started from random weights, it begins as an exact copy of the last frame and, on most scenes we measured, learns within tens of seconds of footage to predict better than that copy.
+A small predictive-coding hierarchy predicts the next webcam frame from the frames it has already seen. Every prediction is scored only against the frame it was issued for, and that error is the only teaching signal: offline on natural video, and online, continuously, on the camera stream in front of it. Started from random weights, it begins as an exact copy of the last frame. On a person moving in front of a still camera it learns, within about a minute, to predict better than that copy; on short, generic action clips it ends about even with it.
 
 ![The predicted mirror](docs/images/live-demo.gif)
 
@@ -32,7 +32,7 @@ What this project adds, and tests:
 
 1. **Upper levels that cannot collapse.** In PredNet-style models the target of level *l* is a learned transform of the error below it, so a network can shrink the target to make its own error vanish. Here each level's target is a fixed image pyramid; the three levels must predict the next frame at full, 1/4, and 1/8 resolution. A test asserts the targets have no parameters.
 2. **Prediction by motion, coarse to fine.** Every level outputs a displacement increment that refines the coarser level's motion; the image is rendered by warping what was already seen, plus a bounded residual. An untrained network is therefore *exactly* persistence, and anything better than persistence had to be learned.
-3. **Learning while it runs.** A background learner trains on windows replayed from the last ten seconds of camera input, with the same due-error loss, and copies improved weights into the live network between frames. A divergence guard rolls back to the last good weights. This is what lets the system learn to see *from scratch* in front of an audience.
+3. **Learning while it runs.** A background learner trains on windows replayed from the last ten seconds of camera input, with the same due-error loss, and copies improved weights into the live network between frames. A guard rolls back to the last good weights when replayed or live error climbs far above persistence. This is what lets the system learn to see *from scratch* in front of an audience; what made long runs stable was bounding the cell state and training from a settled state (burn-in), and the guard only caps the worst cases (see below).
 4. **Precision-weighted routing.** Each 16 px region estimates, from recent due errors only, how reliable each predictor is, and mixes their forecasts by a softmax over that precision. This is test-time precision weighting in Feldman & Friston's sense, made visible by the trust overlay.
 5. **Honest timing.** Nothing ever sees the frame it predicts. Evaluation pairs each prediction with exactly its target frame; tests check this with counterfactual futures.
 
@@ -42,7 +42,7 @@ All numbers come from files in [`reports/`](reports/), produced by the commands 
 
 ### Test set
 
-Official UCF101 split-1 **test** groups (groups 1–7), 2 videos per action class = 202 videos, 32 frames each, **6,262 scored transitions** at 256×192. UCF101 clips in one group are cut from the same source video, so train, validation (groups 8–9), and test share no source video. Checkpoints and router settings were chosen on validation only; the test split was scored once per engine. MAE is normalized pixel error and LPIPS (Zhang et al., 2018) a learned perceptual distance; lower is better for both.
+Official UCF101 split-1 **test** groups (groups 1–7), 2 videos per action class = 202 videos, 32 frames each, **6,262 scored transitions** at 256×192. UCF101 clips in one group are cut from the same source video, so train, validation (groups 8–9), and test share no source video. Checkpoints and router settings were chosen on validation only. Every engine in the table was scored once in its final form; in addition, a mid-training snapshot of the final model was scored once (`reports/test-G-ep1-*`), the two baseline routers were first scored with the earlier, untuned settings before being re-scored with the validation-tuned ones shown here, and the live-learning settings below were developed on six test scenes, which is why the live-learning results use twelve different ones. MAE is normalized pixel error and LPIPS (Zhang et al., 2018) a learned perceptual distance; lower is better for both.
 
 | Engine | MAE ↓ | vs. persistence | SSIM ↑ | LPIPS ↓ | Transitions beating persistence |
 |---|---:|---:|---:|---:|---:|
@@ -56,25 +56,35 @@ Official UCF101 split-1 **test** groups (groups 1–7), 2 videos per action clas
 | Router: cortical + DMVFN | 0.01459 | +19.2% | 0.9291 | 0.0333 | 69.2% |
 | **Router: persistence + cortical + DMVFN** | 0.01443 | +20.1% | 0.9295 | 0.0331 | 73.3% |
 
-The hierarchy has 720 k parameters, learned only by predicting UCF101 video. Alone, it predicts with 17.3% less error than persistence, about twice the 8.7% of the pretrained DMVFN. Routed with persistence and no third-party model at all, it beats persistence + DMVFN. Adding DMVFN on top still helps a little. Perceptual distance barely moves for any method: one-frame warps soften fine texture, and LPIPS penalises that about as much as it rewards correct motion.
+The hierarchy has 720 k parameters, learned only by predicting UCF101 video. Alone, it predicts with 17.3% less error than persistence, about twice the 8.7% of the pretrained DMVFN. That gap is solid: 8.6 points, with a paired-bootstrap 95% interval of 5.4 to 12.2 points over videos, and lower error on 133 of 202 videos (`reports/compare-cortical-vs-dmvfn.json`). DMVFN was trained on Vimeo-90K, not UCF101, so some of its deficit may be domain shift. Routed with persistence and no third-party model at all, the hierarchy is level with persistence + DMVFN: 1.2 points ahead, but the interval (−0.1 to 2.4 points) includes zero and it wins on 123 of 202 videos (`reports/compare-copy-cortical-vs-copy-dmvfn.json`). Adding DMVFN on top still helps a little. Perceptual distance barely moves for any method: one-frame warps soften fine texture, and LPIPS penalises that about as much as it rewards correct motion.
 
-On an RTX 3090 the hierarchy alone takes about 3 ms per frame and the full three-expert mirror about 13 ms without learning, 18 ms with it. Timings in the report files were measured while other jobs shared the GPU, so treat them as upper bounds. Router temperature and adaptation were chosen on the validation split (`reports/tune/`), and every router above uses the same settings.
+On an RTX 3090 the hierarchy alone took 3.1 ms per frame in the benchmark above. Fed at camera rate, the three-expert mirror takes 11.3 ms per frame without learning and 17.1 ms while the learner runs about 14 steps per second beside it (`reports/latency-rtx3090.json`). On a 12-thread laptop CPU (AMD Ryzen AI 9 HX 370 w/ Radeon 890M) the trained hierarchy with persistence takes 31.5 ms per frame (`reports/latency-laptop-cpu.json`). Router temperature and adaptation were chosen on the validation split (`reports/tune/`), and every router above uses the same settings.
 
 ### Learning from scratch, live
 
-`tools/live_learning.py` chains consecutive clips of one test-set source video (20–35 s of one scene) and feeds them, frame by frame, to an **untrained** hierarchy that learns online from replayed windows of the stream. It runs the learner at the rate the live mirror sustains on an RTX 3090 — 0.5 gradient steps per camera frame (about 15 steps/s while inference stays near 18 ms) — but steps it synchronously, so the result does not depend on thread timing. The ratio is the mirror's error divided by the error of repeating the last frame, per 5-second window; below 1 is better than persistence.
+`tools/live_learning.py` chains consecutive clips of one test-set source video (18–66 s of one scene) and feeds them, frame by frame, to an **untrained** hierarchy that learns online from replayed windows of the stream. It steps the learner synchronously at 0.5 steps per frame; the live mirror sustains 0.6–0.7 on an RTX 3090 (`reports/latency-rtx3090.json`). Ratios are the mirror's error divided by the error of repeating the last frame, per 150-frame window (6 s at UCF101's 25 fps); below 1 is better than persistence. These twelve scenes were never used while developing the learner (`--offset 6 --scenes 12`).
 
-| Scene (test split) | Footage | First 5 s | Last 5 s | Second half | Rollbacks |
-|---|---:|---:|---:|---:|---:|
-| ApplyEyeMakeup g04 | 35 s | 1.14 | 0.98 | 0.96 | 0 |
-| Archery g01 | 30 s | 1.07 | 0.96 | 0.94 | 0 |
-| BalanceBeam g06 | 25 s | 1.11 | 0.82 | 0.93 | 2 |
-| BandMarching g01 | 35 s | 0.90 | 0.86 | 0.93 | 0 |
-| BaseballPitch g03 | 20 s | 1.05 | 1.03 | 1.05 | 0 |
-| Basketball g01 | 30 s | 1.57 | 1.09 | 1.10 | 2 |
-| **All six, pooled** | | | | **0.95** | |
+| Scene (test split) | Footage | First window | Last window | Second half | Rollbacks | Second half without guard |
+|---|---:|---:|---:|---:|---:|---:|
+| BasketballDunk g01 | 18 s | 1.06 | 0.94 | 0.95 | 0 | 0.98 |
+| BenchPress g02 | 24 s | 1.08 | 0.91 | 0.93 | 0 | 0.93 |
+| Biking g02 | 50 s | 1.03 | 1.01 | 1.00 | 0 | 1.00 |
+| Billiards g02 | 66 s | 1.65 | 1.04 | 1.16 | 19 | 1.04 |
+| BlowDryHair g06 | 48 s | 1.02 | 0.99 | 0.98 | 0 | 0.99 |
+| BlowingCandles g06 | 36 s | 1.19 | 0.91 | 0.93 | 0 | 0.92 |
+| Bowling g01 | 36 s | 0.98 | 0.99 | 0.96 | 0 | 0.97 |
+| BoxingPunchingBag g01 | 42 s | 1.24 | 0.92 | 0.92 | 1 | 0.88 |
+| BoxingSpeedBag g04 | 54 s | 1.06 | 1.34 | 1.30 | 0 | 1.47 |
+| BrushingTeeth g02 | 66 s | 1.67 | 1.68 | 1.27 | 4 | 2.77 |
+| CliffDiving g05 | 18 s | 1.02 | 0.78 | 0.95 | 0 | 1.16 |
+| CricketBowling g01 | 24 s | 1.47 | 1.02 | 1.07 | 0 | 1.09 |
+| **All twelve, pooled** | | | | **1.02** | | **1.06** |
 
-The frozen untrained network scores exactly 1.00 on every window: it *is* persistence. Learning only from the stream, it ends 5% below persistence error overall within 20–35 seconds of footage and better than persistence on four of six scenes; on the two fast, cluttered sports scenes it stays worse. With a full step per frame (a faster GPU, or a smaller image) the same experiment reaches 10% (`reports/live-scratch-v4.json`). Before the cell-state bound and burn-in were added, one scene diverged to 6× persistence error (`reports/live-scratch-lr1e-3.json`); the bound and the rollback guard now prevent that, and every rollback is counted above.
+The frozen untrained network scores exactly 1.00 on every window: it *is* persistence. Learning only from these short, varied action clips, it ends about even with persistence (1.02 pooled) and better on 7 of 12 scenes. The six scenes used during development looked better (0.95 pooled, `reports/live-scratch-realtime-lr1e-3.json`), which is exactly why the held-out numbers are the ones reported.
+
+Long continuous runs were made stable by bounding the cell state and training from a settled state: before those changes one development scene diverged to 6× persistence error **without triggering a single rollback** (`reports/live-scratch-guard.json`). The guard is a safety net, not the fix. With it off (last column, `reports/live-scratch-heldout-noguard.json`), the worst scene reaches 2.8× instead of 1.3× and the pooled ratio is 1.06; on one scene (Billiards) its 19 rollbacks made things worse.
+
+**The sample clip is where it works.** On the 22-second sign-language clip that ships with the release (a person facing a still camera), `tools/live_learning.py --video sample.mp4 --loop 3` measures 1.11× persistence error in the first 6 s, 0.87× by the end of the first pass (19 s), and 0.72–0.76× after about a minute, by which point the learner has seen the clip repeat (`reports/live-scratch-sample.json`).
 
 **After pretraining, live learning adds little on these clips.** The trained hierarchy, frozen, is 23% below persistence on the same continuous scenes and stays stable for over a thousand frames; fine-tuning it live for 20–35 s changes that by less than one percentage point (`reports/live-pretrained-G*.json`). Its value is adapting to what UCF101 does not contain — a particular room, camera, and lighting — which needs the webcam test set below to measure.
 
@@ -132,20 +142,19 @@ Open **http://127.0.0.1:8080**. On Linux the default PyTorch package includes NV
 
 ### What to expect
 
-On first start, `demo` downloads the trained weights and a sample clip from the [v0.2.0 release](https://github.com/froid1911/cortical-mirror/releases/tag/v0.2.0) to `~/.cache/cortical-mirror`, then opens camera 0.
+`demo` opens camera 0 and starts the hierarchy **untrained**: it begins as an exact copy of the last frame and learns from what it sees, routed only against persistence, so everything the mirror predicts was learned on the spot. `demo --pretrained` instead starts from the trained weights. Files it needs (the trained weights, DMVFN, a sample clip) are downloaded from the [v0.2.0 release](https://github.com/froid1911/cortical-mirror/releases/tag/v0.2.0) to `~/.cache/cortical-mirror` on first use.
 
 | | With an NVIDIA GPU | Without (any Mac, or a PC without one) |
 |---|---|---|
-| Predictors | Trained hierarchy, DMVFN, and persistence | Trained hierarchy and persistence |
-| Live learning | On, in the background | Off: a CPU learner cannot keep up |
-| `demo --from-scratch` | On most scenes we measured, beats persistence within about a minute of motion | Learns too, but takes many minutes |
+| `demo` (from scratch) | Learns live; on a person moving in front of the camera it pulls ahead of persistence within about a minute | Learns, but at under one step per second: expect many minutes |
+| `demo --pretrained` | Trained hierarchy, DMVFN, and persistence, with live learning | Trained hierarchy and persistence; live learning off |
 
 Macs run on the CPU because the project does not yet use Apple's GPU (it has not been measured on a Mac). The mirror itself runs on the CPU; live learning is what needs the GPU.
 
-Without a camera, it plays a 22-second sample clip of a person signing in Belgian French Sign Language, chosen because it looks like someone standing in front of a mirror. Looped in the demo, the clip takes an untrained hierarchy from 6% above to 27% below persistence error within about a minute of live learning on a GPU, and to 14% below within its first pass (`reports/live-scratch-sample.json`).
+Without a camera, it plays a 22-second sample clip of a person signing in Belgian French Sign Language, chosen because it looks like someone standing in front of a mirror. On a GPU, an untrained hierarchy learns to predict it better than persistence within its first pass, and about 25% better after a minute of looping (see [Learning from scratch, live](#learning-from-scratch-live)).
 
 ```bash
-.venv/bin/cortical-mirror demo --from-scratch     # start untrained and watch it learn
+.venv/bin/cortical-mirror demo --pretrained       # start from the trained weights instead
 .venv/bin/cortical-mirror demo --source clip.mp4  # any video file instead of the camera
 .venv/bin/cortical-mirror demo --source 1         # a second camera
 .venv/bin/cortical-mirror demo --horizon 3        # show three frames ahead
@@ -227,13 +236,26 @@ Each `CorticalFlowNet` level receives the positive and negative parts of its las
   --engine adaptive --experts copy,cortical,dmvfn \
   --checkpoint cortical.pt --dmvfn-checkpoint dmvfn_vimeo.pkl --output reports/test-adaptive.json
 
-# Learning from scratch on continuous scenes
-.venv/bin/python tools/live_learning.py --data /path/to/UCF-101 --scenes 6 \
-  --learn-rate 1e-3 --output reports/live-scratch.json
+# Learning from scratch on the twelve held-out scenes (add --no-guard for the ablation)
+.venv/bin/python tools/live_learning.py --data /path/to/UCF-101 --offset 6 --scenes 12 \
+  --output reports/live-scratch-heldout.json
+
+# Learning from scratch on the sample clip, looped three times
+.venv/bin/python tools/live_learning.py --video sample.mp4 --loop 3 \
+  --output reports/live-scratch-sample.json
+
+# Paired bootstrap between two benchmark reports
+.venv/bin/python tools/compare_reports.py reports/test-G-final-cortical.json reports/test-dmvfn.json
+
+# Latency and learner throughput on this machine
+.venv/bin/python tools/latency.py --checkpoint cortical.pt --dmvfn-checkpoint dmvfn_vimeo.pkl \
+  --video sample.mp4 --output reports/latency.json
 
 # The panning test
 .venv/bin/python tools/pan_probe.py --checkpoint cortical.pt
 ```
+
+`live_learning.py` defaults match the live mirror on CUDA (0.5 steps per frame, batch 2, burn-in 8, learning rate 1e-3 from scratch).
 
 `benchmark.py` refuses `--learn`: the live learner runs on its own thread, so its effect is measured with `live_learning.py`, which steps it synchronously.
 
@@ -261,7 +283,7 @@ echo 'eb77e54dfafd9c77e7b086f5e5ef7738cabd16a701b3f5c301a1f6c81fc4756e  data/UCF
 unzip data/UCF-101.zip -d data/ucf101
 ```
 
-Train the released model (8 epochs, about 6 hours on one RTX 3090):
+Train the released model (8 epochs; 5.5 hours on one RTX 3090 that two other training runs shared, `reports/train-G-time.json`):
 
 ```bash
 .venv/bin/cortical-train \
@@ -288,7 +310,8 @@ Tests cover causal counterfactuals, forward-warp direction, the group-disjoint s
 
 - Only one-step prediction is scored. Multi-step rollouts ("eyes closed", look-ahead) are shown in the demo but not evaluated quantitatively.
 - UCF101 is not a webcam, and the hierarchy is small and runs at 256×192. Live learning is meant to adapt to one room, but that has not yet been measured on webcam footage; record a test set with `tools/record.py`.
-- From scratch, the hierarchy is briefly *worse* than persistence while its first motion estimates are wrong, before it improves. Two of six measured scenes (fast, cluttered sports footage) did not get below persistence within their 20–30 s.
+- From scratch, the hierarchy is briefly *worse* than persistence while its first motion estimates are wrong. Within 18–66 s of short, varied action footage it ends about even with persistence, better on 7 of 12 held-out scenes; it needs a person moving steadily in front of a still camera, like the sample clip, to pull clearly ahead within a minute.
+- Live learning needs an NVIDIA GPU. On a CPU the learner manages under one step per second.
 - There is no object permanence, explicit egomotion, or multimodal future; pixel warping and blending can soften detail.
 - The pretrained DMVFN expert is not part of the self-organizing story; ablations without it are reported.
 

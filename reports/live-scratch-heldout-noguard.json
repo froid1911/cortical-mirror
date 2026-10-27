@@ -1,0 +1,1455 @@
+{
+  "config": {
+    "data": "/home/froid/data/ucf101/UCF-101",
+    "video": "None",
+    "loop": "1",
+    "checkpoint": "None",
+    "scenes": "12",
+    "offset": "6",
+    "frames": "1800",
+    "bucket": "150",
+    "steps_per_frame": "0.5",
+    "learn_rate": "None",
+    "anchor": "0.01",
+    "batch_size": "2",
+    "burn_in": "8",
+    "no_guard": "True",
+    "device": "auto",
+    "output": "reports/live-scratch-heldout-noguard.json",
+    "learning_rate": 0.001
+  },
+  "scenes": [
+    {
+      "scene": "v_BasketballDunk_g01",
+      "clips": 7,
+      "fps": 25.0,
+      "loop": 1,
+      "frozen": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.04912013054514925,
+          "copy": 0.04912013054514925,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.061830977605034906,
+          "copy": 0.061830977605034906,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.04580828716357549,
+          "copy": 0.04580828716357549,
+          "steps": 0,
+          "rollbacks": 0
+        }
+      ],
+      "learning": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.05140885685260097,
+          "copy": 0.04912013054514925,
+          "steps": 73,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.0628570393100381,
+          "copy": 0.061830977605034906,
+          "steps": 148,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.04256625273575385,
+          "copy": 0.04580828716357549,
+          "steps": 223,
+          "rollbacks": 0
+        }
+      ]
+    },
+    {
+      "scene": "v_BenchPress_g02",
+      "clips": 7,
+      "fps": 25.0,
+      "loop": 1,
+      "frozen": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.026448398487021525,
+          "copy": 0.026448398487021525,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.019713170696049928,
+          "copy": 0.019713170696049928,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.02403439849925538,
+          "copy": 0.02403439849925538,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.02915293524041772,
+          "copy": 0.02915293524041772,
+          "steps": 0,
+          "rollbacks": 0
+        }
+      ],
+      "learning": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.028488949015736578,
+          "copy": 0.026448398487021525,
+          "steps": 73,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.01932177207743128,
+          "copy": 0.019713170696049928,
+          "steps": 148,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.0233067113875101,
+          "copy": 0.02403439849925538,
+          "steps": 223,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.026062093389530975,
+          "copy": 0.02915293524041772,
+          "steps": 298,
+          "rollbacks": 0
+        }
+      ]
+    },
+    {
+      "scene": "v_Biking_g02",
+      "clips": 7,
+      "fps": 29.97002997002997,
+      "loop": 1,
+      "frozen": [
+        {
+          "frame": 150,
+          "seconds": 5.04,
+          "model": 0.047632661158083164,
+          "copy": 0.047632661158083164,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 10.04,
+          "model": 0.048723364146862874,
+          "copy": 0.048723364146862874,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 15.05,
+          "model": 0.0470447312581382,
+          "copy": 0.0470447312581382,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 20.05,
+          "model": 0.0460272025498125,
+          "copy": 0.0460272025498125,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 25.06,
+          "model": 0.04141733728615994,
+          "copy": 0.04141733728615994,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 30.06,
+          "model": 0.039255915286642754,
+          "copy": 0.039255915286642754,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 35.07,
+          "model": 0.03702868198883758,
+          "copy": 0.03702868198883758,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1200,
+          "seconds": 40.07,
+          "model": 0.04454576165776719,
+          "copy": 0.04454576165776719,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1350,
+          "seconds": 45.08,
+          "model": 0.0393517525554004,
+          "copy": 0.0393517525554004,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1500,
+          "seconds": 50.08,
+          "model": 0.045264406715153506,
+          "copy": 0.045264406715153506,
+          "steps": 0,
+          "rollbacks": 0
+        }
+      ],
+      "learning": [
+        {
+          "frame": 150,
+          "seconds": 5.04,
+          "model": 0.04898413079014669,
+          "copy": 0.047632661158083164,
+          "steps": 73,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 10.04,
+          "model": 0.04898413985734806,
+          "copy": 0.048723364146862874,
+          "steps": 148,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 15.05,
+          "model": 0.04722923916842168,
+          "copy": 0.0470447312581382,
+          "steps": 223,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 20.05,
+          "model": 0.046200883189449087,
+          "copy": 0.0460272025498125,
+          "steps": 298,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 25.06,
+          "model": 0.04153177354387784,
+          "copy": 0.04141733728615994,
+          "steps": 373,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 30.06,
+          "model": 0.03946683491808168,
+          "copy": 0.039255915286642754,
+          "steps": 448,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 35.07,
+          "model": 0.03718344959478903,
+          "copy": 0.03702868198883758,
+          "steps": 523,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1200,
+          "seconds": 40.07,
+          "model": 0.044641994190945604,
+          "copy": 0.04454576165776719,
+          "steps": 598,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1350,
+          "seconds": 45.08,
+          "model": 0.03948100339068333,
+          "copy": 0.0393517525554004,
+          "steps": 673,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1500,
+          "seconds": 50.08,
+          "model": 0.045463241281201286,
+          "copy": 0.045264406715153506,
+          "steps": 748,
+          "rollbacks": 0
+        }
+      ]
+    },
+    {
+      "scene": "v_Billiards_g02",
+      "clips": 7,
+      "fps": 25.0,
+      "loop": 1,
+      "frozen": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.006384624649460117,
+          "copy": 0.006384624649460117,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.004258276131780197,
+          "copy": 0.004258276131780197,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.010518587344510404,
+          "copy": 0.010518587344510404,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.007672446786115567,
+          "copy": 0.007672446786115567,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.007787113132944796,
+          "copy": 0.007787113132944796,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.0016380238408479878,
+          "copy": 0.0016380238408479878,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 42.04,
+          "model": 0.019749564140850755,
+          "copy": 0.019749564140850755,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1200,
+          "seconds": 48.04,
+          "model": 0.0015115572228144932,
+          "copy": 0.0015115572228144932,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1350,
+          "seconds": 54.04,
+          "model": 0.008603871169810495,
+          "copy": 0.008603871169810495,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1500,
+          "seconds": 60.04,
+          "model": 0.013658257440353433,
+          "copy": 0.013658257440353433,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1650,
+          "seconds": 66.04,
+          "model": 0.011956386980600656,
+          "copy": 0.011956386980600656,
+          "steps": 0,
+          "rollbacks": 0
+        }
+      ],
+      "learning": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.010304445301493008,
+          "copy": 0.006384624649460117,
+          "steps": 73,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.0054930887115187945,
+          "copy": 0.004258276131780197,
+          "steps": 148,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.011092457301759472,
+          "copy": 0.010518587344510404,
+          "steps": 223,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.0077891956285263105,
+          "copy": 0.007672446786115567,
+          "steps": 298,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.008846508733695373,
+          "copy": 0.007787113132944796,
+          "steps": 373,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.00205350810312666,
+          "copy": 0.0016380238408479878,
+          "steps": 448,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 42.04,
+          "model": 0.021239656587131322,
+          "copy": 0.019749564140850755,
+          "steps": 523,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1200,
+          "seconds": 48.04,
+          "model": 0.0025142103205629002,
+          "copy": 0.0015115572228144932,
+          "steps": 598,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1350,
+          "seconds": 54.04,
+          "model": 0.0087181819571803,
+          "copy": 0.008603871169810495,
+          "steps": 673,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1500,
+          "seconds": 60.04,
+          "model": 0.013411695333197714,
+          "copy": 0.013658257440353433,
+          "steps": 748,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1650,
+          "seconds": 66.04,
+          "model": 0.011490494661654036,
+          "copy": 0.011956386980600656,
+          "steps": 823,
+          "rollbacks": 0
+        }
+      ]
+    },
+    {
+      "scene": "v_BlowDryHair_g06",
+      "clips": 7,
+      "fps": 25.0,
+      "loop": 1,
+      "frozen": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.030554032285969392,
+          "copy": 0.030554032285969392,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.03561368151102215,
+          "copy": 0.03561368151102215,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.04197181438173478,
+          "copy": 0.04197181438173478,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.030095476080896334,
+          "copy": 0.030095476080896334,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.023668208037464257,
+          "copy": 0.023668208037464257,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.023873100122242856,
+          "copy": 0.023873100122242856,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 42.04,
+          "model": 0.012508126330503728,
+          "copy": 0.012508126330503728,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1200,
+          "seconds": 48.04,
+          "model": 0.023830780557085138,
+          "copy": 0.023830780557085138,
+          "steps": 0,
+          "rollbacks": 0
+        }
+      ],
+      "learning": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.03228243520793816,
+          "copy": 0.030554032285969392,
+          "steps": 73,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.03610147544182837,
+          "copy": 0.03561368151102215,
+          "steps": 148,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.042280131864051024,
+          "copy": 0.04197181438173478,
+          "steps": 223,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.031081878763313094,
+          "copy": 0.030095476080896334,
+          "steps": 298,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.023651164771678546,
+          "copy": 0.023668208037464257,
+          "steps": 373,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.02328819125580291,
+          "copy": 0.023873100122242856,
+          "steps": 448,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 42.04,
+          "model": 0.012644815614136556,
+          "copy": 0.012508126330503728,
+          "steps": 523,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1200,
+          "seconds": 48.04,
+          "model": 0.023644810773742697,
+          "copy": 0.023830780557085138,
+          "steps": 598,
+          "rollbacks": 0
+        }
+      ]
+    },
+    {
+      "scene": "v_BlowingCandles_g06",
+      "clips": 7,
+      "fps": 25.0,
+      "loop": 1,
+      "frozen": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.02778673266991973,
+          "copy": 0.02778673266991973,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.024735323252777257,
+          "copy": 0.024735323252777257,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.02756832384193937,
+          "copy": 0.02756832384193937,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.03474975673481822,
+          "copy": 0.03474975673481822,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.029237103822330635,
+          "copy": 0.029237103822330635,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.03286718867253512,
+          "copy": 0.03286718867253512,
+          "steps": 0,
+          "rollbacks": 0
+        }
+      ],
+      "learning": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.031875605850170054,
+          "copy": 0.02778673266991973,
+          "steps": 73,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.025168850980699063,
+          "copy": 0.024735323252777257,
+          "steps": 148,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.0273160566141208,
+          "copy": 0.02756832384193937,
+          "steps": 223,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.03208376850311955,
+          "copy": 0.03474975673481822,
+          "steps": 298,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.026888578313713274,
+          "copy": 0.029237103822330635,
+          "steps": 373,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.030217682862033447,
+          "copy": 0.03286718867253512,
+          "steps": 448,
+          "rollbacks": 0
+        }
+      ]
+    },
+    {
+      "scene": "v_Bowling_g01",
+      "clips": 7,
+      "fps": 25.0,
+      "loop": 1,
+      "frozen": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.028879132479293426,
+          "copy": 0.028879132479293426,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.0336469980229352,
+          "copy": 0.0336469980229352,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.034206305886715804,
+          "copy": 0.034206305886715804,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.0314472945087861,
+          "copy": 0.0314472945087861,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.031576783556180696,
+          "copy": 0.031576783556180696,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.02910681927857998,
+          "copy": 0.02910681927857998,
+          "steps": 0,
+          "rollbacks": 0
+        }
+      ],
+      "learning": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.028224946631041047,
+          "copy": 0.028879132479293426,
+          "steps": 73,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.034651325593392054,
+          "copy": 0.0336469980229352,
+          "steps": 148,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.03348403765509526,
+          "copy": 0.034206305886715804,
+          "steps": 223,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.03060484735916058,
+          "copy": 0.0314472945087861,
+          "steps": 298,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.029957651067525147,
+          "copy": 0.031576783556180696,
+          "steps": 373,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.028998231204847496,
+          "copy": 0.02910681927857998,
+          "steps": 448,
+          "rollbacks": 0
+        }
+      ]
+    },
+    {
+      "scene": "v_BoxingPunchingBag_g01",
+      "clips": 7,
+      "fps": 25.0,
+      "loop": 1,
+      "frozen": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.00943799731011192,
+          "copy": 0.00943799731011192,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.008859526443605622,
+          "copy": 0.008859526443605622,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.007153214459928374,
+          "copy": 0.007153214459928374,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.008317569145001471,
+          "copy": 0.008317569145001471,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.005949419278961917,
+          "copy": 0.005949419278961917,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.010065912255086004,
+          "copy": 0.010065912255086004,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 42.04,
+          "model": 0.006040348812627295,
+          "copy": 0.006040348812627295,
+          "steps": 0,
+          "rollbacks": 0
+        }
+      ],
+      "learning": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.011621305077957611,
+          "copy": 0.00943799731011192,
+          "steps": 73,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.009131435543919602,
+          "copy": 0.008859526443605622,
+          "steps": 148,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.006981429569423199,
+          "copy": 0.007153214459928374,
+          "steps": 223,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.007307901882256071,
+          "copy": 0.008317569145001471,
+          "steps": 298,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.005672802451687555,
+          "copy": 0.005949419278961917,
+          "steps": 373,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.008512096226525804,
+          "copy": 0.010065912255086004,
+          "steps": 448,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 42.04,
+          "model": 0.005344360978342593,
+          "copy": 0.006040348812627295,
+          "steps": 523,
+          "rollbacks": 0
+        }
+      ]
+    },
+    {
+      "scene": "v_BoxingSpeedBag_g04",
+      "clips": 7,
+      "fps": 25.0,
+      "loop": 1,
+      "frozen": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.01636984567157924,
+          "copy": 0.01636984567157924,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.01991735179598133,
+          "copy": 0.01991735179598133,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.019094543469448885,
+          "copy": 0.019094543469448885,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.0206317652699848,
+          "copy": 0.0206317652699848,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.018663540439059337,
+          "copy": 0.018663540439059337,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.01878696399430434,
+          "copy": 0.01878696399430434,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 42.04,
+          "model": 0.01946193668991327,
+          "copy": 0.01946193668991327,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1200,
+          "seconds": 48.04,
+          "model": 0.018050893244023123,
+          "copy": 0.018050893244023123,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1350,
+          "seconds": 54.04,
+          "model": 0.021898861719916264,
+          "copy": 0.021898861719916264,
+          "steps": 0,
+          "rollbacks": 0
+        }
+      ],
+      "learning": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.01730290268237392,
+          "copy": 0.01636984567157924,
+          "steps": 73,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.020278825828184684,
+          "copy": 0.01991735179598133,
+          "steps": 148,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.0185489813114206,
+          "copy": 0.019094543469448885,
+          "steps": 223,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.022166707863410313,
+          "copy": 0.0206317652699848,
+          "steps": 298,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.018937791989495356,
+          "copy": 0.018663540439059337,
+          "steps": 373,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.01944961516186595,
+          "copy": 0.01878696399430434,
+          "steps": 448,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 42.04,
+          "model": 0.03026206959038973,
+          "copy": 0.01946193668991327,
+          "steps": 523,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1200,
+          "seconds": 48.04,
+          "model": 0.032489086451629796,
+          "copy": 0.018050893244023123,
+          "steps": 598,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1350,
+          "seconds": 54.04,
+          "model": 0.0416784305870533,
+          "copy": 0.021898861719916264,
+          "steps": 673,
+          "rollbacks": 0
+        }
+      ]
+    },
+    {
+      "scene": "v_BrushingTeeth_g02",
+      "clips": 7,
+      "fps": 25.0,
+      "loop": 1,
+      "frozen": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.001525577154631416,
+          "copy": 0.001525577154631416,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.0016335653113977362,
+          "copy": 0.0016335653113977362,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.001516760418113942,
+          "copy": 0.001516760418113942,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.0013449660950573161,
+          "copy": 0.0013449660950573161,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.001020907621520261,
+          "copy": 0.001020907621520261,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.0009191523971579348,
+          "copy": 0.0009191523971579348,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 42.04,
+          "model": 0.001582053229212761,
+          "copy": 0.001582053229212761,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1200,
+          "seconds": 48.04,
+          "model": 0.001260447344199444,
+          "copy": 0.001260447344199444,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1350,
+          "seconds": 54.04,
+          "model": 0.0013043178309453652,
+          "copy": 0.0013043178309453652,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1500,
+          "seconds": 60.04,
+          "model": 0.0018601522726627688,
+          "copy": 0.0018601522726627688,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1650,
+          "seconds": 66.04,
+          "model": 0.0014242375032821049,
+          "copy": 0.0014242375032821049,
+          "steps": 0,
+          "rollbacks": 0
+        }
+      ],
+      "learning": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.003071659964043647,
+          "copy": 0.001525577154631416,
+          "steps": 73,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.0019296460098121315,
+          "copy": 0.0016335653113977362,
+          "steps": 148,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.0016794394639631112,
+          "copy": 0.001516760418113942,
+          "steps": 223,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.0014885149306307236,
+          "copy": 0.0013449660950573161,
+          "steps": 298,
+          "rollbacks": 0
+        },
+        {
+          "frame": 750,
+          "seconds": 30.04,
+          "model": 0.00201376159559004,
+          "copy": 0.001020907621520261,
+          "steps": 373,
+          "rollbacks": 0
+        },
+        {
+          "frame": 900,
+          "seconds": 36.04,
+          "model": 0.003377610550572475,
+          "copy": 0.0009191523971579348,
+          "steps": 448,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1050,
+          "seconds": 42.04,
+          "model": 0.005496445142974456,
+          "copy": 0.001582053229212761,
+          "steps": 523,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1200,
+          "seconds": 48.04,
+          "model": 0.00404562982575347,
+          "copy": 0.001260447344199444,
+          "steps": 598,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1350,
+          "seconds": 54.04,
+          "model": 0.004173999051563442,
+          "copy": 0.0013043178309453652,
+          "steps": 673,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1500,
+          "seconds": 60.04,
+          "model": 0.004140828710127001,
+          "copy": 0.0018601522726627688,
+          "steps": 748,
+          "rollbacks": 0
+        },
+        {
+          "frame": 1650,
+          "seconds": 66.04,
+          "model": 0.0018944858526811004,
+          "copy": 0.0014242375032821049,
+          "steps": 823,
+          "rollbacks": 0
+        }
+      ]
+    },
+    {
+      "scene": "v_CliffDiving_g05",
+      "clips": 7,
+      "fps": 25.0,
+      "loop": 1,
+      "frozen": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.05202318908181042,
+          "copy": 0.05202318908181042,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.039281406564017136,
+          "copy": 0.039281406564017136,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.04125453475513496,
+          "copy": 0.04125453475513496,
+          "steps": 0,
+          "rollbacks": 0
+        }
+      ],
+      "learning": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.0590101302601397,
+          "copy": 0.05202318908181042,
+          "steps": 73,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.054247343751291435,
+          "copy": 0.039281406564017136,
+          "steps": 148,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.038835504263018565,
+          "copy": 0.04125453475513496,
+          "steps": 223,
+          "rollbacks": 0
+        }
+      ]
+    },
+    {
+      "scene": "v_CricketBowling_g01",
+      "clips": 7,
+      "fps": 25.0,
+      "loop": 1,
+      "frozen": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.004331524496277174,
+          "copy": 0.004331524496277174,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.003085251707622471,
+          "copy": 0.003085251707622471,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.0032035715988604353,
+          "copy": 0.0032035715988604353,
+          "steps": 0,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.0037932701631992432,
+          "copy": 0.0037932701631992432,
+          "steps": 0,
+          "rollbacks": 0
+        }
+      ],
+      "learning": [
+        {
+          "frame": 150,
+          "seconds": 6.04,
+          "model": 0.006588053938467056,
+          "copy": 0.004331524496277174,
+          "steps": 73,
+          "rollbacks": 0
+        },
+        {
+          "frame": 300,
+          "seconds": 12.04,
+          "model": 0.003981688735463346,
+          "copy": 0.003085251707622471,
+          "steps": 148,
+          "rollbacks": 0
+        },
+        {
+          "frame": 450,
+          "seconds": 18.04,
+          "model": 0.003749820578765745,
+          "copy": 0.0032035715988604353,
+          "steps": 223,
+          "rollbacks": 0
+        },
+        {
+          "frame": 600,
+          "seconds": 24.04,
+          "model": 0.003889318676665425,
+          "copy": 0.0037932701631992432,
+          "steps": 298,
+          "rollbacks": 0
+        }
+      ]
+    }
+  ]
+}
