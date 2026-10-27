@@ -173,8 +173,12 @@ class LiveState:
                 self._learning_before_dream = not learner.paused
                 learner.paused = True
             opening = not closed and self.eyes_closed
+            if closed and hasattr(self.engine, "set_learning"):
+                self.engine.set_learning(False)
             # Stop dreaming before learning resumes, so no imagined frame is learned.
             self.eyes_closed = closed
+            if opening and hasattr(self.engine, "set_learning"):
+                self.engine.set_learning(True)
             if opening and learner is not None:
                 learner.paused = not self._learning_before_dream
         if "learning" in command and learner is not None and not self.eyes_closed:

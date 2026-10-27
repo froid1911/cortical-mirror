@@ -46,3 +46,23 @@ def test_server_publishes_extra_views(tmp_path):
     metrics = state.metrics()
     assert metrics["mode"] == "twins"
     assert metrics["twins"]["newborn"]["age_frames"] == 5
+
+
+def test_dreaming_twins_learn_nothing(tmp_path):
+    twin = TwinEngine(CortexEngine(seed=1), CortexEngine(seed=2))
+    for frame in frames(4):
+        twin.predict(frame)
+    weights = [e.hierarchy.levels[0].W.clone() for e in (twin.newborn, twin.adult)]
+    ages = (twin.newborn.age_frames, twin.adult.age_frames)
+    state = LiveState(twin, "0", "twins", False, 0)
+    state.control({"eyes_closed": True})  # as the space key does
+    for frame in frames(4):
+        twin.predict(frame)
+    assert (twin.newborn.age_frames, twin.adult.age_frames) == ages
+    assert all(
+        torch.equal(e.hierarchy.levels[0].W, w)
+        for e, w in zip((twin.newborn, twin.adult), weights, strict=True)
+    )
+    state.control({"eyes_closed": False})
+    twin.predict(frames(1)[0])
+    assert twin.newborn.age_frames == ages[0] + 1

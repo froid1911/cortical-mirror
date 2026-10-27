@@ -34,6 +34,14 @@ class TwinEngine:
         self._reset_requested = False
         self._views: dict[str, np.ndarray] = {}
         self._surprise = {"newborn": _Surprise(), "adult": _Surprise()}
+        self._learns = (newborn.learn, adult.learn)
+
+    def set_learning(self, enabled: bool) -> None:
+        """Pause or resume learning for both, keeping each one's own setting
+        (a frozen adult stays frozen). Used while the eyes are closed."""
+
+        self.newborn.learn = enabled and self._learns[0]
+        self.adult.learn = enabled and self._learns[1]
 
     def reset(self) -> None:
         self.newborn.reset()
