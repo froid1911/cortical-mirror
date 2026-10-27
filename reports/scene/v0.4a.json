@@ -1,0 +1,41 @@
+{
+  "discovery": {
+    "learning": {
+      "mean_iou": 0.7886096483284573,
+      "count_accuracy": 0.8675
+    },
+    "frozen": {
+      "mean_iou": 0.7565000165302752,
+      "count_accuracy": 0.4175
+    },
+    "motion_baseline": {
+      "mean_iou": 0.5395383952237546,
+      "count_accuracy": 0.7175
+    },
+    "samples": 10,
+    "scenes": 40,
+    "seconds": 121.2
+  },
+  "manipulation": {
+    "objects": 100,
+    "matched": 93,
+    "scenes": 40,
+    "delete": {
+      "edits": 93,
+      "graph_mse": 0.0006424297534359754,
+      "bitmap_mse": 0.002735554653730604,
+      "unchanged_mse": 0.02031663081218158,
+      "graph_over_bitmap": 0.23484442270596345,
+      "graph_wins": 0.946236559139785
+    },
+    "move": {
+      "edits": 93,
+      "graph_mse": 0.0013096053561668904,
+      "bitmap_mse": 0.0024651702755050715,
+      "unchanged_mse": 0.01980223204009235,
+      "graph_over_bitmap": 0.5312433665048044,
+      "graph_wins": 0.9032258064516129
+    },
+    "seconds": 40.5
+  }
+}
