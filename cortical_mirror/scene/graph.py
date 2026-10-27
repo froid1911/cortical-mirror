@@ -39,6 +39,12 @@ UNEXPLAINED = 0.004
 # Frames back that "still" is judged against: slow, smooth objects barely change
 # from one frame to the next.
 STILL_LAG = 8
+# The most one pixel can count against a node's placement.
+AGAINST = 0.004
+# Visibility above which a view of a node counts as complete.
+COMPLETE = 0.7
+# What a pixel of deviation from the predicted position costs, per unit of mass.
+CONTINUITY = 0.0001
 # Frames a forgotten node is remembered for recognition; one that has not come
 # back by then is taken to be gone for good.
 MEMORY = 150
@@ -67,6 +73,8 @@ class Node:
     still: int = 0
     # Frames it has spent in the fovea.
     looked: int = 0
+    # How much of it was seen in the last frame.
+    visibility: float = 1.0
 
     def displacement(self, frames: int = 5) -> tuple[float, float] | None:
         if not self.trail or len(self.trail) <= frames:
@@ -244,10 +252,29 @@ class SceneGraph:
             return node.x, node.y, 0.0, 0.0
         seen, behind, covered = views
         weight = node.mask * (1 - covered)
-        gain = (weight * (behind - (seen - node.template) ** 2)).sum((-1, -2))
-        best = np.unravel_index(int(np.argmax(gain)), gain.shape)
+        # Evidence against a placement is capped: a pixel the node cannot explain may
+        # be something known standing in front of it.
+        evidence = behind - (seen - node.template) ** 2
+        # Where the known background explains the pixel, it may stand in front of the
+        # node: no evidence against it there at all.
+        evidence = np.where(
+            behind < 0.002, np.maximum(evidence, 0.0), np.maximum(evidence, -AGAINST)
+        )
+        gain = (weight * evidence).sum((-1, -2))
         mass = max(node.mass, 1e-6)
-        visibility = float(weight[best].sum() / mass)
+        # Continuity: things keep moving as they did; each pixel off the prediction
+        # costs a little, so a partial view does not drag a node off its path.
+        offsets = np.arange(-radius, radius + 1)
+        # Only once its motion is established.
+        established = min(max((node.age - 15) / 15, 0.0), 1.0)
+        # The cost saturates: it resists small drifts, not a clear jump (a bounce).
+        deviation = np.minimum(offsets[:, None] ** 2 + offsets[None, :] ** 2, 4)
+        gain = gain - established * CONTINUITY * mass * deviation
+        best = np.unravel_index(int(np.argmax(gain)), gain.shape)
+        # How much of the node is seen: not hidden by anything known, and explained by
+        # its template where it is placed (an unknown occluder hides the rest).
+        explained = (seen[best] - node.template) ** 2 < 0.003
+        visibility = float((weight[best] * explained).sum() / mass)
         return (
             node.x + best[1] - radius,
             node.y + best[0] - radius,
@@ -284,13 +311,18 @@ class SceneGraph:
             cover = self._cover(ordered[:index])
             predicted = (node.x, node.y)
             x, y, gain, visibility = self._search(node, image, cover)
+            node.visibility = visibility
             if visibility > 0.25 and gain > 0.002:
                 vx, vy = x - predicted[0] + node.vx, y - predicted[1] + node.vy
                 # A partly hidden node's measured motion is trusted less.
                 rate = 0.5 * min(visibility, 1.0) ** 2
                 node.vx += rate * (vx - node.vx)
                 node.vy += rate * (vy - node.vy)
-                node.x, node.y = x, y
+                # Mostly hidden, it is where it was expected to be, more than where
+                # its few visible pixels fit best.
+                trust = min(max((visibility - 0.25) / 0.65, 0.0), 1.0)
+                node.x = predicted[0] + trust * (x - predicted[0])
+                node.y = predicted[1] + trust * (y - predicted[1])
                 node.state, node.unseen, node.belief = "seen", 0, 1.0
             else:
                 self._unseen(node, visibility)
@@ -303,10 +335,10 @@ class SceneGraph:
                 self._identify(node)
         for node in self.nodes:
             # Recentring moves the frame, not the object: the trail follows the object.
-            shift = self._recentre(node)
+            shift = self._recentre(node) if node.visibility >= COMPLETE else (0, 0)
             node.trail = [(x + shift[0], y + shift[1]) for x, y in node.trail or []]
             node.trail = [*node.trail, (node.x, node.y)][-12:]
-            if node.state == "seen" and len(node.trail) >= 6:
+            if node.state == "seen" and node.visibility >= COMPLETE and len(node.trail) >= 6:
                 # Velocity as the slope of the recent path: single-frame steps are whole
                 # pixels, and averaging them is slow and biased.
                 path = np.array(node.trail[-10:])
@@ -354,15 +386,30 @@ class SceneGraph:
                 belongs = (by_node < 0.002) & (by_node + 0.0002 < unchanged)
                 foreign = (by_node > 0.01) | background_here
                 evidence = free * (belongs | foreign)
-                mask += 0.2 * evidence * (belongs - mask)
+                # Shape is learned only from complete views: in a partial one, what is
+                # missing may be hidden, not absent.
+                whole = float(node.visibility >= COMPLETE)
+                mask += 0.2 * whole * evidence * (belongs - mask)
                 # Cohesion: where the evidence is silent, a pixel goes with its neighbours.
-                mask += 0.1 * free * (cv2.GaussianBlur(mask, (0, 0), 2.0) - mask)
+                mask += 0.1 * whole * free * (cv2.GaussianBlur(mask, (0, 0), 2.0) - mask)
                 # The whole frame learns, slowly where the mask is low: only pixels
                 # that keep matching while the node moves (its own) grow into the mask.
-                template += free * (0.1 + 0.2 * mask) * (seen - template)
-            # A node expected here whose pixels the background explains instead:
-            # something remembered stands in front of it.
-            hidden = remembered & (mask > 0.7) & ((seen - behind) ** 2 < 0.0025) & (by_node > 0.02)
+                # Inside the mask the template only refines what it already roughly
+                # matches, so a moment out of step does not overwrite the object with
+                # whatever lies there. Never where the known background is seen.
+                rate = np.where(mask < 0.3, 0.1, 0.3 * (by_node < 0.01))
+                template += free * ~background_here * rate * (seen - template)
+            # A node still partly in view, whose expected pixels the background explains
+            # instead: something remembered stands in front of it. Not once it is out
+            # of sight: a hidden thing that fails to reappear is not explained away.
+            in_view = node.state == "seen"
+            hidden = (
+                in_view
+                & remembered
+                & (mask > 0.7)
+                & ((seen - behind) ** 2 < 0.0025)
+                & (by_node > 0.02)
+            )
             shown = (mask > 0.7) & (by_node < by_background) & (nearer < 0.5)
             front = self.front[world]
             front += 0.5 * hidden * (1 - front) - 0.2 * shown * front
@@ -390,7 +437,12 @@ class SceneGraph:
                 if abs(vote) > 0.2:
                     near, far = (a, b) if vote > 0 else (b, a)
                     if near.depth <= far.depth:
-                        near.depth = far.depth + 1.0
+                        # Just above the far one, below whatever was already above it,
+                        # so the order of every other pair is kept.
+                        above = [
+                            n.depth for n in self.nodes if n is not near and n.depth > far.depth
+                        ]
+                        near.depth = (far.depth + min(above)) / 2 if above else far.depth + 1.0
 
     def _pixel_error(self, node: Node, image: np.ndarray) -> np.ndarray:
         out = np.full_like(image, np.inf)

@@ -35,7 +35,9 @@ def test_one_moving_object_becomes_one_node_that_follows_it():
 def test_each_of_several_objects_gets_its_own_node():
     world = SpriteWorld(seed=5, objects=3)
     graph = watch(world, 150)
-    assert len(graph.nodes) == 3
+    # Nodes believed but not seen (a lost track, kept for a while) are not counted here.
+    seen = [n for n in graph.nodes if n.state == "seen"]
+    assert len(seen) == 3
     assert len({matched(graph, thing).id for thing in world.objects}) == 3
 
 
