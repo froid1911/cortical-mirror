@@ -1,0 +1,26 @@
+{
+  "run": "v3-G-wide-burn",
+  "hardware": "one RTX 3090 on a shared node (two other training runs and some benchmarks ran concurrently)",
+  "train_epoch_seconds": [
+    2467,
+    2654,
+    2578,
+    2546,
+    2493,
+    2501,
+    2435,
+    1942
+  ],
+  "validation_seconds": [
+    48,
+    38,
+    38,
+    39,
+    38,
+    38,
+    25,
+    24
+  ],
+  "total_hours": 5.53,
+  "source": "final tqdm elapsed time of each phase in the training log"
+}

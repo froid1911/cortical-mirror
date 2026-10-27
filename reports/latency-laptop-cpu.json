@@ -1,0 +1,43 @@
+{
+  "device": "cpu",
+  "hardware": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
+  "cpu_threads": 12,
+  "video": "sample.mp4",
+  "fps": 23.976023976023978,
+  "seconds": 20.0,
+  "results": [
+    {
+      "configuration": "pretrained, no learning",
+      "experts": [
+        "copy",
+        "cortical"
+      ],
+      "inference_ms_mean": 31.5,
+      "inference_ms_p95": 41.5,
+      "learner_steps_per_second": 0.0,
+      "learner_steps_per_frame": 0.0
+    },
+    {
+      "configuration": "pretrained, learning",
+      "experts": [
+        "copy",
+        "cortical"
+      ],
+      "inference_ms_mean": 63.4,
+      "inference_ms_p95": 123.8,
+      "learner_steps_per_second": 0.3,
+      "learner_steps_per_frame": 0.02
+    },
+    {
+      "configuration": "from scratch, learning",
+      "experts": [
+        "copy",
+        "cortical"
+      ],
+      "inference_ms_mean": 51.8,
+      "inference_ms_p95": 120.9,
+      "learner_steps_per_second": 0.7,
+      "learner_steps_per_frame": 0.04
+    }
+  ]
+}

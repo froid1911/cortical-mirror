@@ -1,0 +1,12 @@
+{
+  "first": "test-G-final-cortical.json",
+  "second": "test-dmvfn.json",
+  "videos": 202,
+  "difference_points": 8.61,
+  "interval_95": [
+    5.42,
+    12.22
+  ],
+  "first_better_on_videos": 133,
+  "bootstrap_samples": 10000
+}
