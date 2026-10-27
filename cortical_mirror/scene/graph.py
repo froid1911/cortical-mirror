@@ -39,6 +39,11 @@ UNEXPLAINED = 0.004
 # Frames back that "still" is judged against: slow, smooth objects barely change
 # from one frame to the next.
 STILL_LAG = 8
+# Frames a forgotten node is remembered for recognition; one that has not come
+# back by then is taken to be gone for good.
+MEMORY = 150
+# A newborn forgets what it cannot see within a few frames.
+NEWBORN_PERSISTENCE = 1.0
 
 
 @dataclass
@@ -93,12 +98,50 @@ class SceneGraph:
         slots: int = SLOTS,
         persistence: float = 30.0,
         learn: bool = True,
+        learn_persistence: bool = False,
     ):
         self.width, self.height, self.slots = width, height, slots
         # Frames an unseen node stays believed (the time constant of its belief).
+        # Unlike everything else in the graph, it carries over from scene to scene:
+        # it is what development changes.
         self.persistence = persistence
         self.learn = learn
+        self.learn_persistence = learn_persistence
         self.reset()
+
+    def save(self, path) -> None:
+        import torch
+
+        torch.save(
+            {
+                "size": (self.width, self.height),
+                "slots": self.slots,
+                "persistence": float(self.persistence),
+                "learn_persistence": self.learn_persistence,
+            },
+            path,
+        )
+
+    @classmethod
+    def load(cls, path, learn: bool = True) -> SceneGraph:
+        import torch
+
+        state = torch.load(path, map_location="cpu", weights_only=True)
+        return cls(
+            *state["size"],
+            slots=state["slots"],
+            persistence=state["persistence"],
+            learn=learn,
+            learn_persistence=state["learn_persistence"],
+        )
+
+    def _adjust_persistence(self, target: float, rate: float) -> None:
+        """Move the persistence toward a target, in log space (a global, three-factor
+        signal: the outcome of a belief, applied to the one shared time constant)."""
+
+        if self.learn_persistence:
+            log = math.log(self.persistence)
+            self.persistence = math.exp(log + rate * (math.log(max(target, 1.0)) - log))
 
     def reset(self) -> None:
         self.nodes: list[Node] = []
@@ -163,6 +206,11 @@ class SceneGraph:
             twin.x, twin.y, twin.depth = twin.x + dx, twin.y + dy, original.depth + 0.5
             nodes.append(twin)
         return self.render(nodes)
+
+    def expect(self) -> np.ndarray:
+        """The graph's picture of the next frame: every node moved on by its velocity."""
+
+        return self.edit(move={n.id: (n.vx, n.vy) for n in self.nodes})
 
     # Inference -----------------------------------------------------------------
 
@@ -249,10 +297,20 @@ class SceneGraph:
         self._spawn(image, motion)
         self._retire()
         for node in self.nodes:
+            if node.age in (10, 20, 30):
+                self._identify(node)
+        for node in self.nodes:
             # Recentring moves the frame, not the object: the trail follows the object.
             shift = self._recentre(node)
             node.trail = [(x + shift[0], y + shift[1]) for x, y in node.trail or []]
             node.trail = [*node.trail, (node.x, node.y)][-12:]
+            if node.state == "seen" and len(node.trail) >= 6:
+                # Velocity as the slope of the recent path: single-frame steps are whole
+                # pixels, and averaging them is slow and biased.
+                path = np.array(node.trail[-10:])
+                steps = np.arange(len(path))
+                node.vx = float(np.polyfit(steps, path[:, 0], 1)[0])
+                node.vy = float(np.polyfit(steps, path[:, 1], 1)[0])
             moved = node.displacement()
             moving = moved is None or math.hypot(*moved) > 1.5
             node.still = 0 if moving or node.state != "seen" else node.still + 1
@@ -343,15 +401,19 @@ class SceneGraph:
     # Birth and death -------------------------------------------------------------
 
     def _spawn(self, image: np.ndarray, motion: np.ndarray) -> None:
-        residual = np.abs(image - self.render())
+        # Smoothed, so that a faint object adds up over its area.
+        residual = cv2.GaussianBlur(np.abs(image - self.render()), (0, 0), 2.0)
         claimed = self._cover(self.nodes)
-        # A newborn node's mask is still growing: what lies next to it is probably it.
+        # What lies right next to a visible node is probably its own edge, and more
+        # so while a newborn node's mask is still growing.
         for node in self.nodes:
-            if node.age < 10:
-                young = cv2.dilate((self._alpha(node) > 0.3).astype(np.uint8), np.ones((21, 21)))
-                claimed = np.maximum(claimed, young.astype(np.float32))
+            if node.state != "seen":
+                continue
+            reach = np.ones((21, 21) if node.age < 10 else (13, 13), np.uint8)
+            near = cv2.dilate((self._alpha(node) > 0.3).astype(np.uint8), reach)
+            claimed = np.maximum(claimed, near.astype(np.float32))
         moving = cv2.dilate((motion > 0.04).astype(np.uint8), np.ones((7, 7), np.uint8))
-        candidate = (residual > 0.08) & (moving > 0) & (claimed < 0.3) & (self.front < 0.5)
+        candidate = (residual > 0.05) & (moving > 0) & (claimed < 0.3) & (self.front < 0.5)
         candidate = cv2.morphologyEx(
             candidate.astype(np.uint8), cv2.MORPH_OPEN, np.ones((3, 3), np.uint8)
         )
@@ -382,8 +444,22 @@ class SceneGraph:
             self._next_id += 1
 
     def _recognise(self, image: np.ndarray, x: float, y: float) -> bool:
-        """Revive a recently forgotten node that explains the residual near (x, y)."""
+        """Something new near (x, y) may be a hidden node coming back, away from where
+        it was expected, or a recently forgotten one: revive it instead of a birth."""
 
+        for node in self.nodes:
+            if node.state == "seen":
+                continue
+            cover = self._cover([n for n in self.nodes if n is not node])
+            probe = copy.deepcopy(node)
+            probe.x, probe.y = x, y
+            found_x, found_y, gain, visibility = self._search(probe, image, cover, radius=24)
+            if visibility > 0.25 and gain > 0.004:
+                error = math.hypot(found_x - node.x, found_y - node.y)
+                self.events.append({"returned": node.id, "after": node.unseen, "error": error})
+                node.x, node.y, node.trail = found_x, found_y, None
+                node.state, node.unseen, node.belief = "seen", 0, 1.0
+                return True
         cover = self._cover(self.nodes)
         for index, (node, forgotten) in enumerate(self.memory):
             probe = copy.deepcopy(node)
@@ -391,12 +467,34 @@ class SceneGraph:
             found_x, found_y, gain, visibility = self._search(probe, image, cover, radius=16)
             if visibility > 0.25 and gain > 0.004:
                 node.x, node.y, node.vx, node.vy = found_x, found_y, 0.0, 0.0
-                node.state, node.unseen, node.belief = "seen", 0, 1.0
+                node.state, node.belief, node.trail = "seen", 1.0, None
                 self.nodes.append(node)
                 del self.memory[index]
-                self.events.append({"recognised": node.id, "after": self.frame_count - forgotten})
+                self._recognised(node, forgotten)
                 return True
         return False
+
+    def _recognised(self, node: Node, forgotten: int) -> None:
+        after = self.frame_count - forgotten
+        self.events.append({"recognised": node.id, "after": after})
+        # It was forgotten too early: unseen for this long, it still existed.
+        unseen = node.unseen + after
+        node.unseen = 0
+        if unseen > self.persistence:
+            self._adjust_persistence(unseen, 0.2)
+
+    def _identify(self, node: Node) -> None:
+        """A node just formed may be a forgotten one seen again: same look, same shape.
+        Then it is that one, with its identity and depth."""
+
+        for index, (old, forgotten) in enumerate(self.memory):
+            if _likeness(node, old) > 0.003:
+                continue
+            del self.memory[index]
+            self.events.append({"identified": node.id, "as": old.id})
+            node.id, node.depth, node.unseen = old.id, old.depth, old.unseen
+            self._recognised(node, forgotten)
+            return
 
     def _retire(self) -> None:
         keep = []
@@ -408,7 +506,7 @@ class SceneGraph:
                 continue
             if node.belief < 0.1 or (node.age > 5 and node.mass < 30):
                 self.events.append({"forgotten": node.id})
-                if node.age > 10 and node.mass > 200:
+                if node.age > 10 and node.mass > 100:
                     self.memory = [(node, self.frame_count), *self.memory][:16]
                 continue
             keep.append(node)
@@ -438,7 +536,11 @@ class SceneGraph:
             self._absorb(partner, node)
             self.events.append({"merged": node.id, "into": partner.id})
         self._together = together
-        self.memory = [(n, f) for n, f in self.memory if self.frame_count - f < 300]
+        kept = [(n, f) for n, f in self.memory if self.frame_count - f < MEMORY]
+        for _ in range(len(self.memory) - len(kept)):
+            # Forgotten and never seen again: believing in it longer would have been wasted.
+            self._adjust_persistence(NEWBORN_PERSISTENCE, 0.25)
+        self.memory = kept
         self.nodes = sorted(survivors, key=lambda n: n.id)
 
     def _dissolve(self, node: Node) -> None:
@@ -513,6 +615,23 @@ class SceneGraph:
             "edges": edges,
             "self": {"kind": "eye", "gaze": None},
         }
+
+
+def _likeness(a: Node, b: Node, reach: int = 8) -> float:
+    """How unlike two nodes look at their best alignment: the mean squared template
+    difference where both masks hold, if they overlap on most of the smaller one."""
+
+    mine = a.mask > 0.5
+    best = math.inf
+    for dy in range(-reach, reach + 1, 2):
+        for dx in range(-reach, reach + 1, 2):
+            theirs = _shift(b.mask, dx, dy) > 0.5
+            both = mine & theirs
+            if both.sum() < 0.4 * min(mine.sum(), theirs.sum(), 1e9) or not both.any():
+                continue
+            difference = a.template[both] - _shift(b.template, dx, dy)[both]
+            best = min(best, float(np.mean(difference**2)))
+    return best
 
 
 def _shift(a: np.ndarray, dx: int, dy: int) -> np.ndarray:

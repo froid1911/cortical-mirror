@@ -57,3 +57,11 @@ def test_deleting_an_object_reveals_the_background_and_moving_it_draws_it_elsewh
     shifted = world.render(moved={thing.id: (20, 0)})
     assert np.array_equal(moved, shifted)
     assert (thing.x, thing.y) == (world.objects[0].x, world.objects[0].y)
+
+
+def test_a_wide_screen_hides_a_small_object_completely():
+    world = SpriteWorld(seed=0, objects=1, occluders=1, occluder_width=44, radius=(7, 9))
+    screen, thing = world.occluders[0], world.objects[0]
+    thing.x, thing.y = screen.x, screen.y
+    assert world.truth()[0]["full"].sum() > 0
+    assert world.truth()[0]["visible"].sum() == 0
