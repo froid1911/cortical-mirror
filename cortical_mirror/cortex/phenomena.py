@@ -56,14 +56,7 @@ def orientation_tuning(
         ]
     )
     code = _encode_static(network, stimuli)
-    level = network.levels[0]
-    saved_step = level.step_size
-    level.step_size = 0.9 / max(level.stability_limit(code.shape), 1e-6)
-    start = torch.zeros(
-        len(stimuli), level.config.cells, HEIGHT // 2, WIDTH // 2, device=network.device
-    )
-    activity = level.settle(code, start, iterations=30)
-    level.step_size = saved_step
+    activity = network.settle(code)[0]
     centre = activity[:, :, HEIGHT // 4 - 4 : HEIGHT // 4 + 4, WIDTH // 4 - 4 : WIDTH // 4 + 4]
     responses = centre.mean((2, 3)).view(orientations, phases, -1).mean(1).cpu()
     angles = torch.arange(orientations) * math.pi / orientations
@@ -161,3 +154,140 @@ def oddball_adaptation(
         ]
     )
     return {"DEV": dev, "STD": std, "CTR": ctr, **mismatch_indices(dev, std, ctr)}
+
+
+def direction_index(preferred: float, opposite: float) -> float:
+    total = preferred + opposite
+    return (preferred - opposite) / total if total > 0 else 0.0
+
+
+@torch.no_grad()
+def direction_selectivity(
+    network: Hierarchy,
+    period: float = 8.0,
+    speed: float = 1.0,
+    directions: int = 12,
+    frames: int = 16,
+) -> dict:
+    """Protocol 3. DSI per cell from drifting gratings seen through the lagged retina."""
+
+    codes = []
+    for d in range(directions):
+        angle = 360.0 * d / directions
+        retina = Retina(WIDTH, HEIGHT, lagged=network.in_channels == 4, device=network.device)
+        for t in range(frames):
+            code = retina.encode(grating(angle, -2 * math.pi * speed * t / period, period))
+            if t >= 2:
+                codes.append(code)
+    code = torch.cat(codes)
+    activity = network.settle(code)[0]
+    centre = activity[:, :, HEIGHT // 4 - 4 : HEIGHT // 4 + 4, WIDTH // 4 - 4 : WIDTH // 4 + 4]
+    responses = centre.mean((2, 3)).view(directions, frames - 2, -1).mean(1).cpu()
+    dsi = []
+    for cell in range(responses.shape[1]):
+        curve = responses[:, cell]
+        best = int(curve.argmax())
+        if float(curve[best]) <= 1e-4:
+            continue
+        dsi.append(
+            direction_index(float(curve[best]), float(curve[(best + directions // 2) % directions]))
+        )
+    return {
+        "dsi": dsi,
+        "median_dsi": float(torch.tensor(dsi).median()) if dsi else 0.0,
+        "fraction_selective": sum(value > 0.3 for value in dsi) / max(len(dsi), 1),
+        "responsive_cells": len(dsi),
+        "curves": responses.T.tolist(),
+    }
+
+
+def suppression_index(curve: list[float]) -> float:
+    """(peak − response to the largest stimulus) / peak; 0 when nothing responds."""
+
+    peak = max(curve)
+    return (peak - curve[-1]) / peak if peak > 0 else 0.0
+
+
+def _preferred_orientations(network: Hierarchy, orientations: int = 12) -> list[float]:
+    curves = orientation_tuning(network, orientations=orientations)["curves"]
+    return [
+        180.0 * max(range(orientations), key=curve.__getitem__) / orientations for curve in curves
+    ]
+
+
+@torch.no_grad()
+def _centre_responses(network: Hierarchy, frames: torch.Tensor, feedback: bool, chunk: int = 64):
+    """Each cell's activity at the central 2 x 2 V1 positions, per stimulus."""
+
+    out = []
+    for begin in range(0, len(frames), chunk):
+        code = _encode_static(network, frames[begin : begin + chunk])
+        activity = network.settle(code, feedback=feedback)[0]
+        centre = activity[:, :, HEIGHT // 4 - 1 : HEIGHT // 4 + 1, WIDTH // 4 - 1 : WIDTH // 4 + 1]
+        out.append(centre.mean((2, 3)))
+    return torch.cat(out).cpu()
+
+
+def _offsets(angle_deg: float):
+    yy, xx = torch.meshgrid(
+        torch.arange(HEIGHT) - HEIGHT / 2 + 0.5,
+        torch.arange(WIDTH) - WIDTH / 2 + 0.5,
+        indexing="ij",
+    )
+    angle = math.radians(angle_deg)
+    across = xx * math.cos(angle) + yy * math.sin(angle)
+    along = -xx * math.sin(angle) + yy * math.cos(angle)
+    return across, along, torch.sqrt(xx**2 + yy**2)
+
+
+def _tuning(network: Hierarchy, make, sizes, feedback: bool) -> dict:
+    preferred = _preferred_orientations(network)
+    angles = sorted(set(preferred))
+    frames = torch.cat([make(angle, size) for angle in angles for size in sizes])
+    responses = _centre_responses(network, frames, feedback)
+    per_stimulus = responses.shape[0] // (len(angles) * len(sizes))
+    responses = responses.view(len(angles), len(sizes), per_stimulus, -1).mean(2)
+    indices, curves = [], []
+    for cell, angle in enumerate(preferred):
+        curve = responses[angles.index(angle), :, cell].tolist()
+        curves.append(curve)
+        if max(curve) > 1e-4:
+            indices.append(suppression_index(curve))
+    return {
+        "index": indices,
+        "median": float(torch.tensor(indices).median()) if indices else 0.0,
+        "fraction_above_0_3": sum(i > 0.3 for i in indices) / max(len(indices), 1),
+        "responsive_cells": len(indices),
+        "curves": curves,
+    }
+
+
+def size_tuning(
+    network: Hierarchy, diameters=(4, 6, 8, 12, 16, 24, 32, 48), phases: int = 8
+) -> dict:
+    """Protocol 4. Suppression index of each cell, with and without top-down feedback."""
+
+    def patch(angle, diameter):
+        _, _, radius = _offsets(angle)
+        mask = (radius <= diameter / 2).float()[None, None]
+        gratings = torch.cat([grating(angle, 2 * math.pi * p / phases) for p in range(phases)])
+        return 0.5 + mask * (gratings - 0.5)
+
+    return {
+        "with_feedback": _tuning(network, patch, diameters, feedback=True),
+        "without_feedback": _tuning(network, patch, diameters, feedback=False),
+    }
+
+
+def end_stopping(network: Hierarchy, lengths=(2, 4, 6, 8, 12, 16, 24)) -> dict:
+    """Protocol 5. End-stopping index of each cell, with and without top-down feedback."""
+
+    def bar(angle, length):
+        across, along, _ = _offsets(angle)
+        mask = ((across.abs() <= 1.0) & (along.abs() <= length / 2)).float()
+        return (0.5 + 0.5 * mask)[None, None]
+
+    return {
+        "with_feedback": _tuning(network, bar, lengths, feedback=True),
+        "without_feedback": _tuning(network, bar, lengths, feedback=False),
+    }

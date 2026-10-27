@@ -85,3 +85,31 @@ def test_newborn_on_a_still_scene_keeps_diverse_living_cells():
     off_diagonal = similarity[~torch.eye(len(similarity), dtype=bool)].abs().mean()
     assert float(off_diagonal) < 0.5
     assert float((results[-1].activities[0] > 0).float().mean()) > 0.005
+
+
+V2 = LevelConfig(cells=64, kernel=6, stride=2, padding=2, sparsity=0.01)
+
+
+def test_unexplained_v1_activity_is_suppressed_by_feedback():
+    from tests.cortex_fixtures import texture
+
+    network = Hierarchy(2, [LevelConfig(), V2])
+    network.levels[1].W.zero_()  # V2 predicts nothing: all V1 activity is unexplained
+    code = Retina().encode(texture(48, 64, seed=2))
+    with_feedback = network.settle(code, feedback=True)[0]
+    without = network.settle(code, feedback=False)[0]
+    assert float(with_feedback.sum()) < 0.9 * float(without.sum())
+
+
+def test_two_level_hierarchy_learns_locally_and_stays_bounded(monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("the cortex must not use backpropagation")
+
+    monkeypatch.setattr(torch.Tensor, "backward", forbidden)
+    network = Hierarchy(2, [LevelConfig(), V2])
+    results = run(network, scenes(1500))
+    assert len(results[-1].activities) == 2
+    for level, activities in enumerate(zip(*[r.activities for r in results[-300:]], strict=True)):
+        rate = torch.stack([(a > 0).float().mean() for a in activities]).mean()
+        assert 0.005 <= float(rate) <= 0.5, (level, float(rate))
+    assert all(torch.isfinite(level.W).all() for level in network.levels)
