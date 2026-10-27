@@ -78,6 +78,7 @@ class OnlineLearner:
         recent: int = 30,
         burn_in: int = 8,
         duty_cycle: float = 0.9,
+        guard: bool = True,
     ):
         if window < 3:
             raise ValueError("window must be at least 3 frames")
@@ -93,6 +94,7 @@ class OnlineLearner:
         self.anchor_weight = anchor_weight
         self.recent = recent
         self.burn_in = burn_in
+        self.guard = guard
         # Fraction of wall time the learner may spend training; the rest is left to
         # inference so learning never makes the mirror stutter.
         self.duty_cycle = duty_cycle
@@ -141,6 +143,8 @@ class OnlineLearner:
         # Replay windows can look fine while the long-running live network drifts,
         # so the worse of the two decides.
         worst = max(self._replay.ratio, self._live.ratio)
+        if not self.guard:
+            return
         if worst < self._best_ratio and self._steps % 10 == 0:
             self._best_ratio = worst
             self._good = {k: v.detach().clone() for k, v in self.student.state_dict().items()}
