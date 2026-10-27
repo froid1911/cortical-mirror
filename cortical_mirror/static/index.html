@@ -410,7 +410,7 @@ async function poll() {
   try {
     const state = await fetch("/state.json", { cache: "no-store" }).then((r) => r.json());
     metrics = state.metrics; history = state.history;
-    if (!viewChosen && metrics.mode === "twins") { viewChosen = true; setView("twins"); }
+    if (!viewChosen) { viewChosen = true; setView(metrics.mode === "twins" ? "twins" : "mirror"); }
     render();
   } catch (error) {
     $("detail").textContent = "Lost the connection to the mirror server. Check that it is still running.";
@@ -453,10 +453,11 @@ function cycleView() {
   const order = viewsOrder();
   setView(order[(order.indexOf(current) + 1) % order.length]);
 }
-setView(viewChosen ? params.get("view") : "mirror");
 document.body.classList.toggle("show-overlay", params.get("overlay") === "1");
 document.body.classList.toggle("show-keys", params.get("keys") === "1");
-connectStreams();
+// Without ?view the first poll picks the view, so no stream opens for a view
+// that is left at once; a stale one can hold one of the six connections.
+if (viewChosen) setView(params.get("view"));
 window.addEventListener("resize", render);
 setInterval(poll, 500);
 poll();
