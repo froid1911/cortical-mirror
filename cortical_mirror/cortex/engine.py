@@ -27,7 +27,9 @@ def phase_levels(phase: int) -> list[LevelConfig]:
 
     levels = [LevelConfig()]
     if phase >= 2:
-        levels.append(LevelConfig(cells=64, kernel=6, stride=2, padding=2))
+        # V2 is driven by sparse V1 activity, a far weaker signal than the retina:
+        # at V1's threshold it barely fires (rates of 0.0002-0.002 across seeds).
+        levels.append(LevelConfig(cells=64, kernel=6, stride=2, padding=2, sparsity=0.01))
     return levels
 
 

@@ -104,7 +104,11 @@ class Level:
     def stability_limit(self, shape: tuple[int, ...], iterations: int = 20) -> float:
         """Largest eigenvalue of the settling operator, by power iteration."""
 
-        vector = torch.rand(1, self.config.cells, *shape[-2:], device=self.W.device)
+        # A fixed starting vector keeps step sizes, and so whole runs, reproducible.
+        generator = torch.Generator().manual_seed(0)
+        vector = torch.rand(1, self.config.cells, *shape[-2:], generator=generator).to(
+            self.W.device
+        )
         norm = torch.tensor(1.0)
         for _ in range(iterations):
             vector = self.drive(self.render(vector))

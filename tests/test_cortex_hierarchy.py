@@ -87,7 +87,7 @@ def test_newborn_on_a_still_scene_keeps_diverse_living_cells():
     assert float((results[-1].activities[0] > 0).float().mean()) > 0.005
 
 
-V2 = LevelConfig(cells=64, kernel=6, stride=2, padding=2)
+V2 = LevelConfig(cells=64, kernel=6, stride=2, padding=2, sparsity=0.01)
 
 
 def test_unexplained_v1_activity_is_suppressed_by_feedback():
