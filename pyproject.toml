@@ -45,3 +45,4 @@ select = ["E", "F", "I", "B", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
 "cortical_mirror/server.py" = ["E501"]
+"tools/cortex_report.py" = ["E501"]

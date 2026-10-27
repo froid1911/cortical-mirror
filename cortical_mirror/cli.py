@@ -231,6 +231,18 @@ def demo_arguments(args) -> None:
         args.source = str(fetch("sample.mp4", folder))
 
 
+def twins_engine(args):
+    """Newborn (fresh, learning) beside the saved adult, for `cortical-mirror twins`."""
+
+    from .cortex.engine import CortexEngine
+    from .cortex.twin import TwinEngine
+
+    device = resolve_device(args.device)
+    adult = CortexEngine.load(args.adult, device=device, learn=not args.frozen_adult)
+    newborn = CortexEngine(device=device, learn=True, phase=adult.phase)
+    return TwinEngine(newborn, adult)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="cortical-mirror", description=__doc__)
     parser.add_argument("--version", action="version", version=__version__)
@@ -263,6 +275,18 @@ def main() -> None:
         "--horizon", type=int, default=1, help="frames ahead to show in the mirror (1-8)"
     )
 
+    twins = commands.add_parser(
+        "twins", help="the learning cortex: a newborn beside an adult, both watching you"
+    )
+    twins.add_argument("--adult", type=Path, required=True, help="adult cortex checkpoint")
+    twins.add_argument("--frozen-adult", action="store_true", help="the adult stops learning")
+    twins.add_argument("--source", default="0", help="camera index, video path or stream URL")
+    twins.add_argument("--host", default="127.0.0.1")
+    twins.add_argument("--port", type=int, default=8080)
+    twins.add_argument("--device", default="auto")
+    twins.add_argument("--no-loop", action="store_true")
+    twins.add_argument("--max-frames", type=int, default=0)
+
     offline = commands.add_parser(
         "evaluate", help="evaluate predictions against their exact target frames"
     )
@@ -273,6 +297,17 @@ def main() -> None:
     offline.add_argument("--samples", type=int, default=8)
     args = parser.parse_args()
 
+    if args.command == "twins":
+        serve(
+            twins_engine(args),
+            source=args.source,
+            engine_name="twins",
+            host=args.host,
+            port=args.port,
+            loop=not args.no_loop,
+            max_frames=args.max_frames,
+        )
+        return
     if args.command == "demo":
         defaults = parser.parse_args(["serve", "--engine", "adaptive"])
         args = argparse.Namespace(**(vars(defaults) | vars(args)))

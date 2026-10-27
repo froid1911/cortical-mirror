@@ -30,3 +30,14 @@ def test_pretrained_demo_on_cpu_turns_learning_off_and_skips_dmvfn(monkeypatch):
     assert args.experts == "copy,cortical"
     assert fetched == ["cortical.pt", "sample.mp4"]
     assert args.source.endswith("sample.mp4")
+
+
+def test_twins_command_pairs_a_fresh_newborn_with_the_saved_adult(tmp_path):
+    from cortical_mirror.cortex.engine import CortexEngine
+
+    adult = CortexEngine(seed=3)
+    adult.hierarchy.age_frames = 12345
+    adult.save(tmp_path / "adult.pt")
+    twin = cli.twins_engine(Namespace(adult=tmp_path / "adult.pt", device="cpu", frozen_adult=True))
+    assert twin.newborn.age_frames == 0 and twin.newborn.learn
+    assert twin.adult.age_frames == 12345 and not twin.adult.learn
