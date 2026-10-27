@@ -161,3 +161,55 @@ def oddball_adaptation(
         ]
     )
     return {"DEV": dev, "STD": std, "CTR": ctr, **mismatch_indices(dev, std, ctr)}
+
+
+def direction_index(preferred: float, opposite: float) -> float:
+    total = preferred + opposite
+    return (preferred - opposite) / total if total > 0 else 0.0
+
+
+@torch.no_grad()
+def direction_selectivity(
+    network: Hierarchy,
+    period: float = 8.0,
+    speed: float = 1.0,
+    directions: int = 12,
+    frames: int = 16,
+) -> dict:
+    """Protocol 3. DSI per cell from drifting gratings seen through the lagged retina."""
+
+    codes = []
+    for d in range(directions):
+        angle = 360.0 * d / directions
+        retina = Retina(WIDTH, HEIGHT, lagged=network.in_channels == 4, device=network.device)
+        for t in range(frames):
+            code = retina.encode(grating(angle, -2 * math.pi * speed * t / period, period))
+            if t >= 2:
+                codes.append(code)
+    code = torch.cat(codes)
+    level = network.levels[0]
+    saved_step = level.step_size
+    level.step_size = min(0.9 / max(level.stability_limit(code.shape), 1e-6), 0.1)
+    start = torch.zeros(
+        len(code), level.config.cells, HEIGHT // 2, WIDTH // 2, device=network.device
+    )
+    activity = level.settle(code, start, iterations=30)
+    level.step_size = saved_step
+    centre = activity[:, :, HEIGHT // 4 - 4 : HEIGHT // 4 + 4, WIDTH // 4 - 4 : WIDTH // 4 + 4]
+    responses = centre.mean((2, 3)).view(directions, frames - 2, -1).mean(1).cpu()
+    dsi = []
+    for cell in range(responses.shape[1]):
+        curve = responses[:, cell]
+        best = int(curve.argmax())
+        if float(curve[best]) <= 1e-4:
+            continue
+        dsi.append(
+            direction_index(float(curve[best]), float(curve[(best + directions // 2) % directions]))
+        )
+    return {
+        "dsi": dsi,
+        "median_dsi": float(torch.tensor(dsi).median()) if dsi else 0.0,
+        "fraction_selective": sum(value > 0.3 for value in dsi) / max(len(dsi), 1),
+        "responsive_cells": len(dsi),
+        "curves": responses.T.tolist(),
+    }

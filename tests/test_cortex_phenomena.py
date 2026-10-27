@@ -53,3 +53,40 @@ def test_oddball_adaptation_leaves_the_network_unchanged():
     result = oddball_adaptation(network, trials=100)
     assert torch.equal(network.levels[0].W, before) and network.age_frames == 0
     assert all(math.isfinite(result[key]) for key in ("DEV", "STD", "CTR", "iRS", "iPE", "iMM"))
+
+
+def lagged_cells(shift: int) -> Hierarchy:
+    """Fixture: each cell's lagged weights are its current weights moved `shift` pixels
+    along the cell's own preferred axis (perpendicular to its stripes)."""
+
+    network = Hierarchy(4, [LevelConfig()])
+    current = bar_cells().levels[0].W
+    lagged = torch.empty_like(current)
+    for cell in range(len(current)):
+        angle = math.pi * (cell % 12) / 12
+        dx, dy = round(shift * math.cos(angle)), round(shift * math.sin(angle))
+        lagged[cell] = torch.roll(current[cell], shifts=(dy, dx), dims=(1, 2))
+    weights = torch.cat((current, lagged), dim=1)
+    weights = weights / weights.flatten(1).norm(dim=1)[:, None, None, None]
+    network.levels[0].W, network.levels[0].B = weights.clone(), weights.clone()
+    return network
+
+
+def test_dsi_math():
+    from cortical_mirror.cortex.phenomena import direction_index
+
+    assert direction_index(preferred=3.0, opposite=1.0) == pytest.approx(0.5)
+    assert direction_index(preferred=1.0, opposite=1.0) == 0.0
+
+
+def test_mirror_symmetric_cells_have_low_dsi():
+    from cortical_mirror.cortex.phenomena import direction_selectivity
+
+    assert direction_selectivity(lagged_cells(0))["median_dsi"] < 0.1
+
+
+def test_shifted_lag_cells_are_direction_selective():
+    from cortical_mirror.cortex.phenomena import direction_selectivity
+
+    result = direction_selectivity(lagged_cells(2))
+    assert result["fraction_selective"] > 0.3

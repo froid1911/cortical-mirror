@@ -15,12 +15,19 @@ import cv2
 import torch
 
 from cortical_mirror.cortex.engine import CortexEngine
-from cortical_mirror.cortex.phenomena import oddball_adaptation, orientation_tuning
+from cortical_mirror.cortex.phenomena import (
+    direction_selectivity,
+    oddball_adaptation,
+    orientation_tuning,
+)
 
 PROTOCOLS = {
     "orientation": orientation_tuning,
     "oddball": oddball_adaptation,
+    "direction": direction_selectivity,
 }
+# The protocols that apply from each phase on.
+PHASE_PROTOCOLS = {1: ["orientation", "oddball"], 2: ["direction"]}
 
 
 def raise_on(engine: CortexEngine, video: Path, frames: int) -> dict:
@@ -63,7 +70,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--experience", type=Path, help="raise the network on this video first")
     parser.add_argument("--experience-frames", type=int, default=3600)
-    parser.add_argument("--protocols", default=",".join(PROTOCOLS))
+    parser.add_argument("--protocols", help="comma-separated; default: all for the phase")
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -83,7 +90,17 @@ def main() -> None:
         report["experience"] = raise_on(engine, args.experience, args.experience_frames)
         report["experience"]["seconds"] = round(time.time() - started, 1)
     report["age_frames"] = engine.age_frames
-    for name in args.protocols.split(","):
+    names = (
+        args.protocols.split(",")
+        if args.protocols
+        else [
+            name
+            for phase, listed in PHASE_PROTOCOLS.items()
+            if phase <= engine.phase
+            for name in listed
+        ]
+    )
+    for name in names:
         started = time.time()
         report[name] = PROTOCOLS[name](engine.hierarchy)
         report[name]["seconds"] = round(time.time() - started, 1)
