@@ -23,10 +23,27 @@ def test_training_smoke_writes_loadable_checkpoint(tmp_path):
     write_video(data / "v_Pan_g11_c01.avi", 2)
     output, log = tmp_path / "adult.pt", tmp_path / "train.jsonl"
     result = subprocess.run(
-        [sys.executable, "tools/train_cortex.py", "--data", str(tmp_path / "videos"),
-         "--streams", "2", "--frames", "200", "--log-every", "100", "--device", "cpu",
-         "--output", str(output), "--log", str(log)],
-        capture_output=True, text=True, timeout=600,
+        [
+            sys.executable,
+            "tools/train_cortex.py",
+            "--data",
+            str(tmp_path / "videos"),
+            "--streams",
+            "2",
+            "--frames",
+            "200",
+            "--log-every",
+            "100",
+            "--device",
+            "cpu",
+            "--output",
+            str(output),
+            "--log",
+            str(log),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=600,
     )
     assert result.returncode == 0, result.stderr[-2000:]
     engine = CortexEngine.load(output, learn=False)

@@ -26,7 +26,6 @@ import torch
 from torch.nn import functional as F
 from torch.nn.grad import conv2d_weight
 
-
 # A newborn's feedback weights start unrelated to its generative weights, which
 # makes the settling operator weak and the computed step large; uncapped, every
 # cell saturates at once and the shared Hebbian update makes all cells identical.
