@@ -217,8 +217,10 @@ As a mirror, this cortex is **worse than simply repeating the last frame**: the 
 ### Run it
 
 ```bash
-# Twin mirrors: a newborn beside an adult, both watching your camera (N restarts the newborn)
-.venv/bin/cortical-mirror twins --adult checkpoints/cortex-adult-p1.pt --source 0
+# Twin mirrors: a newborn beside an adult, both watching your camera (N restarts the newborn).
+# The adult is downloaded from the v0.3.0 release on first use; --phase 2 or 3 picks a later one.
+.venv/bin/cortical-mirror twins
+.venv/bin/cortical-mirror twins --adult checkpoints/cortex-adult-p1.pt   # your own adult
 
 # Raise an adult with the same rules (about 3 h on one RTX 3090)
 .venv/bin/python tools/train_cortex.py --data data/ucf101/UCF-101 --phase 1 --hours 3 \
@@ -232,7 +234,7 @@ As a mirror, this cortex is **worse than simply repeating the last frame**: the 
 .venv/bin/python tools/cortex_report.py
 ```
 
-Phases 2 and 3 use `--phase 2` and `--phase 3` (V2; then the eye). The adult checkpoints are not in a release yet.
+Phases 2 and 3 use `--phase 2` and `--phase 3` (V2; then the eye). The three adults are in the [v0.3.0 release](https://github.com/froid1911/cortical-mirror/releases/tag/v0.3.0): 101, 65 and 30 hours of UCF101 for phases 1, 2 and 3.
 
 ### References for this track
 
@@ -334,7 +336,8 @@ Then open **http://127.0.0.1:8080** on the laptop.
 | 1–5 | Look that many frames ahead |
 | L | Pause or resume learning |
 | R | Forget what it learned here |
-| Tab | Switch between mirror and lab view |
+| Tab | Switch between mirror and lab view (twins first, with `twins`) |
+| N | Restart the newborn (`twins`) |
 | F | Full screen |
 
 ## Architecture
