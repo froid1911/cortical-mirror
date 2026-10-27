@@ -65,6 +65,8 @@ class Node:
     # Recent positions, newest last, and frames in a row it has been seen still.
     trail: list | None = None
     still: int = 0
+    # Frames it has spent in the fovea.
+    looked: int = 0
 
     def displacement(self, frames: int = 5) -> tuple[float, float] | None:
         if not self.trail or len(self.trail) <= frames:

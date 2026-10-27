@@ -15,6 +15,7 @@ world moving, including the shifts its own saccades cause.
 
 from __future__ import annotations
 
+import cv2
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
@@ -55,8 +56,12 @@ class EyeGraph:
         learn_persistence: bool = False,
         learn_motor: bool = True,
         motor: np.ndarray | None = None,
+        fovea: int | None = None,
     ):
         self.view = view
+        # Side of the sharp central square; the rest of the view is seen blurred.
+        self.fovea = fovea
+        self.fovea_size = fovea or min(view)
         self.inner = SceneGraph(*view, persistence=persistence, learn_persistence=learn_persistence)
         self.learn_motor = learn_motor
         self.motor = np.zeros((len(COMMANDS), 2)) if motor is None else np.array(motor, float)
@@ -73,6 +78,10 @@ class EyeGraph:
         self.gaze = self.start
         self.command = 0
         self.world_shift = np.zeros(2)
+        # How badly the graph has been predicting each place, and the error in the
+        # fovea frame by frame (what attention learns from).
+        self.error = np.zeros(CANVAS[::-1], np.float32)
+        self.fovea_errors: list[float] = []
 
     # Where the view lies on the canvas.
 
@@ -133,10 +142,23 @@ class EyeGraph:
         dx, dy, _, _ = search(image, known[part], sure[part], fine, 1)
         return coarse_x + dx, coarse_y + dy
 
+    def foveate(self, image: np.ndarray) -> np.ndarray:
+        """Sharp in the central square, blurred outside, with a soft border."""
+
+        if self.fovea is None:
+            return image
+        h, w = image.shape
+        weight = np.zeros_like(image)
+        half = self.fovea // 2
+        weight[h // 2 - half : h // 2 + half, w // 2 - half : w // 2 + half] = 1.0
+        weight = cv2.GaussianBlur(weight, (0, 0), 4.0)
+        weight[h // 2 - half + 8 : h // 2 + half - 8, w // 2 - half + 8 : w // 2 + half - 8] = 1.0
+        return weight * image + (1 - weight) * cv2.GaussianBlur(image, (0, 0), 3.0)
+
     def observe(self, image: np.ndarray, command: int = 0) -> dict:
         """One view, and the command issued just before it (the efference copy)."""
 
-        image = _as_gray(image, *self.view)
+        image = self.foveate(_as_gray(image, *self.view))
         self.command = command
         before = self._origin()
         planned = self.motor[command]
@@ -166,7 +188,21 @@ class EyeGraph:
         if self.inner.background is not None:
             self.inner.confidence = self._window(self.confidence, origin).copy()
             self.inner.front = self._window(self.front, origin).copy()
+        if self.inner.background is not None:
+            # What the graph expected here, scored before it sees the frame.
+            miss = (self.inner.expect() - image) ** 2
+            self._window(self.error, origin)[:] = (
+                0.7 * self._window(self.error, origin) + 0.3 * miss
+            )
+            w, h = self.view
+            half = self.fovea_size // 2
+            centre = (slice(h // 2 - half, h // 2 + half), slice(w // 2 - half, w // 2 + half))
+            self.fovea_errors.append(float(miss[centre].mean()))
         result = self.inner.observe(image)
+        cx, cy = self.view[0] / 2, self.view[1] / 2
+        for node in self.inner.nodes:
+            if abs(node.x - cx) < self.fovea_size / 2 and abs(node.y - cy) < self.fovea_size / 2:
+                node.looked += 1
         self._window(self.background, origin)[:] = self.inner.background
         self._window(self.confidence, origin)[:] = self.inner.confidence
         self._window(self.front, origin)[:] = self.inner.front
