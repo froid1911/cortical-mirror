@@ -6,6 +6,8 @@ the graph itself never sees it.
 
 from __future__ import annotations
 
+import math
+
 import cv2
 import numpy as np
 
@@ -182,3 +184,121 @@ def manipulation(seeds=range(2000, 2040), frames: int = 240) -> dict:
             else float("nan"),
         }
     return report
+
+
+def occlusion_world(seed: int) -> SpriteWorld:
+    """Protocol 9's trial: one small object passing behind a wide screen."""
+
+    world = SpriteWorld(seed=seed, objects=1, occluders=1, occluder_width=44, radius=(7, 9))
+    thing = world.objects[0]
+    thing.x, thing.y, thing.vx, thing.vy = 40.0, 96.0, 1.5, 0.0
+    return world
+
+
+def training_world(seed: int) -> SpriteWorld:
+    """Protocol 9's training: objects, a screen, and nothing else arranged."""
+
+    return SpriteWorld(
+        seed=seed,
+        objects=1 + seed % 3,
+        occluders=1,
+        occluder_width=30 + seed % 21,
+        radius=(7, 12),
+    )
+
+
+def vanish_hidden(world: SpriteWorld) -> None:
+    """The magic world: whatever is completely hidden ceases to exist."""
+
+    gone = {t["id"] for t in world.truth() if t["full"].any() and not t["visible"].any()}
+    world.objects = [o for o in world.objects if o.id not in gone]
+
+
+def train_persistence(
+    seeds=range(100, 300), frames: int = 300, magic: bool = False, persistence: float = 1.0
+) -> tuple[float, list[float]]:
+    """Raise a graph's persistence on training worlds; returns it and its course."""
+
+    graph = SceneGraph(persistence=persistence, learn_persistence=True)
+    trajectory = []
+    for seed in seeds:
+        graph.reset()
+        world = training_world(seed)
+        for _ in range(frames):
+            world.step()
+            if magic:
+                vanish_hidden(world)
+            graph.observe(world.render())
+        trajectory.append(graph.persistence)
+    return graph.persistence, trajectory
+
+
+def _occlusion_trial(seed: int, vanish: bool, persistence: float, frames: int) -> dict:
+    """Watch one trial; per frame: the image, the graph's expectation of it, the true
+    position (None once the object is gone), and the nodes' positions."""
+
+    world = occlusion_world(seed)
+    graph = SceneGraph(persistence=persistence)
+    record = {"images": [], "expected": [], "truth": [], "visible": [], "nodes": [], "hidden": None}
+    for t in range(frames):
+        world.step()
+        truth = world.truth()
+        if record["hidden"] is None and t > 5 and truth and not truth[0]["visible"].any():
+            record["hidden"] = t
+            if vanish:
+                world.objects.clear()
+        record["expected"].append(graph.expect())
+        image = world.render()
+        graph.observe(image)
+        record["images"].append(image)
+        thing = world.objects[0] if world.objects else None
+        record["truth"].append(None if thing is None else (thing.x, thing.y))
+        record["visible"].append(bool(thing) and bool(world.truth()[0]["visible"].any()))
+        record["nodes"].append([(n.x, n.y) for n in graph.nodes])
+    screen = world.occluders[0]
+    record["right"] = int(screen.x + screen.mask.shape[1] / 2)
+    return record
+
+
+def object_permanence(persistence: float, seeds=range(3000, 3020), frames: int = 120) -> dict:
+    """Protocol 9, for one persistence."""
+
+    kept, errors, surprise = [], [], {"vanish": [], "reappear": []}
+    for seed in seeds:
+        reappear = _occlusion_trial(seed, False, persistence, frames)
+        vanish = _occlusion_trial(seed, True, persistence, frames)
+        hidden = reappear["hidden"]
+        back = next(t for t in range(hidden, frames) if reappear["visible"][t])
+        x, y = reappear["truth"][back - 1]
+        near = min(
+            (math.hypot(nx - x, ny - y) for nx, ny in reappear["nodes"][back - 1]),
+            default=math.inf,
+        )
+        kept.append(near <= 8)
+        if near <= 8:
+            errors.append(near)
+        region = (slice(72, 120), slice(reappear["right"], reappear["right"] + 36))
+        for name, record in (("reappear", reappear), ("vanish", vanish)):
+            surprise[name].append(
+                float(
+                    np.mean(
+                        [
+                            np.mean(
+                                (record["expected"][t][region] - record["images"][t][region]) ** 2
+                            )
+                            for t in range(back, min(back + 15, frames))
+                        ]
+                    )
+                )
+            )
+    vanish_mean = float(np.mean(surprise["vanish"]))
+    reappear_mean = float(np.mean(surprise["reappear"]))
+    return {
+        "persistence": persistence,
+        "kept": float(np.mean(kept)),
+        "median_position_error": float(np.median(errors)) if errors else None,
+        "surprise_vanish": vanish_mean,
+        "surprise_reappear": reappear_mean,
+        "violation_ratio": vanish_mean / reappear_mean if reappear_mean else float("nan"),
+        "trials": len(kept),
+    }

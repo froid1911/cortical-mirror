@@ -63,3 +63,34 @@ def test_the_move_offset_points_back_toward_the_middle():
     assert phenomena.move_offset(world, world.objects[0]) == (-30, 0)
     world.objects[0].x = 40.0
     assert phenomena.move_offset(world, world.objects[0]) == (30, 0)
+
+
+def test_an_occlusion_trial_hides_its_object_completely_and_lets_it_come_back():
+    world = phenomena.occlusion_world(3000)
+    seen = []
+    for _ in range(120):
+        world.step()
+        seen.append(int(world.truth()[0]["visible"].sum()))
+    hidden = seen.index(0)
+    assert 0 < hidden and any(v > 0 for v in seen[hidden:])
+
+
+def test_the_magic_world_removes_an_object_once_it_is_completely_hidden():
+    world = phenomena.occlusion_world(3000)
+    for _ in range(120):
+        world.step()
+        phenomena.vanish_hidden(world)
+    assert world.objects == []
+
+
+def test_training_persistence_reports_where_it_went():
+    tau, trajectory = phenomena.train_persistence(seeds=[100, 101], frames=80)
+    assert tau >= 1.0 and len(trajectory) == 2
+
+
+def test_permanence_keeps_a_hidden_object_only_with_a_long_persistence():
+    patient = phenomena.object_permanence(60.0, seeds=[3000])
+    forgetful = phenomena.object_permanence(1.0, seeds=[3000])
+    assert patient["kept"] == 1.0 and forgetful["kept"] == 0.0
+    for report in (patient, forgetful):
+        assert report["surprise_vanish"] >= 0 and report["surprise_reappear"] >= 0
