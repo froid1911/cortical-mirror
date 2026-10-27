@@ -31,10 +31,25 @@ def test_remapping_rewards_kernels_that_shift_the_right_way():
     assert wrong["remapping_ratio"] > 1.2
 
 
-def test_habituation_measure_reports_saccade_fractions():
-    result = habituation_of_orienting(CortexEngine(phase=3), frames=120, first=60, last=60)
+def test_habituation_measures_dwell_and_gaze_statistics():
+    result = habituation_of_orienting(CortexEngine(phase=3), frames=120, last=60, seeds=2)
     for condition in ("learning", "frozen"):
-        for window in ("first", "last"):
-            fraction = result[condition][window]["toward_onsets"]
-            assert fraction is None or 0.0 <= fraction <= 1.0
-    assert result["learning"]["saccades"] > 0
+        dwell = result[condition]["dwell_on_onsets_last"]
+        assert 0.0 <= dwell <= 1.0
+        gaze = result[condition]["gaze"]
+        assert 0.0 <= gaze["chosen_surprise_percentile"] <= 1.0
+        assert 0.0 <= gaze["revisit_rate"] <= 1.0
+        assert 0.0 <= gaze["random_revisit_rate"] <= 1.0
+
+
+def test_remapping_needs_the_right_direction_not_just_any_change():
+    """A kernel that only shrinks activity after every saccade must not pass."""
+
+    engine = CortexEngine(phase=3)
+    level = engine.hierarchy.levels[0]
+    for command in range(1, len(COMMANDS)):
+        level.V[command] = 0.5 * level.V[0]
+    shrink = predictive_remapping(engine, worlds=2)
+    assert shrink["direction_specificity"] == pytest.approx(1.0, abs=0.02)
+    right = predictive_remapping(shift_kernels(CortexEngine(phase=3), 1), worlds=2)
+    assert right["direction_specificity"] < 0.95

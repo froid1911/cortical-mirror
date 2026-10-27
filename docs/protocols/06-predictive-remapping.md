@@ -21,6 +21,7 @@ For each world and each of the 8 saccade directions, with learning frozen:
    - **told:** the learned temporal kernel of that movement (the efference copy);
    - **not told:** the kernel of "no movement".
 4. Score each against the actual post-saccade activity, as the mean squared error over all cells and positions.
+5. **Direction control:** also forecast the same transition with the kernel of the *opposite* movement. A kernel that merely damps activity after any saccade would beat "no movement" without remapping anything. It would do just as well with the wrong direction, so it fails this control.
 
 Every activity is settled from rest in the same way, so only the learned kernel differs between the two forecasts. Remapping is a property of neural responses, so the score is taken in activity space, as in physiology. An earlier draft scored in retinal-code space and from the running state; there, reconstruction error and differences in how settling starts swamped the effect. Ideal shift kernels scored about 0.91 whichever direction they shifted. This amendment was made before any measurement.
 
@@ -28,6 +29,7 @@ Every activity is settled from rest in the same way, so only the learned kernel 
 
 - **Remapping ratio** = mean error with the copy / mean error without it, over all worlds and directions. Below 1 means the copy helps.
 - The same ratio per direction.
+- **Direction specificity** = mean error with the movement's own kernel / mean error with the opposite movement's kernel. Below 1 means the kernels encode which way the eye moved.
 
 ## Conditions
 
@@ -37,7 +39,12 @@ Every activity is settled from rest in the same way, so only the learned kernel 
 
 ## Pass criteria (declared in advance)
 
-The adult's remapping ratio is below 0.95. That is about half way from 1 to the ceiling below.
+In the adult, both:
+
+- the remapping ratio is below 0.95;
+- the direction specificity is below 0.95.
+
+The direction control was added after a review found that a uniformly damping kernel could pass the ratio alone. It was added before any adult measurement.
 
 **Ceiling, measured before any adult measurement.** On an untrained V1, ideal kernels that shift activity exactly as the image shifts score 0.895. The same kernels shifting the wrong way score 1.474. Perfect remapping cannot reach 0 here, because the lagged channels still hold the pre-saccade view. The first draft's criterion, below 0.8, would have been unreachable even for perfect remapping, so it was amended before any measurement.
 

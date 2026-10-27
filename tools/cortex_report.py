@@ -110,48 +110,47 @@ def feedback_table(reports: dict, name: str, protocol: int, threshold: float) ->
 
 def remapping(reports: dict) -> list[str]:
     rows = [
-        "| Condition | Remapping ratio (below 1: the efference copy helps) | Protocol 6 |",
-        "|---|---:|---|",
+        "| Condition | Remapping ratio (below 1: the copy helps) | Direction specificity (below 1: direction matters) | Protocol 6 |",
+        "|---|---:|---:|---|",
     ]
     for key, label in CONDITIONS:
         r = reports.get(key, {}).get("remapping")
         if not r:
             continue
-        ok = (r["remapping_ratio"] < 0.95) if key == "adult" else None
-        rows.append(f"| {label} | {fmt(r['remapping_ratio'], 3)} | {verdict(ok)} |")
+        specificity = r.get("direction_specificity")
+        ok = (
+            (r["remapping_ratio"] < 0.95 and specificity is not None and specificity < 0.95)
+            if key == "adult"
+            else None
+        )
+        rows.append(
+            f"| {label} | {fmt(r['remapping_ratio'], 3)} | {fmt(specificity, 3)} | {verdict(ok)} |"
+        )
     return rows
 
 
 def orienting(reports: dict) -> list[str]:
-    control = (
-        reports.get("untrained", {})
-        .get("orienting", {})
-        .get("frozen", {})
-        .get("last", {})
-        .get("toward_onsets")
-    )
+    frozen = reports.get("untrained", {}).get("orienting", {}).get("frozen")
+    control = frozen["dwell_on_onsets_last"] if frozen else None
     rows = [
-        "| Condition | Toward onsets, first 200 frames | Toward onsets, last 300 frames | Protocol 7 |",
-        "|---|---:|---:|---|",
+        "| Condition | Dwell on onsets, first 200 frames | Last 300 frames | Revisits vs chance | Protocol 7 |",
+        "|---|---:|---:|---:|---|",
     ]
-    if control is not None:
-        frozen = reports["untrained"]["orienting"]["frozen"]
+    if frozen:
+        gaze = frozen["gaze"]
         rows.append(
-            f"| Control: untrained, not learning | {fmt(frozen['first']['toward_onsets'])} | {fmt(control)} | – |"
+            f"| Control: untrained, not learning | {fmt(frozen['dwell_on_onsets_first'])} | {fmt(control)} | {gaze['revisit_rate']:.2f} vs {gaze['random_revisit_rate']:.2f} | – |"
         )
     for key, label in CONDITIONS:
         r = reports.get(key, {}).get("orienting", {}).get("learning")
         if not r:
             continue
-        last = r["last"]["toward_onsets"]
-        ok = (
-            None if control is None or last is None or key == "untrained" else last >= control + 0.1
-        )
         if key == "untrained":
             label = "Untrained, learning (a newborn)"
-            ok = None if control is None or last is None else last >= control + 0.1
+        ok = None if control is None else r["dwell_on_onsets_last"] >= control + 0.1
+        gaze = r["gaze"]
         rows.append(
-            f"| {label} | {fmt(r['first']['toward_onsets'])} | {fmt(last)} | {verdict(ok)} |"
+            f"| {label} | {fmt(r['dwell_on_onsets_first'])} | {fmt(r['dwell_on_onsets_last'])} | {gaze['revisit_rate']:.2f} vs {gaze['random_revisit_rate']:.2f} | {verdict(ok)} |"
         )
     return rows
 

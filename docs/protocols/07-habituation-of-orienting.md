@@ -10,7 +10,7 @@ In this system the reflex "look toward surprise" is built in. What is learned is
 
 ## Stimulus
 
-A 256 × 192 world, 600 frames:
+A 256 × 192 world, 900 frames, for each of 3 seeds:
 
 - **Left half:** a 1/f texture panning steadily, 2 pixels per frame. It changes everywhere, all the time, but predictably.
 - **Right half:** a static 1/f texture on which a bright 12 × 12 square appears for 3 frames at a random position, at random times (on average every 15 frames, seed 0). It changes rarely, but unpredictably.
@@ -23,10 +23,12 @@ A 256 × 192 world, 600 frames:
 
 ## Measures
 
-- **Fraction of saccades toward the onsets** (rightward) among all horizontal saccades, in:
-  - the first 200 frames;
-  - the last 300 frames.
-- The same for a control: the untrained network with learning off, which has no habituation and whose surprise is raw change.
+- **Dwell on the onsets:** the fraction of frames in which the gaze is on the onset half (gaze x > 128), averaged over the 3 seeds. It is reported for the first 200 frames and the last 300.
+- **Gaze statistics, reported as sanity checks:**
+  - The chosen target's surprise percentile among the possible targets. A random choice averages 0.5. This is high by construction, because the eye seeks surprise.
+  - The revisit rate against the rate a random choice would give (inhibition of return).
+
+**Amendment, before any adult measurement.** The first draft counted the directions of horizontal saccades. A review showed that those counts are bounded by where the eye stands: an eye that orients perfectly to the onsets reaches the edge and can then only move back. That draft also had too few saccades for a 0.1 margin. Dwell over more frames and several seeds replaces it.
 
 ## Conditions
 
@@ -36,7 +38,7 @@ A 256 × 192 world, 600 frames:
 
 ## Pass criteria (declared in advance)
 
-- In the last 300 frames, the learning network's fraction of saccades toward the onsets exceeds the control's by at least 0.1.
+- In the last 300 frames, the learning network's dwell on the onsets exceeds the frozen control's by at least 0.1.
 - This must hold for the newborn or the adult.
 
 Both are reported, and failures are reported as failures.
