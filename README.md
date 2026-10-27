@@ -111,7 +111,7 @@ Progress is judged by **phenomena that emerge**, measured with the stimuli neuro
 2. **Innate structure only where biology has it at birth.**
    - Built in: a retina-like front end (centre-surround ON/OFF cells, contrast normalisation, lagged cells), small receptive fields, a coarse-to-fine layout, homeostatic set points, and the reflex "look toward surprise".
    - Not built in: edge filters, orientations, directions, or where to look.
-3. **The newborn learns only from its own stream, and the adult learns with exactly the same rules.** In 3 hours of training, each adult watched 30–100 hours of UCF101 training video: 101 h in phase 1, 65 h in phase 2, 30 h in phase 3. Later phases are slower per step.
+3. **The newborn learns only from its own stream, and the adult learns with exactly the same rules.** In 3 hours of training, each adult watched 36–121 hours of UCF101 training video (25 fps): 121 h in phase 1, 77 h in phase 2, 36 h in phase 3. Later phases are slower per step.
 4. **Phenomena are measured, not eyeballed**, with criteria fixed in advance.
 5. **Edge cells are a first check, not the result.** Many learning methods produce them.
 
@@ -234,7 +234,7 @@ As a mirror, this cortex is **worse than simply repeating the last frame**: the 
 .venv/bin/python tools/cortex_report.py
 ```
 
-Phases 2 and 3 use `--phase 2` and `--phase 3` (V2; then the eye). The three adults are in the [v0.3.0 release](https://github.com/froid1911/cortical-mirror/releases/tag/v0.3.0): 101, 65 and 30 hours of UCF101 for phases 1, 2 and 3.
+Phases 2 and 3 use `--phase 2` and `--phase 3` (V2; then the eye). The three adults are in the [v0.3.0 release](https://github.com/froid1911/cortical-mirror/releases/tag/v0.3.0): 121, 77 and 36 hours of UCF101 for phases 1, 2 and 3.
 
 ### References for this track
 

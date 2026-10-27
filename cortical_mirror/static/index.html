@@ -346,7 +346,7 @@ function render() {
   renderTwins();
 }
 
-function experience(frames, fps = 30) {
+function experience(frames, fps) {
   const seconds = Math.round(frames / fps);
   if (seconds < 60) return `${seconds} s`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
@@ -376,9 +376,10 @@ function renderTwins() {
   if (!twins) return;
   for (const key of ["newborn", "adult"]) {
     const twin = twins[key];
+    // The newborn sees at the rate the camera is read; the adults watched UCF101 at 25 fps.
     $(`age-${key}`).textContent = key === "newborn"
-      ? `${experience(twin.experience_frames)} of seeing`
-      : `${experience(twin.experience_frames)} of video before today`;
+      ? `${experience(twin.experience_frames, metrics.fps || 30)} of seeing`
+      : `${experience(twin.experience_frames, 25)} of video before today`;
     const surprise = twin.surprise;
     $(`surprise-${key}`).innerHTML = surprise == null
       ? "Surprise compared with expecting nothing to change"
