@@ -4,13 +4,19 @@ A live mirror that shows what the camera will see next — and keeps learning to
 
 A small predictive-coding hierarchy predicts the next webcam frame from the frames it has already seen. Every prediction is scored only against the frame it was issued for, and that error is the only teaching signal: offline on natural video, and online, continuously, on the camera stream in front of it. Started from random weights, it begins as an exact copy of the last frame. On a person moving in front of a still camera it learns, within about a minute, to predict better than that copy; on short, generic action clips it ends about even with it.
 
-![The predicted mirror](docs/images/live-demo.gif)
+**New in v0.3:** a [visual cortex that learns to see with local rules only](#a-cortex-that-learns-to-see-research-track), shown as twin mirrors. A newborn starts blank in front of your camera, beside an adult that learned with the same rules from 121 hours of video. `cortical-mirror twins` runs it.
 
-<sub>Sample footage: “FFSb – Corona LSFB” by the Fédération Francophone des Sourds de Belgique, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:FFSb_-_Corona_LSFB.webm); shown mirrored and as predicted. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).</sub>
+![Twin mirrors: the newborn's cells turn from noise into edge detectors beside the adult's](docs/images/twins.gif)
+
+<sub>The newborn's first 2 minutes of seeing, sped up after the first seconds. Top: what each expects to see next; bottom: what its cells respond to. Sample footage: “FFSb – Corona LSFB” by the Fédération Francophone des Sourds de Belgique, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:FFSb_-_Corona_LSFB.webm); shown mirrored and as predicted. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).</sub>
 
 **Scientific scope:** a functional predictive-coding architecture, not a claim of biological cortical simulation or of machine consciousness.
 
 ## What you see
+
+![The predicted mirror](docs/images/live-demo.gif)
+
+<sub>The v0.2 mirror on the same sample footage.</sub>
 
 - **The mirror** fills the screen with the *predicted* next frame, flipped like a mirror. The real camera is only a small inset.
 - **The surprise curve** plots the mirror's prediction error over minutes against simply repeating the last frame. Started from scratch, you watch it fall below that line.
@@ -313,6 +319,15 @@ Without a camera, it plays a 22-second sample clip of a person signing in Belgia
 
 Append `?view=lab` to the URL to open the lab view directly, for example on a second screen.
 
+### Twin mirrors (the learning cortex)
+
+```bash
+.venv/bin/cortical-mirror twins             # newborn beside the phase 1 adult
+.venv/bin/cortical-mirror twins --phase 3   # the adult with a moving eye
+```
+
+The adult (0.4–5 MB) is downloaded from the [v0.3.0 release](https://github.com/froid1911/cortical-mirror/releases/tag/v0.3.0) on first use. No GPU is needed: on a 24-thread laptop CPU the phase 1 twins keep up with a 25 fps clip, and the phase 3 twins run at 12 frames per second. Press N to restart the newborn, and Tab for the other views; `?view=twins` opens the twin view directly.
+
 ### Webcam on one machine, GPU on another
 
 `--source` also accepts a network stream. To use a Linux laptop's camera with a GPU server you can reach over SSH, stream the camera's own MJPEG frames from the laptop, then forward the stream to the server and the page back to the laptop:
@@ -466,6 +481,10 @@ Tests cover causal counterfactuals, forward-warp direction, the group-disjoint s
 - Live learning needs an NVIDIA GPU. On a CPU the learner manages under one step per second.
 - There is no object permanence, explicit egomotion, or multimodal future; pixel warping and blending can soften detail.
 - The pretrained DMVFN expert is not part of the self-organizing story; ablations without it are reported.
+
+## Changes in v0.3
+
+v0.3 adds the learning cortex: local learning rules only, three phases (V1; V2 with lagged cells; a moving eye with efference copies), seven phenomena measured against criteria written before measurement, and the twin-mirror demo. Three phenomena emerge and four fail; see [Results](#results-1). The v0.2 mirror is unchanged and remains the one to use for prediction.
 
 ## Changes since v0.1
 
