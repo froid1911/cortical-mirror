@@ -97,6 +97,7 @@ class CorticalEngine:
         self._reset_requested = False
         self.learner: OnlineLearner | None = None
         self.last_flow: np.ndarray | None = None
+        self.last_levels: list[tuple[np.ndarray, np.ndarray]] = []
 
     def enable_learning(self, **options) -> OnlineLearner:
         """Keep training on the incoming stream in a background thread."""
@@ -210,6 +211,14 @@ class CorticalEngine:
             )
         self._previous = tensor
         self.last_flow = output.flow[0].float().permute(1, 2, 0).cpu().numpy()
+        # Per level: what it expects next, and how surprised it was by this frame.
+        self.last_levels = [
+            (
+                expected[0].float().permute(1, 2, 0).cpu().numpy(),
+                error[0].float().abs().sum(dim=0).cpu().numpy() / 3.0,
+            )
+            for expected, error in zip(output.state.predicted, output.errors, strict=True)
+        ]
         confidence = output.state.confidence[0, 0].float().cpu().numpy()
         observed = (
             output.observed_error[0, 0].float().cpu().numpy()

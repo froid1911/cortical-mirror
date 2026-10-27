@@ -85,9 +85,24 @@ body.show-overlay .legend-trust { display: flex; }
 
 /* Lab: every internal signal side by side. */
 .lab { display: none; height: 100%; overflow: auto; padding: 24px clamp(16px, 3vw, 40px) 40px; }
-body.lab-mode .mirror { display: none; }
+body.lab-mode .mirror, body.cortex-mode .mirror { display: none; }
 body.lab-mode .lab { display: block; }
-body.lab-mode { overflow: auto; }
+body.lab-mode, body.cortex-mode { overflow: auto; }
+
+/* Cortex: what each level of the hierarchy expects, and where it was surprised. */
+.cortex { display: none; min-height: 100%; padding: 24px clamp(16px, 3vw, 40px) 32px; }
+body.cortex-mode .cortex { display: block; }
+.cortex header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+.cortex h1 { margin: 0; font-size: 34px; font-stretch: 125%; font-weight: 300; letter-spacing: -0.02em; }
+.cortex header p { margin: 0; color: var(--pewter); max-width: 66ch; }
+.cortex-body { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 14px; margin-top: 22px; align-items: center; }
+.cortex-body .levels { grid-column: 2; display: grid; grid-template-columns: repeat(3, 1fr); font-size: 14px; }
+.cortex-body .levels span { display: block; color: var(--pewter); font-size: 13px; }
+.cortex-body .rows { display: grid; grid-template-rows: 1fr 1fr; height: 100%; font-size: 14px; text-align: right; }
+.cortex-body .rows div { display: flex; flex-direction: column; justify-content: center; }
+.cortex-body .rows span { color: var(--pewter); font-size: 13px; }
+.cortex-body img { display: block; width: 100%; max-height: calc(100vh - 220px); object-fit: contain; background: #0d0f13; border-radius: 4px; }
+@media (max-width: 720px) { .cortex-body { grid-template-columns: 1fr; } .cortex-body .rows { display: none; } .cortex-body .levels { grid-column: 1; } }
 .lab header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
 .lab h1 { margin: 0; font-size: 34px; font-stretch: 125%; font-weight: 300; letter-spacing: -0.02em; }
 .lab header p { margin: 0; color: var(--pewter); max-width: 62ch; }
@@ -138,12 +153,24 @@ body.lab-mode { overflow: auto; }
       <dt>1 to 5</dt><dd>Look that many frames ahead</dd>
       <dt>L</dt><dd>Pause or resume learning</dd>
       <dt>R</dt><dd>Forget what it learned here</dd>
-      <dt>Tab</dt><dd>Switch to the lab view</dd>
+      <dt>Tab</dt><dd>Switch between mirror, lab and cortex views</dd>
       <dt>F</dt><dd>Full screen</dd>
     </dl>
   </aside>
   <section class="curve" id="mirror-curve"></section>
 </main>
+
+<div class="cortex">
+  <header>
+    <h1>Inside the hierarchy</h1>
+    <p>Each level predicts its own input, the image at its own scale. Only what it failed to predict, its surprise, is passed up; context from the level above flows down.</p>
+  </header>
+  <div class="cortex-body">
+    <div class="levels"><div>Level 1<span>Full resolution, fine detail</span></div><div>Level 2<span>A quarter of the resolution</span></div><div>Level 3<span>An eighth, the coarse layout</span></div></div>
+    <div class="rows"><div>Expects next<span>Its prediction</span></div><div>Surprised by<span>Its error on this frame</span></div></div>
+    <img data-stream="cortex" data-mode="cortex" alt="Each level's prediction for the next frame, above its error on the current frame">
+  </div>
+</div>
 
 <div class="lab">
   <header>
@@ -281,10 +308,13 @@ function render() {
 const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
 function connectStreams() {
   const lab = document.body.classList.contains("lab-mode");
+  const cortex = document.body.classList.contains("cortex-mode");
   const overlay = document.body.classList.contains("show-overlay");
   document.querySelectorAll("img[data-stream]").forEach((img) => {
     const mode = img.dataset.mode;
-    const wanted = lab ? mode === "lab" : mode === "mirror" || (mode === "mirror-overlay" && overlay);
+    const wanted = cortex
+      ? mode === "cortex"
+      : lab ? mode === "lab" : mode === "mirror" || (mode === "mirror-overlay" && overlay);
     const url = `/stream/${img.dataset.stream}.mjpg`;
     if (wanted && !img.src.endsWith(url)) img.src = url;
     if (!wanted && !img.src.startsWith("data:")) img.src = BLANK;
@@ -313,14 +343,25 @@ document.addEventListener("keydown", (event) => {
   else if (key === "l" && metrics.learner) control({ learning: metrics.learner.paused });
   else if (key === "r") control({ reset_learning: true });
   else if (key >= "1" && key <= "5") control({ horizon: Number(key) });
-  else if (key === "tab") { event.preventDefault(); document.body.classList.toggle("lab-mode"); connectStreams(); }
+  else if (key === "tab") { event.preventDefault(); cycleView(); }
   else if (key === "f") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
   else if (key === "?" || key === "h") document.body.classList.toggle("show-keys");
   else if (key === "escape") document.body.classList.remove("show-keys");
 });
 // ?view=lab, ?overlay=1 and ?keys=1 open a mode directly, e.g. on a second screen.
 const params = new URLSearchParams(location.search);
-document.body.classList.toggle("lab-mode", params.get("view") === "lab");
+const VIEWS_ORDER = ["mirror", "lab", "cortex"];
+function setView(view) {
+  document.body.classList.toggle("lab-mode", view === "lab");
+  document.body.classList.toggle("cortex-mode", view === "cortex");
+  connectStreams();
+}
+function cycleView() {
+  const current = document.body.classList.contains("lab-mode") ? "lab"
+    : document.body.classList.contains("cortex-mode") ? "cortex" : "mirror";
+  setView(VIEWS_ORDER[(VIEWS_ORDER.indexOf(current) + 1) % VIEWS_ORDER.length]);
+}
+setView(VIEWS_ORDER.includes(params.get("view")) ? params.get("view") : "mirror");
 document.body.classList.toggle("show-overlay", params.get("overlay") === "1");
 document.body.classList.toggle("show-keys", params.get("keys") === "1");
 connectStreams();
