@@ -99,6 +99,155 @@ Long continuous runs were made stable by bounding the cell state and training fr
 
 It underestimates a 3 px pan, plausibly because typical UCF101 motion at this resolution is about 1 px per frame (validation teacher flow averages 1.1 px).
 
+## A cortex that learns to see (research track)
+
+The mirror above is good engineering: a network trained by backpropagation on 8,000 videos. It is not how a brain learns. This research track asks a different question, in the spirit of "something that learns to see like cortex from scratch": can a predictive-coding hierarchy that learns **only with local rules** develop what a real visual cortex is known to do, by itself?
+
+Progress is judged by **phenomena that emerge**, measured with the stimuli neuroscience used. Each protocol is written down in [`docs/protocols/`](docs/protocols/) before its first measurement, with its pass criterion, and failures are reported. Nothing is fitted to brain recordings.
+
+### The rules
+
+1. **No backpropagation, and no weight transport.** Every connection changes by the product of the activities at its two ends and the error its cell carries. Feedback weights never read the forward weights. They start unrelated and converge by receiving the same local update (Kolen & Pollack, 1994). The code never uses automatic differentiation, and a test enforces it.
+2. **Innate structure only where biology has it at birth.**
+   - Built in: a retina-like front end (centre-surround ON/OFF cells, contrast normalisation, lagged cells), small receptive fields, a coarse-to-fine layout, homeostatic set points, and the reflex "look toward surprise".
+   - Not built in: edge filters, orientations, directions, or where to look.
+3. **The newborn learns only from its own stream, and the adult learns with exactly the same rules.** In 3 hours of training, each adult watched 30–100 hours of UCF101 training video: 101 h in phase 1, 65 h in phase 2, 30 h in phase 3. Later phases are slower per step.
+4. **Phenomena are measured, not eyeballed**, with criteria fixed in advance.
+5. **Edge cells are a first check, not the result.** Many learning methods produce them.
+
+**Declared simplification:** weights are shared across positions (convolution). That is like every location learning from the same statistics, rather than each one learning separately as in biology.
+
+### What it is
+
+- **Retina.** Luminance at 128 × 96 becomes an ON/OFF code. From phase 2 it also has lagged cells, which carry the previous frame.
+- **V1.** 32 cell types settle to explain the retinal code with as few active cells as possible (sparse coding; Olshausen & Field, 1996).
+- **V2** (from phase 2). V2 learns to predict V1, and V1 is pulled toward that prediction (Rao & Ballard, 1999).
+- **Temporal prediction.** Every level predicts its own next activity, learning by a normalised delta rule.
+- **Eye** (phase 3). The cortex sees a foveal window of a larger view. A coarse periphery, learning by the same rules, signals surprise, and the eye saccades toward it, avoiding recent fixations. Each movement has its own learned temporal kernel. The cortex is told which movement is about to happen (an efference copy), but nothing about the resulting image shift is built in.
+
+Two instances of the same network run as **twin mirrors**: a **newborn** that starts blank in front of the camera, and an **adult**. Watching the newborn's cells turn into the adult's is the demo.
+
+### Results
+
+| Phenomenon (protocol) | Verdict |
+|---|---|
+| Orientation-tuned cells, like V1 (1) | **Emerges.** The newborn reaches 88–94% selective cells within 2 minutes of video; the adult 97%. |
+| Repetition suppression and mismatch (2) | **Emerges,** with a caveat: an untrained network that learns during the sequence already shows much of it. |
+| Direction-selective cells (3) | **Fails.** Learning removes the few the untrained network has. |
+| Surround suppression from feedback (4) | **Fails.** Suppression is strong, but just as strong without feedback, so it comes from competition within V1. |
+| End-stopping from feedback (5) | **Fails,** for the same reason. |
+| Predictive remapping with an efference copy (6) | **Emerges in the adult.** Prediction error after a saccade drops to 0.40 with the copy, and the kernels are direction-specific (0.51). |
+| Habituation of orienting (7) | **Fails.** The eye stays drawn to predictable motion. Inhibition of return works (revisits 0.00 vs 0.20 by chance). |
+
+The tables below are generated from the report files by `tools/cortex_report.py`, which applies each protocol's pre-declared criterion.
+
+#### Phase 1, protocol 1: orientation tuning
+
+| Condition | Median OSI | Cells with OSI > 0.3 | Protocol 1 |
+|---|---:|---:|---|
+| Untrained | 0.09 | 38% | – |
+| Newborn, 2 min of the sample clip | 0.48 | 88% | pass |
+| Newborn, 2 min of a held-out UCF101 scene | 0.64 | 94% | pass |
+| Adult | 0.74 | 97% | pass |
+
+#### Phase 1, protocol 2: oddball adaptation
+
+| Condition | iRS (repetition suppression) | iPE (prediction error) | iMM (mismatch) | Protocol 2 |
+|---|---:|---:|---:|---|
+| Untrained | +0.32 | +0.31 | +0.63 | – |
+| Newborn, 2 min of the sample clip | +0.45 | +0.34 | +0.80 | pass |
+| Newborn, 2 min of a held-out UCF101 scene | +0.45 | +0.34 | +0.79 | pass |
+| Adult | +0.44 | +0.33 | +0.77 | pass |
+
+#### Phase 2, protocol 3: direction selectivity
+
+| Condition | Median DSI | Cells with DSI > 0.3 | Protocol 3 |
+|---|---:|---:|---|
+| Untrained | 0.12 | 19% | – |
+| Newborn, 2 min of the sample clip | 0.07 | 9% | **fail** |
+| Newborn, 2 min of a held-out UCF101 scene | 0.00 | 0% | **fail** |
+| Adult | 0.01 | 0% | **fail** |
+
+#### Phase 2, protocol 4: surround suppression
+
+| Condition | Median index with feedback | Without feedback | Difference | Protocol 4 |
+|---|---:|---:|---:|---|
+| Untrained | 0.18 | 0.10 | +0.08 | – |
+| Newborn, 2 min of the sample clip | 0.66 | 0.66 | -0.00 | – |
+| Newborn, 2 min of a held-out UCF101 scene | 0.65 | 0.65 | -0.00 | – |
+| Adult | 0.67 | 0.67 | -0.00 | **fail** |
+
+#### Phase 2, protocol 5: end-stopping
+
+| Condition | Median index with feedback | Without feedback | Difference | Protocol 5 |
+|---|---:|---:|---:|---|
+| Untrained | 0.12 | 0.08 | +0.05 | – |
+| Newborn, 2 min of the sample clip | 0.37 | 0.38 | -0.01 | – |
+| Newborn, 2 min of a held-out UCF101 scene | 0.32 | 0.32 | -0.00 | – |
+| Adult | 0.30 | 0.31 | -0.00 | **fail** |
+
+#### Phase 3, protocol 6: predictive remapping
+
+| Condition | Remapping ratio (below 1: the copy helps) | Direction specificity (below 1: direction matters) | Protocol 6 |
+|---|---:|---:|---|
+| Untrained | 1.000 | 1.000 | – |
+| Newborn, 2 min of the sample clip | 1.171 | 0.992 | – |
+| Newborn, 2 min of a held-out UCF101 scene | 1.038 | 0.992 | – |
+| Adult | 0.399 | 0.511 | pass |
+
+#### Phase 3, protocol 7: habituation of orienting
+
+| Condition | Dwell on onsets, first 200 frames | Last 300 frames | Revisits vs chance | Protocol 7 |
+|---|---:|---:|---:|---|
+| Control: untrained, not learning | 0.00 | 0.00 | 0.00 vs 0.21 | – |
+| Untrained, learning (a newborn) | 0.00 | 0.00 | 0.00 vs 0.20 | **fail** |
+| Newborn, 2 min of the sample clip | 0.00 | 0.00 | 0.00 vs 0.20 | **fail** |
+| Newborn, 2 min of a held-out UCF101 scene | 0.00 | 0.00 | 0.00 vs 0.21 | **fail** |
+| Adult | 0.00 | 0.00 | 0.00 vs 0.20 | **fail** |
+
+**Why the failures, as diagnosed:**
+- **Direction selectivity.** In ordinary footage, one frame barely differs from the next. Local learning therefore gives each cell the same weights for the current and the lagged image, which cancels any direction preference.
+- **Surround suppression and end-stopping.** V2 learned to predict V1 almost exactly (mean prediction 0.0064 vs V1's 0.0070). So the top-down error is near zero for small and large stimuli alike, and feedback cannot suppress the predictable surround more than the centre.
+- **Habituation of orienting.** Within the test's 30 seconds, the periphery does not learn to predict a steady pan well enough to lose interest in it, and neither does the adult's.
+
+**Why the remapping result is real:** each learned movement kernel places its weight in the direction that maps the old view onto the new one. That holds for all eight movements: rightward +0.68 in x, upward −0.67 in y, and about ±0.6 on both axes for the diagonals. "No movement" stays centred. A direction control (the opposite movement's kernel) rules out kernels that merely dampen activity.
+
+As a mirror, this cortex is **worse than simply repeating the last frame**: the adults' training logs show 1.3–2× the error in their own retinal code. One newborn reached 0.85× on the sample clip. It is about equal to its own "nothing changes" expectation. The v0.2 mirror above remains the one to use for prediction. This track is about how seeing develops, not about pixel accuracy.
+
+### Run it
+
+```bash
+# Twin mirrors: a newborn beside an adult, both watching your camera (N restarts the newborn)
+.venv/bin/cortical-mirror twins --adult checkpoints/cortex-adult-p1.pt --source 0
+
+# Raise an adult with the same rules (about 3 h on one RTX 3090)
+.venv/bin/python tools/train_cortex.py --data data/ucf101/UCF-101 --phase 1 --hours 3 \
+  --output checkpoints/cortex-adult-p1.pt --log reports/cortex/train-p1.jsonl
+
+# Measure the phenomena, as a newborn raised on a clip or as a saved adult
+.venv/bin/python tools/phenomena.py --untrained --phase 1 --experience clip.mp4 \
+  --output reports/cortex/phase1-newborn.json
+.venv/bin/python tools/phenomena.py --checkpoint checkpoints/cortex-adult-p1.pt \
+  --output reports/cortex/phase1-adult.json
+.venv/bin/python tools/cortex_report.py
+```
+
+Phases 2 and 3 use `--phase 2` and `--phase 3` (V2; then the eye). The adult checkpoints are not in a release yet.
+
+### References for this track
+
+- D. H. Hubel and T. N. Wiesel. Receptive fields, binocular interaction and functional architecture in the cat's visual cortex. *J. Physiol.* 160, 1962. And: Receptive fields and functional architecture in two nonstriate visual areas (18 and 19) of the cat. *J. Neurophysiol.* 28, 1965.
+- B. A. Olshausen and D. J. Field. Emergence of simple-cell receptive field properties by learning a sparse code for natural images. *Nature* 381, 1996.
+- J. F. Kolen and J. B. Pollack. Backpropagation without weight transport. *IEEE ICNN*, 1994.
+- J. H. van Hateren and D. L. Ruderman. Independent component analysis of natural image sequences yields spatio-temporal filters similar to simple cells in primary visual cortex. *Proc. R. Soc. B* 265, 1998.
+- J. R. Cavanaugh, W. Bair and J. A. Movshon. Nature and interaction of signals from the receptive field center and surround in macaque V1 neurons. *J. Neurophysiol.* 88, 2002.
+- M. Zhu and C. J. Rozell. Visual nonclassical receptive field effects emerge from sparse coding in a dynamical system. *PLoS Comput. Biol.* 9, 2013.
+- G. G. Parras et al. Neurons along the auditory pathway exhibit a hierarchical organization of prediction error. *Nature Communications* 8, 2017.
+- J.-R. Duhamel, C. L. Colby and M. E. Goldberg. The updating of the representation of visual space in parietal cortex by intended eye movements. *Science* 255, 1992.
+- M. A. Sommer and R. H. Wurtz. Influence of the thalamus on spatial visual processing in frontal cortex. *Nature* 444, 2006.
+- E. N. Sokolov. *Perception and the Conditioned Reflex*. Pergamon, 1963.
+- L. Itti and P. Baldi. Bayesian surprise attracts human attention. *Vision Research* 49, 2009.
+
 ## Setup
 
 You need a computer with a webcam, about 1 GB of free disk space, and internet access the first time. An NVIDIA GPU is optional: without one, the mirror runs on the CPU (see [What to expect](#what-to-expect)).
