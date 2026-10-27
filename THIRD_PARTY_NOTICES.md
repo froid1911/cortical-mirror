@@ -18,7 +18,7 @@ The local adaptation removes training-only dependencies and hard-coded CUDA allo
 
 ## Sample clip
 
-`sample.mp4` (a v0.2.0 release asset, played by `cortical-mirror demo` when no camera is found) and the animation `docs/images/live-demo.gif` contain **"FFSb - Corona LSFB"** by the **Fédération Francophone des Sourds de Belgique (FFSB)**.
+`sample.mp4` (a v0.2.0 release asset, played by `cortical-mirror demo` when no camera is found) and the animations `docs/images/live-demo.gif` and `docs/images/twins.gif` contain **"FFSb - Corona LSFB"** by the **Fédération Francophone des Sourds de Belgique (FFSB)**.
 
 Source: https://commons.wikimedia.org/wiki/File:FFSb_-_Corona_LSFB.webm
 
