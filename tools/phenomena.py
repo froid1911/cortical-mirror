@@ -17,17 +17,31 @@ import torch
 from cortical_mirror.cortex.engine import CortexEngine
 from cortical_mirror.cortex.phenomena import (
     direction_selectivity,
+    end_stopping,
     oddball_adaptation,
     orientation_tuning,
+    size_tuning,
 )
 
 PROTOCOLS = {
     "orientation": orientation_tuning,
     "oddball": oddball_adaptation,
     "direction": direction_selectivity,
+    "size": size_tuning,
+    "endstopping": end_stopping,
 }
 # The protocols that apply from each phase on.
-PHASE_PROTOCOLS = {1: ["orientation", "oddball"], 2: ["direction"]}
+PHASE_PROTOCOLS = {1: ["orientation", "oddball"], 2: ["direction", "size", "endstopping"]}
+
+
+def summarise(result: dict) -> dict:
+    """The scalars of a result, recursively: per-cell lists stay in the file."""
+
+    return {
+        key: summarise(value) if isinstance(value, dict) else value
+        for key, value in result.items()
+        if not isinstance(value, list)
+    }
 
 
 def raise_on(engine: CortexEngine, video: Path, frames: int) -> dict:
@@ -104,7 +118,7 @@ def main() -> None:
         started = time.time()
         report[name] = PROTOCOLS[name](engine.hierarchy)
         report[name]["seconds"] = round(time.time() - started, 1)
-        summary = {k: v for k, v in report[name].items() if not isinstance(v, list)}
+        summary = summarise(report[name])
         print(name, json.dumps(summary), flush=True)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

@@ -90,3 +90,11 @@ def test_shifted_lag_cells_are_direction_selective():
 
     result = direction_selectivity(lagged_cells(2))
     assert result["fraction_selective"] > 0.3
+
+
+def test_suppression_index_math():
+    from cortical_mirror.cortex.phenomena import suppression_index
+
+    assert suppression_index([1.0, 3.0, 2.0]) == pytest.approx(1 / 3)
+    assert suppression_index([1.0, 2.0, 3.0]) == 0.0
+    assert suppression_index([0.0, 0.0]) == 0.0
