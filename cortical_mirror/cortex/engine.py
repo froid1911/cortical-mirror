@@ -23,7 +23,12 @@ RETINA_SIZE = (128, 96)
 
 
 def phase_levels(phase: int) -> list[LevelConfig]:
-    return [LevelConfig()]
+    """Phase 1: V1. From phase 2: V2 above it, predicting V1's activity."""
+
+    levels = [LevelConfig()]
+    if phase >= 2:
+        levels.append(LevelConfig(cells=64, kernel=6, stride=2, padding=2))
+    return levels
 
 
 def render_prediction(

@@ -33,6 +33,8 @@ MAX_SETTLING_STEP = 0.1
 # No single frame may move a cell's weights by more than this fraction of their
 # (unit) length: plasticity is bounded per cell, locally.
 MAX_WEIGHT_CHANGE = 0.05
+# How strongly a level's activity is pulled toward the prediction from above.
+TOP_DOWN_WEIGHT = 0.5
 
 
 @dataclass(frozen=True)
@@ -153,47 +155,98 @@ class Hierarchy:
         self.reset_state()
 
     def reset_state(self) -> None:
-        self._activity: torch.Tensor | None = None
-        self._predicted_activity: torch.Tensor | None = None
+        self._activities: list[torch.Tensor] | None = None
+        self._predicted_activities: list[torch.Tensor] | None = None
         self._predicted_code: torch.Tensor | None = None
         self._previous_code: torch.Tensor | None = None
         self._still_code: torch.Tensor | None = None
 
+    def _refresh_step_sizes(self, code: torch.Tensor) -> None:
+        shape = code.shape
+        for level in self.levels:
+            limit = max(level.stability_limit(shape), 1e-6)
+            level.step_size = min(0.9 / limit, MAX_SETTLING_STEP)
+            c = level.config
+            shape = (shape[0], c.cells, shape[2] // c.stride, shape[3] // c.stride)
+
+    def _zeros(self, code: torch.Tensor) -> list[torch.Tensor]:
+        activities, (height, width) = [], code.shape[-2:]
+        for level in self.levels:
+            c = level.config
+            height, width = height // c.stride, width // c.stride
+            activities.append(
+                torch.zeros(code.shape[0], c.cells, height, width, device=self.device)
+            )
+        return activities
+
+    def _errors(self, code: torch.Tensor, activities: list[torch.Tensor]) -> list[torch.Tensor]:
+        inputs = [code, *activities[:-1]]
+        return [
+            x - level.render(a) for x, level, a in zip(inputs, self.levels, activities, strict=True)
+        ]
+
+    def _settle(self, code, activities, iterations: int, feedback: bool):
+        """Every level is driven by the error it must explain and, unless it is the top,
+        pulled toward the prediction the level above makes of it (Rao & Ballard)."""
+
+        for _ in range(iterations):
+            errors = self._errors(code, activities)
+            updated = []
+            for index, (level, activity) in enumerate(zip(self.levels, activities, strict=True)):
+                drive = level.drive(errors[index]) - level.theta
+                if feedback and index + 1 < len(self.levels):
+                    drive = drive - TOP_DOWN_WEIGHT * errors[index + 1]
+                updated.append((activity + level.step_size * drive).clamp(0.0, 1.0))
+            activities = updated
+        return activities, self._errors(code, activities)
+
+    @torch.no_grad()
+    def settle(
+        self, code: torch.Tensor, iterations: int = 30, feedback: bool = True
+    ) -> list[torch.Tensor]:
+        """Frozen settle from rest, for measurements: no learning, no state change."""
+
+        code = code.to(self.device)
+        saved = [level.step_size for level in self.levels]
+        self._refresh_step_sizes(code)
+        activities, _ = self._settle(code, self._zeros(code), iterations, feedback)
+        for level, step in zip(self.levels, saved, strict=True):
+            level.step_size = step
+        return activities
+
     @torch.no_grad()
     def step(self, code: torch.Tensor, learn: bool = True, iterations: int = 20) -> StepResult:
-        level = self.levels[0]
         code = code.to(self.device)
-        if self.age_frames % 100 == 0 or level.step_size <= 0:
-            limit = max(level.stability_limit(code.shape), 1e-6)
-            level.step_size = min(0.9 / limit, MAX_SETTLING_STEP)
+        if self.age_frames % 100 == 0 or self.levels[0].step_size <= 0:
+            self._refresh_step_sizes(code)
         code_error = persistence_error = stillness_error = float("nan")
         if self._predicted_code is not None and self._predicted_code.shape == code.shape:
             code_error = float((self._predicted_code - code).square().mean())
             persistence_error = float((self._previous_code - code).square().mean())
             stillness_error = float((self._still_code - code).square().mean())
-        # Warm start from what the level expected to see.
-        start = self._predicted_activity
-        if start is None or start.shape[0] != code.shape[0]:
-            start = torch.zeros(
-                code.shape[0],
-                level.config.cells,
-                code.shape[2] // level.config.stride,
-                code.shape[3] // level.config.stride,
-                device=self.device,
-            )
-        activity = level.settle(code, start, iterations)
-        error = code - level.render(activity)
+        # Warm start from what each level expected to see.
+        starts = self._predicted_activities
+        if starts is None or starts[0].shape[0] != code.shape[0]:
+            starts = self._zeros(code)
+        activities, errors = self._settle(code, starts, iterations, feedback=True)
         if learn:
-            level.learn(code, activity, error, self._activity)
+            inputs = [code, *activities[:-1]]
+            previous = self._activities or [None] * len(self.levels)
+            for level, x, a, e, p in zip(
+                self.levels, inputs, activities, errors, previous, strict=True
+            ):
+                level.learn(x, a, e, p)
             self.age_frames += 1
-        self._activity = activity
-        self._predicted_activity = level.forecast(activity)
-        self._predicted_code = level.render(self._predicted_activity)
-        self._still_code = level.render(activity)
+        self._activities = activities
+        self._predicted_activities = [
+            level.forecast(a) for level, a in zip(self.levels, activities, strict=True)
+        ]
+        self._predicted_code = self.levels[0].render(self._predicted_activities[0])
+        self._still_code = self.levels[0].render(activities[0])
         self._previous_code = code
         return StepResult(
-            activities=[activity],
-            errors=[error],
+            activities=activities,
+            errors=errors,
             code_error=code_error,
             persistence_error=persistence_error,
             predicted_next=self._predicted_code,
