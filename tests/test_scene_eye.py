@@ -3,9 +3,9 @@ import random
 
 import numpy as np
 
+from cortical_mirror.cortex.eye import COMMANDS
 from cortical_mirror.scene.eye import SACCADE, EyeGraph, look
 from cortical_mirror.scene.world import SpriteWorld
-from cortical_mirror.cortex.eye import COMMANDS
 
 WORLD = (384, 288)
 VIEW = (256, 192)
