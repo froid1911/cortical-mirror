@@ -54,3 +54,13 @@ def test_phase3_engine_shows_the_world_and_moves_its_eye():
     assert result.image.shape == (192, 256, 3)
     assert any(commands)
     assert len(engine.eyes[0].history) > 1
+
+
+def test_world_view_marks_where_the_eye_has_been():
+    from cortical_mirror.cortex.engine import render_world
+
+    code = torch.zeros(1, 4, 96, 128)
+    frame = np.full((192, 256, 3), 128, np.uint8)
+    image = render_world(code, frame, (136, 96), history=[(128, 96), (136, 96)])
+    blue, green, red = (int(v) for v in image[96, 128])
+    assert blue > red + 40  # a fixation dot in the expectation colour

@@ -54,7 +54,10 @@ def render_prediction(
 
 
 def render_world(
-    code_next: torch.Tensor, frame_bgr: np.ndarray, gaze: tuple[int, int]
+    code_next: torch.Tensor,
+    frame_bgr: np.ndarray,
+    gaze: tuple[int, int],
+    history: list[tuple[int, int]] | None = None,
 ) -> np.ndarray:
     """Display adapter for the eye: coarse world, the fovea's predicted contrast where
     the eye will look next, and a frame around the fovea."""
@@ -72,6 +75,12 @@ def render_world(
     cv2.rectangle(
         out, (x - half_w, y - half_h), (x + half_w - 1, y + half_h - 1), (255, 184, 143), 1
     )
+    # Where the eye has been: the last fixations, joined, in the expectation colour.
+    trail = (history or [])[-8:]
+    for start, end in zip(trail, trail[1:], strict=False):
+        cv2.line(out, start, end, (255, 184, 143), 1, cv2.LINE_AA)
+    for point in trail:
+        cv2.circle(out, point, 2, (255, 184, 143), -1, cv2.LINE_AA)
     return out
 
 
@@ -174,7 +183,8 @@ class CortexEngine:
         if self.periphery is None:
             image = render_prediction(result.predicted_next, frame_bgr, self.width, self.height)
         else:
-            image = render_world(result.predicted_next, frame_bgr, self.eyes[0].gaze)
+            eye = self.eyes[0]
+            image = render_world(result.predicted_next, frame_bgr, eye.gaze, eye.history)
             image = cv2.resize(image, (self.width, self.height), interpolation=cv2.INTER_AREA)
         error = result.errors[0].abs().mean(dim=1)[0].cpu().numpy()
         return EnginePrediction(
