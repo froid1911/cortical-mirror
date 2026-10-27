@@ -54,3 +54,21 @@ def test_phase_one_checkpoints_still_load():
     for level in old["architecture"]["levels"]:
         level.pop("motor_commands", None)  # written before the field existed
     Hierarchy(2, [LevelConfig()]).load_state_dict(old)
+
+
+def test_eye_without_surprise_stays_still():
+    eye = Eye(period_frames=1)
+    start = eye.gaze
+    for _ in range(20):
+        _, command = eye.look(world(), torch.zeros(1, 1, 48, 64))
+        assert command == 0
+    assert eye.gaze == start
+
+
+def test_ties_are_broken_without_a_direction_preference():
+    first_moves = set()
+    for seed in range(12):
+        eye = Eye(period_frames=1, seed=seed)
+        _, command = eye.look(world(), torch.ones(1, 1, 48, 64))
+        first_moves.add(command)
+    assert len(first_moves) >= 4

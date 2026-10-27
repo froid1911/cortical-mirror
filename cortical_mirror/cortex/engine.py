@@ -162,7 +162,7 @@ class CortexEngine:
         self.periphery.step(code, learn=self.learn)
         self.last_surprise = surprise
         while len(self.eyes) < world.shape[0]:
-            self.eyes.append(Eye(*WORLD_SIZE, fovea=RETINA_SIZE))
+            self.eyes.append(Eye(*WORLD_SIZE, fovea=RETINA_SIZE, seed=len(self.eyes)))
         fovea = torch.cat([eye.crop(world[i : i + 1]) for i, eye in enumerate(self.eyes)])
         # Decide each eye's next movement, and tell the cortex (the efference copy).
         commands = torch.tensor(
