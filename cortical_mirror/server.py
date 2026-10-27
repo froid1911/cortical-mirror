@@ -15,7 +15,18 @@ import numpy as np
 from .engines import EnginePrediction, PredictiveEngine
 
 INDEX_HTML = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
-VIEWS = ("camera", "prediction", "error", "overlay", "cortex")
+VIEWS = (
+    "camera",
+    "prediction",
+    "error",
+    "overlay",
+    "cortex",
+    # Twin mirrors (cortex/twin.py) add these through extra_views().
+    "newborn",
+    "adult",
+    "newborn_cells",
+    "adult_cells",
+)
 # BGR. Blue is the model's expectation, violet the pretrained motion expert, pewter
 # persistence; the page legend uses the same colours.
 EXPERT_COLOURS = {
@@ -172,6 +183,8 @@ class LiveState:
             learner.reset()
             with self._condition:
                 self._history.clear()
+        if command.get("reset_newborn") and hasattr(self.engine, "request_newborn_reset"):
+            self.engine.request_newborn_reset()
         if "horizon" in command:
             self.horizon = int(np.clip(int(command["horizon"]), 1, 8))
         return {
@@ -274,6 +287,9 @@ class LiveState:
                     "overlay": overlay,
                     "cortex": cortex_view(self.engine, self.engine.width, self.engine.height),
                 }
+                if hasattr(self.engine, "extra_views"):
+                    images |= self.engine.extra_views()
+                extra = self.engine.extra_metrics() if hasattr(self.engine, "extra_metrics") else {}
                 views = {}
                 for name, image in images.items():
                     ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 92])
@@ -292,6 +308,10 @@ class LiveState:
                                 "cortical": float(np.mean(bucket["cortical"])),
                                 "dreaming": self.eyes_closed,
                                 "steps": learner["steps"] if learner else 0,
+                                "twins": {
+                                    name: twin["surprise"]
+                                    for name, twin in extra.get("twins", {}).items()
+                                },
                             }
                         )
                     bucket = {key: [] for key in bucket}
@@ -316,7 +336,8 @@ class LiveState:
                         "experts": list(getattr(self.engine, "names", ())),
                         "learner": self._learner_metrics(),
                         "error": "",
-                    },
+                    }
+                    | extra,
                 )
                 previous_actual = actual
                 pending = current
