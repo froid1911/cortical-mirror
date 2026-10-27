@@ -41,3 +41,39 @@ def test_twins_command_pairs_a_fresh_newborn_with_the_saved_adult(tmp_path):
     twin = cli.twins_engine(Namespace(adult=tmp_path / "adult.pt", device="cpu", frozen_adult=True))
     assert twin.newborn.age_frames == 0 and twin.newborn.learn
     assert twin.adult.age_frames == 12345 and not twin.adult.learn
+
+
+def test_twins_without_an_adult_downloads_the_adult_of_the_chosen_phase(monkeypatch):
+    fetched = []
+    monkeypatch.setattr(cli, "fetch", lambda name, folder: fetched.append(name) or folder / name)
+    monkeypatch.setattr(cli, "camera_available", lambda source: True)
+    args = Namespace(adult=None, phase=3, assets=Path("/assets"), source="0")
+    cli.twins_arguments(args)
+    assert fetched == ["cortex-adult-p3.pt"]
+    assert args.adult == Path("/assets/cortex-adult-p3.pt")
+
+
+def test_twins_with_an_adult_and_no_camera_plays_the_sample_clip(monkeypatch):
+    fetched = []
+    monkeypatch.setattr(cli, "fetch", lambda name, folder: fetched.append(name) or folder / name)
+    monkeypatch.setattr(cli, "camera_available", lambda source: False)
+    args = Namespace(adult=Path("mine.pt"), phase=1, assets=Path("/assets"), source="0")
+    cli.twins_arguments(args)
+    assert fetched == ["sample.mp4"]
+    assert args.adult == Path("mine.pt") and args.source.endswith("sample.mp4")
+
+
+def test_every_adult_phase_has_a_download():
+    for phase in (1, 2, 3):
+        assert f"cortex-adult-p{phase}.pt" in cli.DEMO_ASSETS
+
+
+def test_a_failed_adult_download_says_to_pass_an_adult(monkeypatch, tmp_path):
+    import pytest
+
+    def offline(url):
+        raise OSError("offline")
+
+    monkeypatch.setattr(cli.urllib.request, "urlopen", offline)
+    with pytest.raises(SystemExit, match="--adult"):
+        cli.fetch("cortex-adult-p1.pt", tmp_path)

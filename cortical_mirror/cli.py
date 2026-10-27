@@ -144,11 +144,13 @@ def create_engine(args):
     return CopyEngine(width=args.width, height=args.height)
 
 
-RELEASE = "https://github.com/froid1911/cortical-mirror/releases/download/v0.2.0"
+RELEASES = "https://github.com/froid1911/cortical-mirror/releases/download"
 DEMO_ASSETS = {
-    "cortical.pt": f"{RELEASE}/cortical-mirror-v0.2.0.pt",
-    "dmvfn_vimeo.pkl": f"{RELEASE}/dmvfn_vimeo.pkl",
-    "sample.mp4": f"{RELEASE}/sample.mp4",
+    "cortical.pt": f"{RELEASES}/v0.2.0/cortical-mirror-v0.2.0.pt",
+    "dmvfn_vimeo.pkl": f"{RELEASES}/v0.2.0/dmvfn_vimeo.pkl",
+    "sample.mp4": f"{RELEASES}/v0.2.0/sample.mp4",
+    # The learning cortex's adults, one per phase, each trained on hours of UCF101.
+    **{f"cortex-adult-p{p}.pt": f"{RELEASES}/v0.3.0/cortex-adult-p{p}.pt" for p in (1, 2, 3)},
 }
 
 
@@ -166,11 +168,12 @@ def fetch(name: str, folder: Path) -> Path:
                 shutil.copyfileobj(response, out)
         except OSError as error:
             temporary.unlink(missing_ok=True)
-            alternative = (
-                "pass --source with a video path"
-                if name == "sample.mp4"
-                else "start untrained with --from-scratch"
-            )
+            if name == "sample.mp4":
+                alternative = "pass --source with a video path"
+            elif name.startswith("cortex-adult"):
+                alternative = "pass --adult with a checkpoint you have"
+            else:
+                alternative = "leave out --pretrained to start untrained"
             raise SystemExit(
                 f"could not download {name} from {DEMO_ASSETS[name]} ({error}). "
                 f"Place the file at {path} yourself, or {alternative}."
@@ -231,6 +234,18 @@ def demo_arguments(args) -> None:
         args.source = str(fetch("sample.mp4", folder))
 
 
+def twins_arguments(args) -> None:
+    """Fill in what `cortical-mirror twins` needs: the adult of the chosen phase,
+    downloaded on first use unless --adult names one, and the sample clip if
+    there is no camera."""
+
+    if args.adult is None:
+        args.adult = fetch(f"cortex-adult-p{args.phase}.pt", args.assets)
+    if not camera_available(args.source):
+        print(f"no camera at {args.source!r}; playing the sample clip", file=sys.stderr)
+        args.source = str(fetch("sample.mp4", args.assets))
+
+
 def twins_engine(args):
     """Newborn (fresh, learning) beside the saved adult, for `cortical-mirror twins`."""
 
@@ -278,7 +293,13 @@ def main() -> None:
     twins = commands.add_parser(
         "twins", help="the learning cortex: a newborn beside an adult, both watching you"
     )
-    twins.add_argument("--adult", type=Path, required=True, help="adult cortex checkpoint")
+    twins.add_argument(
+        "--adult", type=Path, help="adult cortex checkpoint (default: download the --phase adult)"
+    )
+    twins.add_argument(
+        "--phase", type=int, choices=(1, 2, 3), default=1, help="which adult to download"
+    )
+    twins.add_argument("--assets", type=Path, default=Path.home() / ".cache" / "cortical-mirror")
     twins.add_argument("--frozen-adult", action="store_true", help="the adult stops learning")
     twins.add_argument("--source", default="0", help="camera index, video path or stream URL")
     twins.add_argument("--host", default="127.0.0.1")
@@ -298,6 +319,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.command == "twins":
+        twins_arguments(args)
         serve(
             twins_engine(args),
             source=args.source,
