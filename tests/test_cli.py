@@ -1,0 +1,32 @@
+from argparse import Namespace
+from pathlib import Path
+
+from cortical_mirror import cli
+
+
+def demo_args(**overrides):
+    values = {"assets": Path("/assets"), "device": "cpu", "pretrained": False, "source": "0"}
+    return Namespace(**(values | overrides))
+
+
+def test_demo_starts_from_scratch_without_any_pretrained_model(monkeypatch):
+    fetched = []
+    monkeypatch.setattr(cli, "fetch", lambda name, folder: fetched.append(name) or folder / name)
+    monkeypatch.setattr(cli, "camera_available", lambda source: True)
+    args = demo_args()
+    cli.demo_arguments(args)
+    assert args.from_scratch and args.learn
+    assert args.experts == "copy,cortical"
+    assert fetched == []
+
+
+def test_pretrained_demo_on_cpu_turns_learning_off_and_skips_dmvfn(monkeypatch):
+    fetched = []
+    monkeypatch.setattr(cli, "fetch", lambda name, folder: fetched.append(name) or folder / name)
+    monkeypatch.setattr(cli, "camera_available", lambda source: False)
+    args = demo_args(pretrained=True)
+    cli.demo_arguments(args)
+    assert not args.from_scratch and not args.learn
+    assert args.experts == "copy,cortical"
+    assert fetched == ["cortical.pt", "sample.mp4"]
+    assert args.source.endswith("sample.mp4")

@@ -192,26 +192,40 @@ def camera_available(source: str) -> bool:
 
 
 def demo_arguments(args) -> None:
-    """Fill in everything `cortical-mirror demo` needs, downloading on first use."""
+    """Fill in everything `cortical-mirror demo` needs, downloading on first use.
+
+    By default the hierarchy starts untrained and learns from the stream, routed
+    only against persistence, so everything the mirror shows was learned on the
+    spot. `--pretrained` loads the trained weights and, on CUDA, adds DMVFN.
+    """
 
     folder = args.assets
     args.device = resolve_device(args.device)
-    if not args.from_scratch:
-        args.checkpoint = fetch("cortical.pt", folder)
     args.engine = "adaptive"
+    args.from_scratch = not args.pretrained
     args.learn = True
-    if args.device == "cpu":
-        # DMVFN alone would hold a laptop CPU near 10 fps; keep the mirror fluid.
+    if args.from_scratch:
         args.experts = "copy,cortical"
-        print("no CUDA device: routing between persistence and the hierarchy", file=sys.stderr)
-        if args.from_scratch:
-            print("learning on the CPU is slow: expect minutes, not seconds", file=sys.stderr)
-        else:
-            # A CPU learner managed ~0.5 steps/s and cut the mirror to ~18 fps.
-            args.learn = False
-            print("live learning needs a CUDA GPU to keep up; it is off", file=sys.stderr)
+        if args.device == "cpu":
+            # Measured on a 12-thread laptop CPU: about 1 learning step per second,
+            # a tenth of the GPU rate (reports/latency-laptop-cpu.json).
+            print(
+                "no CUDA device: learning from scratch on the CPU takes minutes, not seconds",
+                file=sys.stderr,
+            )
     else:
-        args.dmvfn_checkpoint = fetch("dmvfn_vimeo.pkl", folder)
+        args.checkpoint = fetch("cortical.pt", folder)
+        if args.device == "cpu":
+            # DMVFN would hold a laptop CPU near 10 fps, and a CPU learner cannot keep up.
+            args.experts = "copy,cortical"
+            args.learn = False
+            print(
+                "no CUDA device: routing persistence and the trained hierarchy; "
+                "live learning is off",
+                file=sys.stderr,
+            )
+        else:
+            args.dmvfn_checkpoint = fetch("dmvfn_vimeo.pkl", folder)
     if not camera_available(args.source):
         print(f"no camera at {args.source!r}; playing the sample clip", file=sys.stderr)
         args.source = str(fetch("sample.mp4", folder))
@@ -223,14 +237,18 @@ def main() -> None:
     commands = parser.add_subparsers(dest="command", required=True)
 
     demo = commands.add_parser(
-        "demo", help="one command: download weights, open the camera, learn live"
+        "demo", help="one command: open the camera and learn to predict it from scratch"
     )
     demo.set_defaults(engine="adaptive")
     demo.add_argument("--source", default="0", help="camera index or video path")
     demo.add_argument("--host", default="127.0.0.1")
     demo.add_argument("--port", type=int, default=8080)
     demo.add_argument("--assets", type=Path, default=Path.home() / ".cache" / "cortical-mirror")
-    demo.add_argument("--from-scratch", action="store_true", help="start the hierarchy untrained")
+    demo.add_argument(
+        "--pretrained",
+        action="store_true",
+        help="start from the trained weights (and add DMVFN on CUDA) instead of from scratch",
+    )
     demo.add_argument("--horizon", type=int, default=1, help="frames ahead to show (1-8)")
     demo.add_argument("--device", default="auto")
 
