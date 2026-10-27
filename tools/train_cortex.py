@@ -69,9 +69,7 @@ def main() -> None:
         while (args.frames and step < args.frames) or (not args.frames and time.time() < deadline):
             world = streams.frames(engine.device, engine.input_size)
             result = engine.observe(world)
-            code = (
-                engine.retina.encode(world) if engine.periphery is None else result.predicted_next
-            )
+            code = engine.last_code
             step += 1
             if step % args.log_every == 0 or step == args.frames:
                 activity = result.activities[0]

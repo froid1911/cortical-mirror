@@ -84,3 +84,12 @@ def test_training_an_adult_with_an_eye_saves_its_periphery(tmp_path):
     assert result.returncode == 0, result.stderr[-2000:]
     engine = CortexEngine.load(output, learn=False)
     assert engine.phase == 3 and engine.periphery.age_frames == 30
+
+
+def test_engine_exposes_the_code_it_observed_in_every_phase():
+    import torch
+
+    for phase, size in ((1, (96, 128)), (3, (192, 256))):
+        engine = CortexEngine(phase=phase)
+        engine.observe(torch.rand(2, 1, *size))
+        assert engine.last_code.shape[-2:] == (96, 128)

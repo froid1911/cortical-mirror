@@ -98,6 +98,7 @@ class CortexEngine:
         self.eyes: list[Eye] = []
         self._periphery_previous: torch.Tensor | None = None
         self.last_surprise: torch.Tensor | None = None
+        self.last_code: torch.Tensor | None = None
         self.last_command = 0
         self.last_code_error = float("nan")
         self.last_persistence_error = float("nan")
@@ -135,7 +136,8 @@ class CortexEngine:
         """One frame per stream, ``[B, 1, H, W]`` at ``input_size``."""
 
         if self.periphery is None:
-            return self.hierarchy.step(self.retina.encode(world), learn=self.learn)
+            self.last_code = self.retina.encode(world)
+            return self.hierarchy.step(self.last_code, learn=self.learn)
         coarse = F.interpolate(world, size=PERIPHERY_SIZE[::-1], mode="area")
         code = self.periphery_retina.encode(coarse)
         # Expected input: what was just seen plus the change the periphery has learned
@@ -159,7 +161,8 @@ class CortexEngine:
             device=self.device,
         )
         self.last_command = int(commands[0])
-        return self.hierarchy.step(self.retina.encode(fovea), learn=self.learn, commands=commands)
+        self.last_code = self.retina.encode(fovea)
+        return self.hierarchy.step(self.last_code, learn=self.learn, commands=commands)
 
     def predict(self, frame_bgr: np.ndarray) -> EnginePrediction:
         start = time.perf_counter()
