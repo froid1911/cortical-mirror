@@ -61,3 +61,19 @@ def test_experience_counts_every_stream_and_survives_saving(tmp_path):
     assert engine.experience_frames == 80
     engine.save(tmp_path / "adult.pt")
     assert CortexEngine.load(tmp_path / "adult.pt").experience_frames == 80
+
+
+def test_a_loaded_adult_counts_each_live_frame_once(tmp_path):
+    engine = CortexEngine()
+    engine.streams = 16
+    for frame in FRAMES[:5]:
+        engine.predict(frame)
+    engine.save(tmp_path / "adult.pt")
+    adult = CortexEngine.load(tmp_path / "adult.pt")
+    for frame in FRAMES[:3]:
+        adult.predict(frame)
+    assert adult.experience_frames == 80 + 3
+    adult.save(tmp_path / "older.pt")
+    assert CortexEngine.load(tmp_path / "older.pt").experience_frames == 83
+    adult.reset_learning()
+    assert adult.experience_frames == 0

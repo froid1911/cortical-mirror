@@ -114,6 +114,10 @@ class CortexEngine:
         self.last_stillness_error = float("nan")
         # Frames seen per learning step: 1 live, more when an adult trains on parallel streams.
         self.streams = 1
+        # Experience brought from a checkpoint, and the age it had then; only
+        # steps taken since count at the current number of streams.
+        self._experience_before = 0
+        self._age_before = 0
 
     @property
     def age_frames(self) -> int:
@@ -121,7 +125,8 @@ class CortexEngine:
 
     @property
     def experience_frames(self) -> int:
-        return self.hierarchy.age_frames * self.streams
+        steps = self.hierarchy.age_frames - self._age_before
+        return self._experience_before + steps * self.streams
 
     def reset(self) -> None:
         self.retina.reset()
@@ -137,6 +142,7 @@ class CortexEngine:
 
         self.reset()
         self.hierarchy.reset_learning()
+        self._experience_before = self._age_before = 0
         if self.periphery is not None:
             self.periphery.reset_learning()
 
@@ -217,6 +223,7 @@ class CortexEngine:
         state = {
             "engine": {"phase": self.phase, "width": self.width, "height": self.height},
             "streams": self.streams,
+            "experience_frames": self.experience_frames,
             "hierarchy": self.hierarchy.state_dict(),
             "periphery": self.periphery.state_dict() if self.periphery is not None else None,
         }
@@ -228,7 +235,11 @@ class CortexEngine:
         state = torch.load(path, map_location="cpu", weights_only=True)
         engine = cls(device=device, learn=learn, **state["engine"])
         engine.hierarchy.load_state_dict(state["hierarchy"])
-        engine.streams = int(state.get("streams", 1))
+        # Older checkpoints only know their training streams.
+        engine._experience_before = int(
+            state.get("experience_frames", engine.age_frames * int(state.get("streams", 1)))
+        )
+        engine._age_before = engine.age_frames
         if engine.periphery is not None and state.get("periphery"):
             engine.periphery.load_state_dict(state["periphery"])
         return engine
