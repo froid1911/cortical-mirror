@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import copy
 import math
+import os
 from dataclasses import dataclass
 
 import cv2
@@ -131,7 +132,8 @@ class SceneGraph:
     ):
         self.width, self.height, self.slots = width, height, slots
         # Where the search runs: on the CPU in arrays (None), or on a torch device.
-        self.device = device
+        # SCENE_DEVICE sets it for every graph a run makes (protocols, eye, video).
+        self.device = device if device is not None else (os.environ.get("SCENE_DEVICE") or None)
         # Frames an unseen node stays believed (the time constant of its belief).
         # Unlike everything else in the graph, it carries over from scene to scene:
         # it is what development changes.
