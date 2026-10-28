@@ -57,6 +57,8 @@ STILL_LAG = 8
 AGAINST = 0.004
 # Visibility above which a view of a node counts as complete.
 COMPLETE = 0.7
+# Frames after which a node's motion counts as established.
+ESTABLISHED = 15
 # What a pixel of deviation from the predicted position costs, per unit of mass.
 CONTINUITY = 0.0001
 # Frames a forgotten node is remembered for recognition; one that has not come
@@ -472,8 +474,12 @@ class SceneGraph:
                 self._unseen(node, visibility)
             elif visibility > 0.25 and gain > 0.002:
                 vx, vy = x - predicted[0] + node.vx, y - predicted[1] + node.vy
-                # A partly hidden node's measured motion is trusted less.
+                # An established node's motion is learned only from complete views, like
+                # shape: in a partial view the best fit lags behind whatever hides the
+                # rest. A newborn's must be learned from what it gets.
                 rate = 0.5 * min(visibility, 1.0) ** 2
+                if node.age >= ESTABLISHED and visibility < COMPLETE:
+                    rate = 0.0
                 node.vx += rate * (vx - node.vx)
                 node.vy += rate * (vy - node.vy)
                 # Mostly hidden, it is where it was expected to be, more than where
