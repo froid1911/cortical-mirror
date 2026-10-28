@@ -78,7 +78,7 @@ class Attention:
         looked = {node.id: node.looked for node in graph.inner.nodes if node.age >= LASTING}
         for command in range(len(COMMANDS)):
             x, y = (int(round(v)) for v in self._target(graph, command))
-            area = (slice(y - half, y + half), slice(x - half, x + half))
+            area = (slice(max(y - half, 0), y + half), slice(max(x - half, 0), x + half))
             novelty = sum(
                 np.exp(-looked.get(node, 0) / FAMILIAR)
                 for node, nx, ny in positions
@@ -119,7 +119,8 @@ class Attention:
         out = np.zeros(len(COMMANDS))
         for command in range(len(COMMANDS)):
             x, y = (int(round(v)) for v in self._target(graph, command))
-            out[command] = float(np.mean(graph.progress[y - half : y + half, x - half : x + half]))
+            area = graph.progress[max(y - half, 0) : y + half, max(x - half, 0) : x + half]
+            out[command] = float(np.mean(area)) if area.size else 0.5
         return out
 
     def learn(self, features: np.ndarray, progress: float) -> None:

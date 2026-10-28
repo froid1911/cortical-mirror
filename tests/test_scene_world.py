@@ -84,3 +84,14 @@ def test_a_creatures_limbs_swing_at_a_fixed_distance_from_its_torso():
     assert max(angles) - min(angles) > 0.3
     creatures = {t["id"]: t["creature"] for t in world.truth()}
     assert creatures[torso.id] == creatures[limbs[0].id] == 0
+
+
+def test_a_screen_in_the_creature_world_stands_in_front_of_every_creature():
+    from cortical_mirror.scene.world import CreatureWorld
+
+    world = CreatureWorld(seed=0, creatures=3, occluders=1, occluder_width=60)
+    screen = world.occluders[0]
+    for creature in world.creatures:
+        for part in creature["parts"]:
+            part.x, part.y = screen.x, screen.y
+    assert all(t["visible"].sum() == 0 for t in world.truth())

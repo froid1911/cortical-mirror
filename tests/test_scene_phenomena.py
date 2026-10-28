@@ -144,3 +144,17 @@ def test_running_seeds_in_parallel_gives_the_same_numbers(monkeypatch):
     monkeypatch.setenv("SCENE_WORKERS", "2")
     parallel = phenomena.object_permanence(60.0, seeds=[3000, 3001], frames=90)
     assert parallel == sequential
+
+
+def test_parallel_runs_on_a_cuda_device_do_not_fork(monkeypatch):
+    import multiprocessing
+
+    seen = []
+    real = multiprocessing.get_context
+    monkeypatch.setattr(
+        phenomena.multiprocessing, "get_context", lambda method: seen.append(method) or real(method)
+    )
+    monkeypatch.setenv("SCENE_WORKERS", "2")
+    monkeypatch.setenv("SCENE_DEVICE", "cuda")
+    assert phenomena.seed_map(abs, [-1, -2]) == [1, 2]
+    assert seen == ["spawn"]

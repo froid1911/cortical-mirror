@@ -187,6 +187,9 @@ class EyeGraph:
             dx, dy = remainder
             self.background = _shift(self.background, -dx, -dy)
             self.background_shade = _shift(self.background_shade, -dx, -dy)
+            self.error = _shift(self.error, -dx, -dy)
+            self.visits = _shift(self.visits, -dx, -dy)
+            self.progress = _shift(self.progress, -dx, -dy, fill=0.5)
             self.confidence = _shift(self.confidence, -dx, -dy)
             self.front = _shift(self.front, -dx, -dy)
             self.world_shift -= np.asarray(remainder, float)
@@ -302,15 +305,9 @@ def recentre(graph: EyeGraph) -> tuple[int, int]:
     if margin_x <= x <= CANVAS[0] - margin_x and margin_y <= y <= CANVAS[1] - margin_y:
         return 0, 0
     dx, dy = int(round(cx - x)), int(round(cy - y))
-    for name in (
-        "background",
-        "background_shade",
-        "confidence",
-        "front",
-        "error",
-        "visits",
-        "progress",
-    ):
+    for name in ("background", "background_shade", "confidence", "front", "error", "visits"):
         setattr(graph, name, _shift(getattr(graph, name), dx, dy))
+    # Unexplored canvas coming in is presumed to teach, as at the start.
+    graph.progress = _shift(graph.progress, dx, dy, fill=0.5)
     graph.gaze = (x + dx, y + dy)
     return dx, dy

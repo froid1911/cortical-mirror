@@ -28,7 +28,9 @@ def seed_map(fn, items) -> list:
     workers = min(int(os.environ.get("SCENE_WORKERS", "1")), len(items))
     if workers <= 1:
         return [fn(item) for item in items]
-    context = multiprocessing.get_context("fork")
+    # Forking a process that already used CUDA breaks the children: start afresh then.
+    method = "spawn" if os.environ.get("SCENE_DEVICE", "").startswith("cuda") else "fork"
+    context = multiprocessing.get_context(method)
     with ProcessPoolExecutor(workers, mp_context=context) as pool:
         return list(pool.map(fn, items))
 

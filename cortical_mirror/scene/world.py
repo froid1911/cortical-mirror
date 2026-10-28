@@ -202,9 +202,10 @@ class CreatureWorld(SpriteWorld):
             occluders=occluders,
             occluder_width=occluder_width,
         )
-        # Screens are numbered apart from the creatures' parts.
+        # Screens are numbered apart from the creatures' parts, and stand in front of them.
         for index, screen in enumerate(self.occluders):
             screen.id = 1000 + index
+            screen.depth = 1000 + index
         rng = np.random.default_rng(seed + 10_000)
         self.creatures: list[dict] = []
         self.time = 0
