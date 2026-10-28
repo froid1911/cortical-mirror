@@ -273,3 +273,20 @@ class EyeGraph:
             "world_shift": [round(float(v), 1) for v in self.world_shift],
         }
         return data
+
+
+def recentre(graph: EyeGraph) -> tuple[int, int]:
+    """Move the canvas under a gaze that has wandered toward its edge, so a long pan
+    never runs off it. Only bookkeeping: what is known keeps its place relative to
+    the view. Returns the shift applied."""
+
+    x, y = graph.gaze
+    cx, cy = graph.start
+    margin_x, margin_y = graph.view[0] // 2 + REACH + 8, graph.view[1] // 2 + REACH + 8
+    if margin_x <= x <= CANVAS[0] - margin_x and margin_y <= y <= CANVAS[1] - margin_y:
+        return 0, 0
+    dx, dy = int(round(cx - x)), int(round(cy - y))
+    for name in ("background", "background_shade", "confidence", "front", "error", "visits"):
+        setattr(graph, name, _shift(getattr(graph, name), dx, dy))
+    graph.gaze = (x + dx, y + dy)
+    return dx, dy
