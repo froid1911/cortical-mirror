@@ -247,3 +247,15 @@ Grouping did not improve. Deleting a creature is now worse than the bitmap, but 
 | 12 Self vs world | commanded 0.0, uncommanded 1.0, prediction 0.02; newborn 1.0 | pass |
 
 Run on flank's GPU 3. The first attempt crashed at its last step (the checkpoint folder was missing in a fresh worktree) and was re-run in full.
+
+## v0.7: learned motion, used (`v0.7-learned-motion.json`, protocol 17)
+
+40 fresh UCF101 test clips (seed 2, excluding the clips of seeds 0 and 1).
+
+| Condition | Expectation ÷ last frame | Clips better than the last frame |
+|---|---|---|
+| **Learned motion (MT adult)** | **0.878** | 87.5% |
+| MT silenced | 1.000 | 0% |
+| Optical flow (v0.6, yardstick) | 0.822 | 87.5% |
+
+**Passes both criteria:** learned motion below 1.0, silenced at or above 0.99. Real video is now predicted from motion the cortex learned. Silencing MT takes the prediction back to exactly the last frame, so nothing engineered senses motion in that path. Learned motion is 7% behind engineered flow in error, and equal in the fraction of clips it wins. Phase correlation still aligns the graph's canvas, as labelled scaffolding outside the prediction.

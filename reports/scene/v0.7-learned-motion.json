@@ -1,0 +1,61 @@
+{
+  "split": "test",
+  "seed": 2,
+  "videos": [
+    "v_VolleyballSpiking_g03_c04.avi",
+    "v_Typing_g05_c01.avi",
+    "v_BaseballPitch_g03_c02.avi",
+    "v_BenchPress_g07_c02.avi",
+    "v_BenchPress_g03_c02.avi",
+    "v_HighJump_g06_c03.avi",
+    "v_TrampolineJumping_g01_c01.avi",
+    "v_BreastStroke_g04_c01.avi",
+    "v_Skijet_g03_c04.avi",
+    "v_TaiChi_g01_c04.avi",
+    "v_RopeClimbing_g03_c01.avi",
+    "v_UnevenBars_g01_c02.avi",
+    "v_Haircut_g06_c03.avi",
+    "v_Fencing_g02_c05.avi",
+    "v_PlayingViolin_g04_c04.avi",
+    "v_CricketShot_g03_c05.avi",
+    "v_PlayingViolin_g06_c01.avi",
+    "v_BabyCrawling_g07_c06.avi",
+    "v_PlayingPiano_g04_c03.avi",
+    "v_Rowing_g05_c01.avi",
+    "v_BoxingSpeedBag_g02_c02.avi",
+    "v_JumpingJack_g03_c01.avi",
+    "v_Punch_g05_c02.avi",
+    "v_IceDancing_g02_c04.avi",
+    "v_TableTennisShot_g04_c06.avi",
+    "v_SkateBoarding_g07_c04.avi",
+    "v_UnevenBars_g07_c04.avi",
+    "v_ParallelBars_g03_c04.avi",
+    "v_HorseRiding_g01_c03.avi",
+    "v_PlayingDhol_g01_c01.avi",
+    "v_Kayaking_g07_c03.avi",
+    "v_Nunchucks_g04_c01.avi",
+    "v_FloorGymnastics_g02_c03.avi",
+    "v_YoYo_g05_c02.avi",
+    "v_BalanceBeam_g01_c01.avi",
+    "v_WalkingWithDog_g02_c05.avi",
+    "v_Archery_g07_c05.avi",
+    "v_HorseRace_g02_c02.avi",
+    "v_Lunges_g02_c01.avi",
+    "v_HammerThrow_g06_c03.avi"
+  ],
+  "learned_motion": {
+    "ratio": 0.8783563003875743,
+    "clips_better_than_repeating": 0.875,
+    "seconds": 257.8
+  },
+  "mt_silenced": {
+    "ratio": 1.0,
+    "clips_better_than_repeating": 0.0,
+    "seconds": 249.7
+  },
+  "part_motion": {
+    "ratio": 0.8224725834500893,
+    "clips_better_than_repeating": 0.875,
+    "seconds": 175.5
+  }
+}
