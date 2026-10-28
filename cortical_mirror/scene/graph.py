@@ -34,6 +34,17 @@ from numpy.lib.stride_tricks import sliding_window_view
 SPRITE = 48
 SEARCH = 8
 SLOTS = 8
+# Kalman tracking: how much a node's velocity may change per frame (variance), the
+# variance of a position found from a complete view, and of a newborn's state.
+ACCELERATION = 0.02
+MEASUREMENT = 0.5
+VISIBILITY_POWER = 4.0
+NEWBORN_COV = (4.0, 4.0, 4.0, 4.0)
+_F = np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], float)
+_Q = ACCELERATION * np.array(
+    [[0.25, 0, 0.5, 0], [0, 0.25, 0, 0.5], [0.5, 0, 1, 0], [0, 0.5, 0, 1]], float
+)
+_H = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], float)
 # Padding of the frame kept on a device: room for the widest search (recognition).
 FRAME_PAD = SPRITE // 2 + 24
 # What an unknown background costs to explain a pixel (a squared luminance error):
@@ -94,6 +105,8 @@ class Node:
     visibility: float = 1.0
     # Its brightness, for the picture, beside the code it is matched in.
     shade: np.ndarray | None = None
+    # With Kalman tracking: the uncertainty of [x, y, vx, vy].
+    cov: np.ndarray | None = None
 
     def displacement(self, frames: int = 5) -> tuple[float, float] | None:
         if not self.trail or len(self.trail) <= frames:
@@ -129,11 +142,16 @@ class SceneGraph:
         learn: bool = True,
         learn_persistence: bool = False,
         device: str | None = None,
+        tracking: str = "direct",
     ):
         self.width, self.height, self.slots = width, height, slots
         # Where the search runs: on the CPU in arrays (None), or on a torch device.
         # SCENE_DEVICE sets it for every graph a run makes (protocols, eye, video).
         self.device = device if device is not None else (os.environ.get("SCENE_DEVICE") or None)
+        # How a node follows its object: "direct" (v0.5: the search result, blended by
+        # visibility) or "kalman" (a filter over position and velocity that weighs each
+        # search result by how much of the node was seen, and coasts when it was not).
+        self.tracking = tracking
         # Frames an unseen node stays believed (the time constant of its belief).
         # Unlike everything else in the graph, it carries over from scene to scene:
         # it is what development changes.
@@ -431,14 +449,28 @@ class SceneGraph:
         for node in self.nodes:
             node.x, node.y = node.x + node.vx, node.y + node.vy
             node.age += 1
+            if self.tracking == "kalman":
+                if node.cov is None:
+                    node.cov = np.diag(NEWBORN_COV)
+                node.cov = _F @ node.cov @ _F.T + _Q
         # Nearest first: a node's visibility depends only on what is in front of it.
         ordered = sorted(self.nodes, key=lambda n: -n.depth)
         for index, node in enumerate(ordered):
             cover = self._cover(ordered[:index])
             predicted = (node.x, node.y)
-            x, y, gain, visibility = self._search(node, image, cover)
+            radius = SEARCH
+            if self.tracking == "kalman":
+                # Search as far as the node's own uncertainty reaches.
+                spread = math.sqrt(max(node.cov[0, 0], node.cov[1, 1]))
+                radius = int(min(max(math.ceil(2.5 * spread), SEARCH), 24))
+            x, y, gain, visibility = self._search(node, image, cover, radius=radius)
             node.visibility = visibility
-            if visibility > 0.25 and gain > 0.002:
+            if self.tracking == "kalman" and visibility > 0.25 and gain > 0.002:
+                self._kalman_update(node, x, y, visibility)
+                node.state, node.unseen, node.belief = "seen", 0, 1.0
+            elif self.tracking == "kalman":
+                self._unseen(node, visibility)
+            elif visibility > 0.25 and gain > 0.002:
                 vx, vy = x - predicted[0] + node.vx, y - predicted[1] + node.vy
                 # A partly hidden node's measured motion is trusted less.
                 rate = 0.5 * min(visibility, 1.0) ** 2
@@ -464,7 +496,12 @@ class SceneGraph:
             shift = self._recentre(node) if node.visibility >= COMPLETE else (0, 0)
             node.trail = [(x + shift[0], y + shift[1]) for x, y in node.trail or []]
             node.trail = [*node.trail, (node.x, node.y)][-30:]
-            if node.state == "seen" and node.visibility >= COMPLETE and len(node.trail) >= 6:
+            if (
+                self.tracking == "direct"
+                and node.state == "seen"
+                and node.visibility >= COMPLETE
+                and len(node.trail) >= 6
+            ):
                 # Velocity as the slope of the recent path: single-frame steps are whole
                 # pixels, and averaging them is slow and biased.
                 path = np.array(node.trail[-10:])
@@ -528,6 +565,19 @@ class SceneGraph:
             for ids in members.values()
             if len(ids) > 1
         ]
+
+    def _kalman_update(self, node: Node, x: float, y: float, visibility: float) -> None:
+        """Fuse a found position with the prediction: the less of the node was seen,
+        the less the finding counts."""
+
+        state = np.array([node.x, node.y, node.vx, node.vy])
+        noise = MEASUREMENT / max(visibility, 0.05) ** VISIBILITY_POWER
+        innovation = np.array([x, y]) - _H @ state
+        s = _H @ node.cov @ _H.T + noise * np.eye(2)
+        gain = node.cov @ _H.T @ np.linalg.inv(s)
+        state = state + gain @ innovation
+        node.cov = (np.eye(4) - gain @ _H) @ node.cov
+        node.x, node.y, node.vx, node.vy = (float(v) for v in state)
 
     def _unseen(self, node: Node, visibility: float) -> None:
         inside = 0 <= node.x < self.width and 0 <= node.y < self.height
@@ -697,7 +747,7 @@ class SceneGraph:
             if visibility > 0.25 and gain > 0.004:
                 error = math.hypot(found_x - node.x, found_y - node.y)
                 self.events.append({"returned": node.id, "after": node.unseen, "error": error})
-                node.x, node.y, node.trail = found_x, found_y, None
+                node.x, node.y, node.trail, node.cov = found_x, found_y, None, None
                 node.state, node.unseen, node.belief = "seen", 0, 1.0
                 return True
         cover = self._cover(self.nodes)
@@ -707,7 +757,7 @@ class SceneGraph:
             found_x, found_y, gain, visibility = self._search(probe, image, cover, radius=16)
             if visibility > 0.25 and gain > 0.004:
                 node.x, node.y, node.vx, node.vy = found_x, found_y, 0.0, 0.0
-                node.state, node.belief, node.trail = "seen", 1.0, None
+                node.state, node.belief, node.trail, node.cov = "seen", 1.0, None, None
                 self.nodes.append(node)
                 del self.memory[index]
                 self._recognised(node, forgotten)

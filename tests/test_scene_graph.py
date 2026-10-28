@@ -201,3 +201,15 @@ def test_a_creatures_parts_are_bound_into_one_group_and_two_creatures_stay_apart
     assert owner[torso_a] != owner[torso_b]
     data = graph.to_json()
     assert any(edge["relation"] == "part_of" for edge in data["edges"])
+
+
+def test_kalman_tracking_follows_an_object_and_coasts_behind_a_screen():
+    graph = SceneGraph(tracking="kalman", persistence=60.0)
+    world = occlusion_world()
+    for _ in range(58):
+        world.step()
+        graph.observe(world.render())
+    thing = world.objects[0]
+    hidden = [n for n in graph.nodes if n.state == "occluded"]
+    assert hidden and abs(hidden[0].vx - thing.vx) < 0.3
+    assert hidden[0].cov[0, 0] > 0.5
