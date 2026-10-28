@@ -1,0 +1,59 @@
+{
+  "self_world": {
+    "adult_motor": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        32.0,
+        0.0
+      ],
+      [
+        32.0,
+        -32.0
+      ],
+      [
+        0.0,
+        -32.0
+      ],
+      [
+        -32.0,
+        -32.0
+      ],
+      [
+        -32.0,
+        0.0
+      ],
+      [
+        -32.0,
+        32.0
+      ],
+      [
+        0.0,
+        32.0
+      ],
+      [
+        32.0,
+        32.0
+      ]
+    ],
+    "newborn": {
+      "commanded": 1.0,
+      "uncommanded": 1.0,
+      "prediction_error_from_memory": 0.011698968429118394,
+      "prediction_error_unchanged": 0.011765028862282634,
+      "prediction_ratio": 0.9943850173308098,
+      "trials": 20
+    },
+    "adult": {
+      "commanded": 0.0,
+      "uncommanded": 1.0,
+      "prediction_error_from_memory": 0.00024798134618322367,
+      "prediction_error_unchanged": 0.012034650193527341,
+      "prediction_ratio": 0.020605613141676256,
+      "trials": 20
+    },
+    "seconds": 264.9
+  }
+}

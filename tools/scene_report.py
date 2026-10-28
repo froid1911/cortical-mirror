@@ -7,10 +7,12 @@ from pathlib import Path
 
 from cortical_mirror.scene.graph import NEWBORN_PERSISTENCE, SceneGraph
 from cortical_mirror.scene.phenomena import (
+    attention_trials,
     manipulation,
     object_discovery,
     object_permanence,
     self_and_world,
+    train_attention,
     train_motor,
     train_persistence,
 )
@@ -52,11 +54,27 @@ def self_world() -> dict:
     }
 
 
+def attention() -> dict:
+    """Protocol 11: train the eye's gaze value, then test all three ways of looking."""
+
+    import torch
+
+    weights = train_attention()
+    torch.save({"weights": torch.tensor(weights)}, ADULT.with_name("scene-adult-gaze.pt"))
+    return {
+        "adult_weights": weights.round(4).tolist(),
+        "newborn": attention_trials("random"),
+        "surprise_reflex": attention_trials("surprise"),
+        "adult": attention_trials("learned", weights),
+    }
+
+
 PROTOCOLS = {
     "discovery": object_discovery,
     "manipulation": manipulation,
     "permanence": permanence,
     "self_world": self_world,
+    "attention": attention,
 }
 
 
