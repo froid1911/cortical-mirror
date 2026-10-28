@@ -1,0 +1,33 @@
+{
+  "attention": {
+    "adult_weights": [
+      -0.3032,
+      0.0539,
+      0.0164,
+      -0.1123,
+      0.1594
+    ],
+    "newborn": {
+      "policy": "random",
+      "noise_capture": 0.14576271186440679,
+      "world_error": 0.02198114711791277,
+      "time_to_novelty": 71.5,
+      "trials": 20
+    },
+    "surprise_reflex": {
+      "policy": "surprise",
+      "noise_capture": 0.6271186440677966,
+      "world_error": 0.06434654984623193,
+      "time_to_novelty": 272.0,
+      "trials": 20
+    },
+    "adult": {
+      "policy": "learned",
+      "noise_capture": 0.00847457627118644,
+      "world_error": 0.026448919903486967,
+      "time_to_novelty": 145.0,
+      "trials": 20
+    },
+    "seconds": 3012.0
+  }
+}

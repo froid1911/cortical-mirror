@@ -5,9 +5,77 @@ import json
 import time
 from pathlib import Path
 
-from cortical_mirror.scene.phenomena import manipulation, object_discovery
+from cortical_mirror.scene.graph import NEWBORN_PERSISTENCE, SceneGraph
+from cortical_mirror.scene.phenomena import (
+    attention_trials,
+    manipulation,
+    object_discovery,
+    object_permanence,
+    self_and_world,
+    train_attention,
+    train_motor,
+    train_persistence,
+)
 
-PROTOCOLS = {"discovery": object_discovery, "manipulation": manipulation}
+ADULT = Path("checkpoints/scene-adult.pt")
+
+
+def permanence() -> dict:
+    """Protocol 9: raise an adult and a magic-world control, then test all conditions."""
+
+    adult, adult_course = train_persistence()
+    magic, magic_course = train_persistence(magic=True)
+    graph = SceneGraph(persistence=adult, learn_persistence=True)
+    ADULT.parent.mkdir(parents=True, exist_ok=True)
+    graph.save(ADULT)
+    return {
+        "adult_persistence": adult,
+        "magic_persistence": magic,
+        "adult_course": adult_course,
+        "magic_course": magic_course,
+        "newborn": object_permanence(NEWBORN_PERSISTENCE),
+        "adult": object_permanence(adult),
+        "built_in": object_permanence(60.0),
+    }
+
+
+def self_world() -> dict:
+    """Protocol 12: learn a motor map, then test newborn and adult."""
+
+    import numpy as np
+    import torch
+
+    motor = train_motor()
+    torch.save({"motor": torch.tensor(motor)}, ADULT.with_name("scene-adult-eye.pt"))
+    return {
+        "adult_motor": motor.round(2).tolist(),
+        "newborn": self_and_world(np.zeros_like(motor)),
+        "adult": self_and_world(motor),
+    }
+
+
+def attention() -> dict:
+    """Protocol 11: train the eye's gaze value, then test all three ways of looking."""
+
+    import torch
+
+    weights = train_attention()
+    torch.save({"weights": torch.tensor(weights)}, ADULT.with_name("scene-adult-gaze.pt"))
+    return {
+        "adult_weights": weights.round(4).tolist(),
+        "newborn": attention_trials("random"),
+        "surprise_reflex": attention_trials("surprise"),
+        "adult": attention_trials("learned", weights),
+    }
+
+
+PROTOCOLS = {
+    "discovery": object_discovery,
+    "manipulation": manipulation,
+    "permanence": permanence,
+    "self_world": self_world,
+    "attention": attention,
+}
 
 
 def main() -> None:

@@ -151,6 +151,8 @@ DEMO_ASSETS = {
     "sample.mp4": f"{RELEASES}/v0.2.0/sample.mp4",
     # The learning cortex's adults, one per phase, each trained on hours of UCF101.
     **{f"cortex-adult-p{p}.pt": f"{RELEASES}/v0.3.0/cortex-adult-p{p}.pt" for p in (1, 2, 3)},
+    # The scene graph's adult: the persistence it learned from occlusion scenes.
+    "scene-adult.pt": f"{RELEASES}/v0.4.0/scene-adult.pt",
 }
 
 
@@ -172,6 +174,8 @@ def fetch(name: str, folder: Path) -> Path:
                 alternative = "pass --source with a video path"
             elif name.startswith("cortex-adult"):
                 alternative = "pass --adult with a checkpoint you have"
+            elif name == "scene-adult.pt":
+                alternative = "pass --newborn, or --adult with a scene checkpoint"
             else:
                 alternative = "leave out --pretrained to start untrained"
             raise SystemExit(
@@ -258,6 +262,19 @@ def twins_engine(args):
     return TwinEngine(newborn, adult)
 
 
+def scene_arguments(args) -> None:
+    if args.adult is None and not args.newborn:
+        args.adult = fetch("scene-adult.pt", args.assets)
+
+
+def scene_graph(args):
+    from .scene.graph import NEWBORN_PERSISTENCE, SceneGraph
+
+    if args.newborn:
+        return SceneGraph(persistence=NEWBORN_PERSISTENCE)
+    return SceneGraph.load(args.adult)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="cortical-mirror", description=__doc__)
     parser.add_argument("--version", action="version", version=__version__)
@@ -308,6 +325,18 @@ def main() -> None:
     twins.add_argument("--no-loop", action="store_true")
     twins.add_argument("--max-frames", type=int, default=0)
 
+    scene = commands.add_parser(
+        "scene", help="the world explained as a scene graph you can edit (v0.4)"
+    )
+    scene.add_argument(
+        "--source", default="world", help="'world' (the sprite world), a camera index or a video"
+    )
+    scene.add_argument("--adult", type=Path, help="scene adult (default: download it)")
+    scene.add_argument("--newborn", action="store_true", help="forget what it cannot see")
+    scene.add_argument("--assets", type=Path, default=Path.home() / ".cache" / "cortical-mirror")
+    scene.add_argument("--host", default="127.0.0.1")
+    scene.add_argument("--port", type=int, default=8080)
+
     offline = commands.add_parser(
         "evaluate", help="evaluate predictions against their exact target frames"
     )
@@ -318,6 +347,14 @@ def main() -> None:
     offline.add_argument("--samples", type=int, default=8)
     args = parser.parse_args()
 
+    if args.command == "scene":
+        from .scene.live import SceneLive, SpriteSource, VideoSource
+        from .scene.live import serve as serve_scene
+
+        scene_arguments(args)
+        source = SpriteSource() if args.source == "world" else VideoSource(args.source)
+        serve_scene(SceneLive(source, scene_graph(args)), args.host, args.port)
+        return
     if args.command == "twins":
         twins_arguments(args)
         serve(

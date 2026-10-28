@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scene Graph</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --black: #000;
+  --glass: rgba(26, 29, 36, 0.58);
+  --silver: #e9ecef;
+  --pewter: #9aa3ad;
+  --expect: #8fb8ff;
+  --surprise: #ffb347;
+  --rule: rgba(233, 236, 239, 0.14);
+  --font: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: var(--black); color: var(--silver); }
+body { font: 400 15px/1.45 var(--font); padding: 24px 28px 32px; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--expect); outline-offset: 3px; }
+img[data-stream] { color: transparent; }
+
+h1 { margin: 0; font-size: clamp(40px, 6vw, 84px); line-height: 0.9; font-stretch: 125%; font-weight: 300; letter-spacing: -0.035em; }
+.lede { margin: 10px 0 22px 2px; max-width: 64ch; color: var(--pewter); font-stretch: 87%; font-size: 17px; }
+.lede strong { color: var(--silver); font-weight: 600; }
+
+.stage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(240px, 0.8fr); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .stage { grid-template-columns: 1fr; } }
+figure { margin: 0; }
+.frame { position: relative; border-radius: 6px; overflow: hidden; background: var(--glass); box-shadow: 0 0 0 1px var(--rule); aspect-ratio: 4 / 3; }
+.frame img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.frame svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+figcaption { margin: 8px 2px 0; font-size: 13px; color: var(--pewter); }
+figcaption strong { color: var(--silver); font-weight: 600; font-size: 14px; }
+
+.node { cursor: grab; pointer-events: all; }
+.node circle { fill: rgba(143, 184, 255, 0.06); stroke: var(--expect); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.node.hidden circle { stroke-dasharray: 4 4; fill: none; }
+.node.deleted circle { stroke: var(--surprise); fill: rgba(255, 179, 71, 0.08); }
+.node.selected circle { stroke-width: 3; }
+.node text { fill: var(--silver); font: 600 9px var(--font); paint-order: stroke; stroke: #000; stroke-width: 3px; }
+.node:active { cursor: grabbing; }
+
+.graph { border-radius: 6px; background: var(--glass); box-shadow: 0 0 0 1px var(--rule); padding: 14px 16px; font-size: 13px; }
+.graph h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.graph ol { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
+.graph li { display: grid; grid-template-columns: 2.2em 1fr auto; gap: 8px; color: var(--pewter); }
+.graph li b { color: var(--silver); font-weight: 600; }
+.graph li .state-hidden { color: var(--expect); }
+.graph li .state-deleted { color: var(--surprise); }
+.graph .relations { color: var(--pewter); margin: 0 0 12px; }
+.graph .relations span { color: var(--silver); }
+.graph .empty { color: var(--pewter); margin: 0 0 12px; }
+
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; color: var(--pewter); }
+.keys dt { color: var(--silver); font-weight: 600; text-align: right; }
+.keys dd { margin: 0; }
+.actions { display: flex; gap: 8px; margin-top: 12px; }
+.actions button { padding: 6px 12px; border: 0; border-radius: 4px; background: rgba(233, 236, 239, 0.1); cursor: pointer; }
+.actions button:hover { background: rgba(233, 236, 239, 0.18); }
+.error { color: var(--surprise); }
+</style>
+</head>
+<body>
+<h1>Scene graph</h1>
+<p class="lede">The world explained as things: a remembered background, objects with a shape, a place, a motion and a depth. <strong>Click an object to delete it, drag it to move it.</strong> The right picture then shows the world as it would look if it were changed, while the graph keeps tracking the real thing.</p>
+
+<div class="stage">
+  <figure>
+    <div class="frame"><img data-stream="seen" alt="What the graph sees"></div>
+    <figcaption><strong>What it sees</strong></figcaption>
+  </figure>
+  <figure>
+    <div class="frame" id="explained-frame">
+      <img data-stream="explained" alt="The world as the graph explains it, with any edits">
+      <svg id="overlay" viewBox="0 0 256 192" preserveAspectRatio="none" aria-label="Objects in the graph"></svg>
+    </div>
+    <figcaption><strong>What it explains</strong> · a dashed ring is an object it believes in but cannot see</figcaption>
+  </figure>
+  <aside class="graph" aria-live="polite">
+    <h2>Objects</h2>
+    <ol id="nodes"></ol>
+    <h2>Relations</h2>
+    <p class="relations" id="edges"></p>
+    <dl class="keys">
+      <dt>Click</dt><dd>delete, or bring back</dd>
+      <dt>Drag</dt><dd>move</dd>
+      <dt>D</dt><dd>duplicate the selected object</dd>
+      <dt>R</dt><dd>undo every edit</dd>
+    </dl>
+    <div class="actions"><button type="button" id="reset">Undo every edit</button></div>
+    <p class="error" id="error" hidden></p>
+  </aside>
+</div>
+
+<script>
+const overlay = document.getElementById("overlay");
+const list = document.getElementById("nodes");
+const edgesText = document.getElementById("edges");
+const errorText = document.getElementById("error");
+let scene = { nodes: [], edges: [], edits: { deleted: [], moved: {}, duplicated: [] } };
+let selected = null;
+let drag = null;
+
+for (const img of document.querySelectorAll("img[data-stream]")) {
+  img.src = `/stream/${img.dataset.stream}.mjpg`;
+}
+
+function edit(command) {
+  return fetch("/edit", { method: "POST", body: JSON.stringify(command) })
+    .then((r) => r.json()).then((r) => { scene.edits = r.edits; draw(); });
+}
+
+function shown(node) {
+  const moved = scene.edits.moved[String(node.id)] || [0, 0];
+  return { x: node.x + moved[0], y: node.y + moved[1] };
+}
+
+function draw() {
+  const deleted = new Set(scene.edits.deleted);
+  overlay.replaceChildren();
+  list.replaceChildren();
+  for (const node of scene.nodes) {
+    const { x, y } = shown(node);
+    const r = Math.max(6, Math.sqrt(node.size / Math.PI));
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    const kind = deleted.has(node.id) ? "deleted" : node.state === "seen" ? "seen" : "hidden";
+    g.setAttribute("class", `node ${kind}${selected === node.id ? " selected" : ""}`);
+    g.setAttribute("transform", `translate(${x} ${y})`);
+    g.dataset.id = node.id;
+    g.innerHTML = `<circle r="${r}"></circle><text x="${r * 0.72}" y="${-r * 0.72}">${node.id}</text>`;
+    overlay.append(g);
+    const item = document.createElement("li");
+    const label = { seen: "in view", hidden: node.state, deleted: "deleted" }[kind];
+    item.innerHTML = `<b>${node.id}</b><span class="state-${kind}">${label}</span><span>depth ${node.depth}</span>`;
+    list.append(item);
+  }
+  if (!scene.nodes.length) {
+    const item = document.createElement("li");
+    item.className = "empty";
+    item.textContent = "Nothing moving yet: objects form from what moves together.";
+    list.append(item);
+  }
+  const words = { occludes: "in front of", moves_with: "moves with", near: "near" };
+  edgesText.innerHTML = scene.edges.length
+    ? scene.edges.map((e) => `<span>${e.from}</span> ${words[e.relation]} <span>${e.to}</span>`).join(" · ")
+    : "None yet.";
+}
+
+function toScene(event) {
+  const box = overlay.getBoundingClientRect();
+  return { x: (event.clientX - box.left) * 256 / box.width, y: (event.clientY - box.top) * 192 / box.height };
+}
+
+overlay.addEventListener("pointerdown", (event) => {
+  const g = event.target.closest(".node");
+  if (!g || event.button !== 0) return;
+  selected = Number(g.dataset.id);
+  drag = { id: selected, start: toScene(event), moved: false, element: g };
+  overlay.setPointerCapture(event.pointerId);
+  // Mark the selection in place: redrawing now would detach the element being dragged.
+  for (const other of overlay.querySelectorAll(".node.selected")) other.classList.remove("selected");
+  g.classList.add("selected");
+});
+overlay.addEventListener("pointermove", (event) => {
+  if (!drag) return;
+  const p = toScene(event);
+  if (Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > 2) drag.moved = true;
+  // Follow the pointer while dragging; the poll redraws everything once it ends.
+  const node = scene.nodes.find((n) => n.id === drag.id);
+  if (node) {
+    const { x, y } = shown(node);
+    drag.element.setAttribute("transform", `translate(${x + p.x - drag.start.x} ${y + p.y - drag.start.y})`);
+  }
+});
+function cancelDrag() { drag = null; draw(); }
+overlay.addEventListener("pointercancel", cancelDrag);
+overlay.addEventListener("lostpointercapture", () => { if (drag) cancelDrag(); });
+overlay.addEventListener("pointerup", (event) => {
+  if (!drag) return;
+  const p = toScene(event);
+  const { id, start, moved } = drag;
+  drag = null;
+  if (moved) {
+    edit({ move: id, by: [p.x - start.x, p.y - start.y] });
+  } else if (scene.edits.deleted.includes(id)) {
+    edit({ restore: id });
+  } else {
+    edit({ delete: id });
+  }
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "r" || event.key === "R") edit({ reset: true });
+  if ((event.key === "d" || event.key === "D") && selected !== null) edit({ duplicate: selected });
+});
+document.getElementById("reset").addEventListener("click", () => edit({ reset: true }));
+
+async function poll() {
+  try {
+    const next = await (await fetch("/scene.json")).json();
+    scene = next;
+    errorText.hidden = !next.error;
+    errorText.textContent = next.error || "";
+    if (!drag) draw();
+  } catch (error) {
+    errorText.hidden = false;
+    errorText.textContent = "The server stopped.";
+  }
+  setTimeout(poll, 120);
+}
+poll();
+</script>
+</body>
+</html>

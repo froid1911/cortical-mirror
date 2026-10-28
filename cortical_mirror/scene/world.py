@@ -30,10 +30,10 @@ def texture(height: int, width: int, rng: np.random.Generator) -> np.ndarray:
     return image / max(float(image.max()), 1e-6)
 
 
-def blob(rng: np.random.Generator, size: int = SPRITE) -> np.ndarray:
+def blob(rng: np.random.Generator, size: int = SPRITE, radius=(9, 18)) -> np.ndarray:
     """A random smooth shape, ``[size, size]`` bool, centred."""
 
-    radius = rng.uniform(9, 18)
+    radius = rng.uniform(*radius)
     harmonics = [(k, rng.uniform(0, 0.25), rng.uniform(0, 2 * math.pi)) for k in (2, 3, 4)]
     yy, xx = np.mgrid[:size, :size] - (size - 1) / 2
     angle = np.arctan2(yy, xx)
@@ -62,6 +62,8 @@ class SpriteWorld:
         objects: int = 3,
         occluders: int = 0,
         speed: tuple[float, float] = (0.5, 2.5),
+        occluder_width: int = 14,
+        radius: tuple[float, float] = (9, 18),
     ):
         self.width, self.height = width, height
         rng = np.random.default_rng(seed)
@@ -76,7 +78,7 @@ class SpriteWorld:
                 Thing(
                     id=index,
                     texture=surface.clip(0, 1).astype(np.float32),
-                    mask=blob(rng),
+                    mask=blob(rng, radius=radius),
                     x=float(rng.uniform(SPRITE / 2, width - SPRITE / 2)),
                     y=float(rng.uniform(SPRITE / 2, height - SPRITE / 2)),
                     vx=pace * math.cos(angle),
@@ -86,12 +88,12 @@ class SpriteWorld:
             )
         self.occluders: list[Thing] = []
         for index in range(occluders):
-            bar = np.zeros((SPRITE, SPRITE), bool)
-            bar[:, SPRITE // 2 - 7 : SPRITE // 2 + 7] = True
+            # A screen: a bright bar, as wide as asked, as tall as half the world.
+            bar = np.ones((height // 2, occluder_width), bool)
             self.occluders.append(
                 Thing(
                     id=objects + index,
-                    texture=np.full((SPRITE, SPRITE), 0.9, np.float32),
+                    texture=np.full(bar.shape, 0.9, np.float32),
                     mask=bar,
                     x=width * (index + 1) / (occluders + 1),
                     y=height / 2,
@@ -119,10 +121,11 @@ class SpriteWorld:
 
         texture_out = np.zeros((self.height, self.width), np.float32)
         mask_out = np.zeros((self.height, self.width), bool)
-        left = int(round(thing.x + offset[0])) - SPRITE // 2
-        top = int(round(thing.y + offset[1])) - SPRITE // 2
+        rows, columns = thing.mask.shape
+        left = int(round(thing.x + offset[0])) - columns // 2
+        top = int(round(thing.y + offset[1])) - rows // 2
         x0, y0 = max(left, 0), max(top, 0)
-        x1, y1 = min(left + SPRITE, self.width), min(top + SPRITE, self.height)
+        x1, y1 = min(left + columns, self.width), min(top + rows, self.height)
         if x0 < x1 and y0 < y1:
             sx, sy = x0 - left, y0 - top
             texture_out[y0:y1, x0:x1] = thing.texture[sy : sy + y1 - y0, sx : sx + x1 - x0]

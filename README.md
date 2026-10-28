@@ -4,6 +4,12 @@ A live mirror that shows what the camera will see next — and keeps learning to
 
 A small predictive-coding hierarchy predicts the next webcam frame from the frames it has already seen. Every prediction is scored only against the frame it was issued for, and that error is the only teaching signal: offline on natural video, and online, continuously, on the camera stream in front of it. Started from random weights, it begins as an exact copy of the last frame. On a person moving in front of a still camera it learns, within about a minute, to predict better than that copy; on short, generic action clips it ends about even with it.
 
+**New in v0.4:** [the world as a scene graph](#the-world-as-a-scene-graph-v04). It explains what it sees as things: a remembered background, and objects with a shape, a place, a motion and a depth. The eye is one of its nodes. Edit the graph, by deleting an object or moving it, and it renders what the world would look like then. `cortical-mirror scene` runs it in your browser.
+
+![The scene graph: what it sees beside what it explains; one object is deleted and the background behind it comes from memory](docs/images/scene-graph.gif)
+
+<sub>The sprite world. Rings are the graph's objects; a dashed ring is one it believes in but cannot see, an orange ring one deleted from the picture.</sub>
+
 **New in v0.3:** a [visual cortex that learns to see with local rules only](#a-cortex-that-learns-to-see-research-track), shown as twin mirrors. A newborn starts blank in front of your camera, beside an adult that learned with the same rules from 121 hours of video. `cortical-mirror twins` runs it.
 
 ![Twin mirrors: the newborn's cells turn from noise into edge detectors beside the adult's](docs/images/twins.gif)
@@ -256,6 +262,67 @@ Phases 2 and 3 use `--phase 2` and `--phase 3` (V2; then the eye). The three adu
 - E. N. Sokolov. *Perception and the Conditioned Reflex*. Pergamon, 1963.
 - L. Itti and P. Baldi. Bayesian surprise attracts human attention. *Vision Research* 49, 2009.
 
+## The world as a scene graph (v0.4)
+
+The cortex above predicts bitmaps. Joscha Bach's comment on it set the next step: *"Der Output sollte ein Scenegraph sein. Es geht nicht nur darum, Bitmaps vorherzusagen, sondern die Welt zu erklären, so dass man sie manipulieren kann."* That is: the output should be a scene graph; the point is not only to predict bitmaps, but to explain the world so that it can be manipulated. v0.4 adds a scene level, [`cortical_mirror/scene/`](cortical_mirror/scene/), whose state is an explicit graph:
+
+- **Background:** a canvas larger than the view, with a confidence per pixel. It is remembered where it is hidden.
+- **Objects:** each has an appearance, a soft mask, a position, a velocity, a depth rank and a belief.
+- **The eye:** its gaze, and a learned map of what each of its commands does to the view.
+- **Relations:** in front of, moves with, near.
+
+The graph renders itself back to front, and `graph.edit(move=..., delete=..., depth=..., duplicate=...)` renders a changed world.
+
+**What is innate and what is learned.** That the world holds objects at all is given: slots with a position, a velocity and a depth (object files, in Spelke's core-knowledge sense). This extends v0.3's rule on innate structure, and the design document says so. The rest is learned with local rules, with no backpropagation:
+- which pixels belong together: common fate, pixel by pixel;
+- what each object looks like: a delta rule weighted by responsibility, the online form of layered-sprite EM;
+- what stands in front of what: votes where objects overlap;
+- what stands in front of objects: occluders learned from objects disappearing behind them;
+- how long to believe in what cannot be seen: one time constant, learned from outcomes;
+- what the eye's commands do: a delta rule on the shift each command leaves unexplained;
+- where to look: a three-factor rule toward the learning progress each fixation brings.
+
+Objects are found and followed by local search around where they are expected (inference, not learning). Design: [`docs/superpowers/specs/2026-10-27-scene-graph-design.md`](docs/superpowers/specs/2026-10-27-scene-graph-design.md).
+
+### Results
+
+Protocols 8–12 were written before measuring, on synthetic sprite worlds where the truth is known; the graph never sees it. Every protocol ran once as built. Tracking behind screens was then improved, tuned on development seeds only, and every protocol ran once more on its pre-registered held-out seeds. Both runs are reported ([`reports/scene/`](reports/scene/)).
+
+| Protocol | What it asks | Verdict |
+|---|---|---|
+| [8](docs/protocols/08-object-discovery.md) Object discovery | Do nodes come to be the objects? | First run **fails** one criterion: IoU 0.79 is only 0.03 above a graph that does not learn. Second run passes: IoU 0.81 (no learning 0.31, a motion baseline 0.54), node count right 92% of the time. |
+| [9](docs/protocols/09-object-permanence.md) Object permanence | Does the adult keep a hidden object and expect it back, unlike the newborn? | **Fails for the adult** in both runs: it keeps the object in 40% and 50% of trials (needs 80%). The developmental part passes: the newborn forgets at once and is surprised only by reappearance. Persistence learned in a world where hidden things return grows to 116–127 frames, and in a world where they vanish only to 4. |
+| [10](docs/protocols/10-explanation-by-manipulation.md) Explanation by manipulation | Delete or move an object: does the graph render the world as it would be? | **Passes.** Deleting renders 0.23–0.30 × the error of cut-and-inpaint on the same pixels (it remembers what was behind); moving renders 0.48–0.53 ×. It wins on 90–96% of edits. |
+| [11](docs/protocols/11-learned-attention.md) Learned attention | Does looking for learning progress beat a surprise reflex? | **Partly fails.** The surprise reflex is captured by TV noise (63% of fixations); the learned eye almost never looks at it (0.9%, random gaze 15%). But it learned to avoid everything unknown rather than to seek what teaches: it knows the world less well than random gaze (1.2 ×) and finds a newcomer more slowly (145 vs 72 frames). |
+| [12](docs/protocols/12-self-and-world.md) Self vs world | Are its own saccades told from the world moving? | **Passes.** The adult's learned motor map is exact (32 px per saccade). It sees its own saccades as a still world (0.0) and the same shift without a command as the world moving (1.0), the eye-press effect. It predicts the coming view from memory at 0.02 × the error of "no change". The newborn sees the world jump whenever its eye moves. |
+
+**Why permanence fails.** A graph with permanence built in (τ = 60) scores exactly the same as the learned adult. So the belief is not the problem; tracking an object as it slides behind a screen it has never seen is. Where the node is kept, a vanishing object is 3–5 × as surprising as one that comes back. Low-contrast objects are lost even in plain view.
+
+**On real video** the scene level does not yet work. On the sample clip its expectation of the next frame is 1.9 × worse than repeating the last frame, and it holds about one object at a time. Real video has a moving camera, deforming people and changing light; the sprite world has none of that ([`reports/scene/v0.4-sample-video.json`](reports/scene/v0.4-sample-video.json)).
+
+### Run it
+
+```bash
+.venv/bin/cortical-mirror scene                  # the sprite world, with the adult's persistence
+.venv/bin/cortical-mirror scene --newborn        # forgets what it cannot see
+.venv/bin/cortical-mirror scene --source 0       # your camera (see above: it does not yet do well)
+
+# The protocols, and the adults they raise (CPU; about an hour in all)
+.venv/bin/python tools/scene_report.py --output reports/scene/v0.4.json
+.venv/bin/python tools/scene_report.py --protocols attention --output reports/scene/v0.4-attention.json
+```
+
+### References for the scene graph
+
+- E. S. Spelke. Principles of object perception. *Cognitive Science* 14, 1990.
+- D. Kahneman, A. Treisman and B. J. Gibbs. The reviewing of object files: object-specific integration of information. *Cognitive Psychology* 24, 1992.
+- R. Baillargeon, E. S. Spelke and S. Wasserman. Object permanence in five-month-old infants. *Cognition* 20, 1985.
+- N. Jojic and B. J. Frey. Learning flexible sprites in video layers. *CVPR*, 2001.
+- J. Y. A. Wang and E. H. Adelson. Representing moving images with layers. *IEEE Trans. Image Processing* 3, 1994.
+- H. von Helmholtz. *Handbuch der physiologischen Optik*, 1867; E. von Holst and H. Mittelstaedt. Das Reafferenzprinzip. *Naturwissenschaften* 37, 1950.
+- P.-Y. Oudeyer, F. Kaplan and V. V. Hafner. Intrinsic motivation systems for autonomous mental development. *IEEE Trans. Evolutionary Computation* 11, 2007.
+- J. Schmidhuber. Curious model-building control systems. *IJCNN*, 1991.
+
 ## Setup
 
 You need a computer with a webcam, about 1 GB of free disk space, and internet access the first time. An NVIDIA GPU is optional: without one, the mirror runs on the CPU (see [What to expect](#what-to-expect)).
@@ -327,6 +394,14 @@ Append `?view=lab` to the URL to open the lab view directly, for example on a se
 ```
 
 The adult (0.4–5 MB) is downloaded from the [v0.3.0 release](https://github.com/froid1911/cortical-mirror/releases/tag/v0.3.0) on first use. No GPU is needed: on a 24-thread laptop CPU the phase 1 twins keep up with a 25 fps clip, and the phase 3 twins run at 12 frames per second. Press N to restart the newborn, and Tab for the other views; `?view=twins` opens the twin view directly.
+
+### The scene graph
+
+```bash
+.venv/bin/cortical-mirror scene
+```
+
+Open http://127.0.0.1:8080. Click an object to delete it and drag it to move it; press D to duplicate the selected object and R to undo every edit. The adult's learned persistence (a few kilobytes) is downloaded from the [v0.4.0 release](https://github.com/froid1911/cortical-mirror/releases/tag/v0.4.0) on first use; `--newborn` needs no download. It runs on the CPU.
 
 ### Webcam on one machine, GPU on another
 
@@ -479,8 +554,12 @@ Tests cover causal counterfactuals, forward-warp direction, the group-disjoint s
 - UCF101 is not a webcam, and the hierarchy is small and runs at 256×192. Live learning is meant to adapt to one room, but that has not yet been measured on webcam footage; record a test set with `tools/record.py`.
 - From scratch, the hierarchy is briefly *worse* than persistence while its first motion estimates are wrong. Within 18–66 s of short, varied action footage it ends about even with persistence, better on 7 of 12 held-out scenes; it needs a person moving steadily in front of a still camera, like the sample clip, to pull clearly ahead within a minute.
 - Live learning needs an NVIDIA GPU. On a CPU the learner manages under one step per second.
-- There is no object permanence, explicit egomotion, or multimodal future; pixel warping and blending can soften detail.
+- The mirror has no object permanence, explicit egomotion, or multimodal future; pixel warping and blending can soften detail. The v0.4 scene level has objects and a self, but only in synthetic worlds: on real video it is worse than repeating the last frame, and its adult fails the permanence protocol.
 - The pretrained DMVFN expert is not part of the self-organizing story; ablations without it are reported.
+
+## Changes in v0.4
+
+v0.4 adds the scene level: the world explained as an editable scene graph, with objects, a remembered background, occluders, depth order, learned persistence, the eye as a node with a learned motor map, and gaze learned from learning progress. Five protocols (8–12) were written before measuring and run twice. Manipulation and self versus world pass. Discovery passes in the second run. Permanence fails for the adult. Learned attention escapes the noise trap that captures a surprise reflex, but fails at curiosity. A live page (`cortical-mirror scene`) shows the graph and lets you edit it. The v0.2 mirror and v0.3 cortex are unchanged.
 
 ## Changes in v0.3
 
