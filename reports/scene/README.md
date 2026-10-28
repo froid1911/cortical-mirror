@@ -127,3 +127,13 @@ Newborn: kept 0.0, violation ratio 0.0, pass. τ: 118 frames in the normal world
 ### On a GPU
 
 `SceneGraph(device="cuda")` (or `SCENE_DEVICE=cuda`) runs the search, 78% of the time, on a torch device. The placements are the same as on the CPU (`tests/test_scene_device.py`). On flank: 40 ms per frame on the CPU arrays, 12.9 ms on one GPU. Protocol seeds run in parallel processes (`SCENE_WORKERS`).
+
+### v0.4's protocols on v0.5's code (`v0.5-carryover.json`, same seeds, a third run)
+
+| Protocol | Result | Verdict |
+|---|---|---|
+| 8 Discovery | IoU 0.81 (frozen 0.30, motion baseline 0.54), count 0.91 | pass |
+| 10 Manipulation | delete 0.22 ×, move 0.44 × the bitmap; 94 of 100 matched | pass |
+| 12 Self vs world | commanded 0.0, uncommanded 1.0, prediction 0.02; newborn 1.0 | pass |
+
+Run on flank's GPU 3 with `SCENE_DEVICE=cuda`.
