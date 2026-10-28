@@ -8,10 +8,9 @@ fovea would land on:
 * how badly the graph has been predicting it;
 * how new the objects there are;
 * how long the fovea has already spent there;
-* the progress looking there brought before (a map that starts optimistic and is
-  raised again where something new appears).
-
-A target's value is a weighted sum of its features. After the fixation, the
+A target's value is a weighted sum of its features, plus the place's own learned
+value: the progress looking there brought before, a map that starts optimistic
+and is raised again where something new appears. After the fixation, the
 weights change by a three-factor rule: the features of the fixation just made
 (presynaptic) times a global signal, the learning progress it brought (how much
 the graph's prediction error in the fovea fell) minus the progress the weights
@@ -30,7 +29,7 @@ import numpy as np
 
 from ..cortex.eye import COMMANDS
 
-FEATURES = ("unknown", "error", "novelty", "familiar", "progress", "bias")
+FEATURES = ("unknown", "error", "novelty", "familiar", "bias")
 # The prediction error (mean squared, luminance) that counts as fully surprising.
 ERROR_SCALE = 0.02
 # Frames in the fovea a node takes to lose most of its novelty, and a place to
@@ -87,7 +86,6 @@ class Attention:
                 min(1.0, float(np.mean(graph.error[area])) / ERROR_SCALE),
                 min(1.0, novelty),
                 min(1.0, float(np.mean(graph.visits[area])) / FAMILIAR),
-                float(np.mean(graph.progress[area])),
                 1.0,
             )
         return out
@@ -102,7 +100,9 @@ class Attention:
         elif self.policy == "random":
             values = np.zeros(len(COMMANDS))
         else:
-            values = features @ self.weights
+            # The learned value of a target: its features, weighted, plus what looking
+            # at that very place has taught before (its own learned value).
+            values = features @ self.weights + self.place_values(graph)
         # Inhibition of return: places just looked at are worth less.
         for command in allowed:
             tx, ty = self._target(graph, command)
@@ -110,6 +110,14 @@ class Attention:
                 values[command] -= 1.0
         best = max(values[c] for c in allowed)
         return self.rng.choice([c for c in allowed if values[c] >= best - 1e-9])
+
+    def place_values(self, graph) -> np.ndarray:
+        half = graph.fovea_size // 2
+        out = np.zeros(len(COMMANDS))
+        for command in range(len(COMMANDS)):
+            x, y = (int(round(v)) for v in self._target(graph, command))
+            out[command] = float(np.mean(graph.progress[y - half : y + half, x - half : x + half]))
+        return out
 
     def learn(self, features: np.ndarray, progress: float) -> None:
         """Three-factor rule: the fixation's features times (progress − promise)."""

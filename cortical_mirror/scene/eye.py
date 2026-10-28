@@ -88,7 +88,7 @@ class EyeGraph:
         self.visits = np.zeros(CANVAS[::-1], np.float32)
         # The learning progress each place has brought when looked at. Optimistic at
         # first: an unexplored place is presumed to teach.
-        self.progress = np.ones(CANVAS[::-1], np.float32)
+        self.progress = np.full(CANVAS[::-1], 0.5, np.float32)
         self.fovea_errors: list[float] = []
 
     # Where the view lies on the canvas.

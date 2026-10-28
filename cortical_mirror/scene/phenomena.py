@@ -588,3 +588,45 @@ def parts_and_wholes(
     report["delete_ratio"] = rate(graph_mse) / rate(bitmap_mse) if bitmap_mse else float("nan")
     report["scenes"] = len(list(seeds))
     return report
+
+
+def lit(image: np.ndarray, t: int) -> np.ndarray:
+    """Protocol 14's slow change of light: gain and offset."""
+
+    gain = 1 + 0.4 * math.sin(2 * math.pi * t / 100)
+    offset = 0.1 * math.sin(2 * math.pi * t / 70)
+    return np.clip(gain * image + offset, 0.0, 1.0).astype(np.float32)
+
+
+def lighting(
+    fronts: dict,
+    seeds=range(7000, 7020),
+    frames: int = 300,
+    sample_from: int = 200,
+    every: int = 10,
+) -> dict:
+    """Protocol 14: discovery under changing and constant light, for each code."""
+
+    report = {}
+    for name, front in fronts.items():
+        for changing in (True, False):
+            ious, counts = [], []
+            for seed in seeds:
+                world = SpriteWorld(seed=seed, objects=3)
+                graph = SceneGraph(world.width, world.height)
+                for t in range(frames):
+                    world.step()
+                    image = lit(world.render(), t) if changing else world.render()
+                    graph.observe(front.code(image), shade=image)
+                    if t < sample_from or (t - sample_from) % every:
+                        continue
+                    truth = [o["visible"] for o in world.truth()]
+                    masks = node_masks(graph)
+                    ious.append(mean_iou(truth, masks))
+                    counts.append(float(len(masks) == len(truth)))
+            report.setdefault(name, {})["changing" if changing else "constant"] = {
+                "mean_iou": float(np.mean(ious)),
+                "count_accuracy": float(np.mean(counts)),
+            }
+    report["scenes"] = len(list(seeds))
+    return report
