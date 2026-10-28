@@ -80,3 +80,13 @@ def test_the_motion_cortex_turns_frames_into_a_velocity_field(tmp_path):
     loaded = MotionCortex.load(tmp_path / "mt.pt")
     assert torch.equal(loaded.fine.kernels, cortex.fine.kernels)
     assert torch.equal(loaded.coarse.kernels, cortex.coarse.kernels)
+
+
+def test_the_motion_cell_protocol_reports_its_three_measures():
+    from cortical_mirror.cortex.mt import MotionCortex
+    from cortical_mirror.cortex.phenomena import motion_cells
+
+    report = motion_cells(MotionCortex(types=4, seed=0, settle=5), texture_seeds=[0])
+    assert 0.0 <= report["fraction_dsi_over_half"] <= 1.0
+    assert 0 <= report["sectors_covered"] <= 8
+    assert 0.0 <= report["median_direction_error"] <= 180.0

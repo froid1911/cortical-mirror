@@ -186,6 +186,8 @@ class MotionCortex:
         before, self.previous = self.previous, now
         if before is None or before.shape != now.shape:
             return None
+        # The transition just seen, kept for measurements of the cells themselves.
+        self._last_pair = (before, now)
         height, width = gray.shape[-2:]
         if self.silenced:
             return torch.zeros(now.shape[0], 2, height, width, device=self.device)
