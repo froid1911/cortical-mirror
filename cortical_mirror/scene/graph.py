@@ -472,8 +472,9 @@ class SceneGraph:
                 self._unseen(node, visibility)
             elif visibility > 0.25 and gain > 0.002:
                 vx, vy = x - predicted[0] + node.vx, y - predicted[1] + node.vy
-                # A partly hidden node's measured motion is trusted less.
-                rate = 0.5 * min(visibility, 1.0) ** 2
+                # Motion is learned only from complete views, like shape: in a partial
+                # view the best fit lags behind whatever hides the rest.
+                rate = 0.5 * min(visibility, 1.0) ** 2 if visibility >= COMPLETE else 0.0
                 node.vx += rate * (vx - node.vx)
                 node.vy += rate * (vy - node.vy)
                 # Mostly hidden, it is where it was expected to be, more than where
