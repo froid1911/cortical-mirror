@@ -75,6 +75,7 @@ class EyeGraph:
 
         self.inner.reset()
         self.background = np.zeros(CANVAS[::-1], np.float32)
+        self.background_shade = np.zeros(CANVAS[::-1], np.float32)
         self.confidence = np.zeros(CANVAS[::-1], np.float32)
         self.front = np.zeros(CANVAS[::-1], np.float32)
         self.gaze = self.start
@@ -159,10 +160,12 @@ class EyeGraph:
         weight[h // 2 - half + 8 : h // 2 + half - 8, w // 2 - half + 8 : w // 2 + half - 8] = 1.0
         return weight * image + (1 - weight) * cv2.GaussianBlur(image, (0, 0), 3.0)
 
-    def observe(self, image: np.ndarray, command: int = 0) -> dict:
-        """One view, and the command issued just before it (the efference copy)."""
+    def observe(self, image: np.ndarray, command: int = 0, shade: np.ndarray | None = None) -> dict:
+        """One view, and the command issued just before it (the efference copy).
+        ``image`` is the code objects are matched in; ``shade`` its brightness."""
 
         image = self.foveate(_as_gray(image, *self.view))
+        shade = image if shade is None else self.foveate(_as_gray(shade, *self.view))
         self.command = command
         before = self._origin()
         planned = self.motor[command]
@@ -180,6 +183,7 @@ class EyeGraph:
             # the canvas had it at origin + remainder, so the canvas moves back by it.
             dx, dy = remainder
             self.background = _shift(self.background, -dx, -dy)
+            self.background_shade = _shift(self.background_shade, -dx, -dy)
             self.confidence = _shift(self.confidence, -dx, -dy)
             self.front = _shift(self.front, -dx, -dy)
             self.world_shift -= np.asarray(remainder, float)
@@ -190,6 +194,7 @@ class EyeGraph:
             None if self.inner.background is None else self._window(self.background, origin).copy()
         )
         if self.inner.background is not None:
+            self.inner.background_shade = self._window(self.background_shade, origin).copy()
             self.inner.confidence = self._window(self.confidence, origin).copy()
             self.inner.front = self._window(self.front, origin).copy()
         if self.inner.background is not None:
@@ -203,12 +208,13 @@ class EyeGraph:
             centre = (slice(h // 2 - half, h // 2 + half), slice(w // 2 - half, w // 2 + half))
             self.fovea_errors.append(float(miss[centre].mean()))
             self._window(self.visits, origin)[centre] += 1.0
-        result = self.inner.observe(image)
+        result = self.inner.observe(image, shade=shade)
         cx, cy = self.view[0] / 2, self.view[1] / 2
         for node in self.inner.nodes:
             if abs(node.x - cx) < self.fovea_size / 2 and abs(node.y - cy) < self.fovea_size / 2:
                 node.looked += 1
         self._window(self.background, origin)[:] = self.inner.background
+        self._window(self.background_shade, origin)[:] = self.inner.background_shade
         self._window(self.confidence, origin)[:] = self.inner.confidence
         self._window(self.front, origin)[:] = self.inner.front
         return {**result, "world_moved": (-remainder[0], -remainder[1])}

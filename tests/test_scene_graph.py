@@ -162,3 +162,20 @@ def test_shifting_by_more_than_the_size_leaves_nothing():
     from cortical_mirror.scene.graph import _shift
 
     assert not _shift(np.ones((4, 4)), 5, 0).any()
+
+
+def test_a_graph_matching_on_one_code_still_renders_brightness():
+    world = SpriteWorld(seed=1, objects=1)
+    graph = SceneGraph()
+    for _ in range(80):
+        world.step()
+        image = world.render()
+        # Matching on an inverted image stands in for any code: the picture stays brightness.
+        graph.observe(1.0 - image, shade=image)
+    assert len(graph.nodes) == 1
+    assert float(np.mean((graph.render(shade=True) - world.render()) ** 2)) < 0.002
+    assert float(np.mean((graph.render() - (1.0 - world.render())) ** 2)) < 0.002
+    node = graph.nodes[0].id
+    gone = graph.edit(delete={node}, shade=True)
+    region = world.truth()[0]["full"]
+    assert float(np.mean((gone[region] - world.background_view()[region]) ** 2)) < 0.003

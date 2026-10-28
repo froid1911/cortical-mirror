@@ -75,6 +75,8 @@ class Node:
     looked: int = 0
     # How much of it was seen in the last frame.
     visibility: float = 1.0
+    # Its brightness, for the picture, beside the code it is matched in.
+    shade: np.ndarray | None = None
 
     def displacement(self, frames: int = 5) -> tuple[float, float] | None:
         if not self.trail or len(self.trail) <= frames:
@@ -156,6 +158,7 @@ class SceneGraph:
     def reset(self) -> None:
         self.nodes: list[Node] = []
         self.background: np.ndarray | None = None
+        self.background_shade: np.ndarray | None = None
         # How sure the graph is of each background pixel: it grows where the input stays still.
         self.confidence = np.zeros((self.height, self.width), np.float32)
         self.front = np.zeros((self.height, self.width), np.float32)
@@ -179,21 +182,24 @@ class SceneGraph:
             out[placed[0]] = node.mask[placed[1]]
         return out
 
-    def render(self, nodes: list[Node] | None = None) -> np.ndarray:
-        """The graph's picture of the world, ``[H, W]`` float32 in [0, 1]."""
+    def render(self, nodes: list[Node] | None = None, shade: bool = False) -> np.ndarray:
+        """The graph's picture of the world, ``[H, W]`` float32 in [0, 1]: in the code
+        it matches in, or with ``shade`` in brightness."""
 
         if self.background is None:
             return np.zeros((self.height, self.width), np.float32)
-        image = self.background.copy()
+        background = self.background_shade if shade else self.background
+        image = background.copy()
         for node in sorted(self.nodes if nodes is None else nodes, key=lambda n: n.depth):
             placed = _place(self.width, self.height, node.x, node.y)
             if not placed:
                 continue
             world, sprite = placed
             alpha = node.mask[sprite]
-            image[world] = alpha * node.template[sprite] + (1 - alpha) * image[world]
+            surface = node.shade if shade else node.template
+            image[world] = alpha * surface[sprite] + (1 - alpha) * image[world]
         # Surfaces known to stand in front of objects hide them.
-        return self.front * self.background + (1 - self.front) * image
+        return self.front * background + (1 - self.front) * image
 
     def edit(
         self,
@@ -201,6 +207,7 @@ class SceneGraph:
         delete: set | None = None,
         depth: dict | None = None,
         duplicate: dict | None = None,
+        shade: bool = False,
     ) -> np.ndarray:
         """Render the world as it would be if changed; the graph itself is untouched."""
 
@@ -220,12 +227,12 @@ class SceneGraph:
             twin.x, twin.y = twin.x + mx + dx, twin.y + my + dy
             twin.depth = original.depth + 0.5
             nodes.append(twin)
-        return self.render(nodes)
+        return self.render(nodes, shade=shade)
 
-    def expect(self) -> np.ndarray:
+    def expect(self, shade: bool = False) -> np.ndarray:
         """The graph's picture of the next frame: every node moved on by its velocity."""
 
-        return self.edit(move={n.id: (n.vx, n.vy) for n in self.nodes})
+        return self.edit(move={n.id: (n.vx, n.vy) for n in self.nodes}, shade=shade)
 
     # Inference -----------------------------------------------------------------
 
@@ -293,14 +300,17 @@ class SceneGraph:
         known = self.confidence * (image - self.background) ** 2
         return known + (1 - self.confidence) * UNEXPLAINED
 
-    def observe(self, image: np.ndarray) -> dict:
-        """One frame of the world, gray ``[H, W]`` in [0, 1] (or uint8 BGR)."""
+    def observe(self, image: np.ndarray, shade: np.ndarray | None = None) -> dict:
+        """One frame, ``[H, W]`` in [0, 1] (or uint8 BGR): the code objects are matched
+        in, and its brightness for the picture (the same image if not given)."""
 
         image = _as_gray(image, self.width, self.height)
+        self.shade = image if shade is None else _as_gray(shade, self.width, self.height)
         self.frame_count += 1
         self.events = []
         if self.background is None:
             self.background = image.copy()
+            self.background_shade = self.shade.copy()
             self.previous = image
             self._recent = [image]
             return {"nodes": 0}
@@ -403,7 +413,10 @@ class SceneGraph:
                 # matches, so a moment out of step does not overwrite the object with
                 # whatever lies there. Never where the known background is seen.
                 rate = np.where(mask < 0.3, 0.1, 0.3 * (by_node < 0.01))
-                template += free * ~background_here * rate * (seen - template)
+                step = free * ~background_here * rate
+                template += step * (seen - template)
+                surface = node.shade[sprite]
+                surface += step * (self.shade[world] - surface)
             # A node still partly in view, whose expected pixels the background explains
             # instead: something remembered stands in front of it. Not once it is out
             # of sight: a hidden thing that fails to reappear is not explained away.
@@ -428,6 +441,7 @@ class SceneGraph:
         )
         rate = free * (0.01 + 0.25 * still)
         self.background += rate * (image - self.background)
+        self.background_shade += rate * (self.shade - self.background_shade)
 
     def _vote_depth(self, image: np.ndarray) -> None:
         for i, a in enumerate(self.nodes):
@@ -485,10 +499,12 @@ class SceneGraph:
             if self._recognise(image, x, y):
                 continue
             template = np.zeros((SPRITE, SPRITE), np.float32)
+            surface = np.zeros((SPRITE, SPRITE), np.float32)
             mask = np.zeros((SPRITE, SPRITE), np.float32)
             placed = _place(self.width, self.height, x, y)
             world, sprite = placed
             template[sprite] = image[world]
+            surface[sprite] = self.shade[world]
             mask[sprite] = 0.6 * (labels[world] == label)
             # Something appearing over a known node came out from behind it.
             overlapping = [
@@ -498,7 +514,9 @@ class SceneGraph:
                 depth = min(overlapping) - 1.0
             else:
                 depth = max((n.depth for n in self.nodes), default=0.0) + 1.0
-            self.nodes.append(Node(self._next_id, template, mask, x, y, depth=depth, origin=(x, y)))
+            self.nodes.append(
+                Node(self._next_id, template, mask, x, y, depth=depth, origin=(x, y), shade=surface)
+            )
             self.events.append({"born": self._next_id})
             self._next_id += 1
 
@@ -610,6 +628,9 @@ class SceneGraph:
             self.background[world] = (
                 alpha * node.template[sprite] + (1 - alpha) * self.background[world]
             )
+            self.background_shade[world] = (
+                alpha * node.shade[sprite] + (1 - alpha) * self.background_shade[world]
+            )
         self.events.append({"dissolved": node.id})
 
     def _absorb(self, keep: Node, gone: Node) -> None:
@@ -617,6 +638,7 @@ class SceneGraph:
         template, mask = _shift(gone.template, dx, dy), _shift(gone.mask, dx, dy)
         take = mask > keep.mask
         keep.template = np.where(take, template, keep.template)
+        keep.shade = np.where(take, _shift(gone.shade, dx, dy), keep.shade)
         keep.mask = np.maximum(keep.mask, mask)
         self._recentre(keep)
 
@@ -632,6 +654,7 @@ class SceneGraph:
         if dx == 0 and dy == 0:
             return 0, 0
         node.template = _shift(node.template, -dx, -dy)
+        node.shade = _shift(node.shade, -dx, -dy)
         node.mask = _shift(node.mask, -dx, -dy)
         node.x, node.y = node.x + dx, node.y + dy
         return dx, dy
