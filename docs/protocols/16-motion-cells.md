@@ -46,4 +46,23 @@ In v0.7, an MT level has motion cell types competing to explain how V1's activit
   - median decoding error ≤ 30°.
 - **Untrained:** fraction with DSI > 0.5 ≤ 0.1. Direction must come from experience.
 
+## Amendment after a development check, before any adult measurement (2026-10-28)
+
+A development check exposed a flaw in the direction-selectivity criterion. Compared were the untrained network and a 3-minute smoke-trained MT (the phase 1 V1 adult, textures 100–102, not the protocol's 0–9):
+- the untrained network's fraction of types with DSI > 0.5 was **0.94**;
+- the smoke network's was 0.81.
+
+The competition between types makes every type's responsibility depend strongly on direction, even when its kernel is random. The DSI of responsibilities is therefore high by construction and cannot show learning. The untrained criterion (≤ 0.1) can never hold.
+
+The other two measures showed the learning plainly:
+- sectors covered: 0 untrained, 8 after 3 minutes;
+- median decoding error: 66° untrained, 2.6° after 3 minutes.
+
+**Amended criterion** (replacing "fraction of types with DSI > 0.5"):
+
+- **Tuning agreement:** for each responsive type with a learned displacement at least 0.5 positions long, does its preferred grating direction lie within 45° of the direction of its own displacement? Grating direction θ moves the pattern along (cos θ, sin θ) in image coordinates (y down), the same frame as the displacement.
+- **Pass:** a fraction of agreeing types ≥ 0.5 in the adult. In the untrained network, types have displacements shorter than 0.5, so they do not count; its fraction is reported.
+
+The original DSI fraction is still reported for both conditions; under the original criterion the untrained condition fails. The sector and decoding criteria are unchanged.
+
 Failures are reported as failures.

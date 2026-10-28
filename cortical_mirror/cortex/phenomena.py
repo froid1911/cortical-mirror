@@ -504,9 +504,25 @@ def motion_cells(cortex, texture_seeds=range(10), frames_grating: int = 16) -> d
                 vx, vy = torch.stack(decoded).mean(0).tolist()
                 error = math.degrees(math.atan2(vy, vx) - angle)
                 errors.append(abs((error + 180) % 360 - 180))
+    # Amended criterion: does a type's preferred grating direction agree with the
+    # direction of its own learned displacement?
+    agreeing, judged = 0, 0
+    for m in range(level.types):
+        dx, dy = displacements[m].tolist()
+        if math.hypot(dx, dy) < 0.5:
+            continue
+        speed = int(curves[:, :, m].max(1).values.argmax())
+        if float(curves[speed, :, m].max()) < 0.05:
+            continue
+        judged += 1
+        preferred = 360.0 * int(curves[speed, :, m].argmax()) / directions
+        learned = math.degrees(math.atan2(dy, dx))
+        agreeing += abs((preferred - learned + 180) % 360 - 180) <= 45
     return {
         "dsi": dsi,
         "fraction_dsi_over_half": sum(v > 0.5 for v in dsi) / level.types,
+        "types_judged": judged,
+        "tuning_agreement": agreeing / judged if judged else 0.0,
         "responsive_types": len(dsi),
         "sectors_covered": len(sectors),
         "displacements": displacements.tolist(),
