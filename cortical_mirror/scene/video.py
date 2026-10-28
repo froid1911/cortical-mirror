@@ -26,11 +26,19 @@ class VideoGraph:
         front=None,
         persistence: float = 30.0,
         motion: PartMotion | None | str = "parts",
+        motion_source: str = "flow",
+        mt=None,
     ):
         self.size = size
         self.front = front or LuminanceFront()
         # v0.6: the next frame from how the graph's parts move (None: v0.5's expectation).
         self.motion = PartMotion() if motion == "parts" else motion
+        # Where the parts' motion is sensed: engineered optical flow ("flow", v0.6) or
+        # the learned motion cells of a MotionCortex ("learned", v0.7).
+        self.motion_source = motion_source
+        self.mt = mt
+        if motion_source == "learned" and mt is None:
+            raise ValueError("learned motion needs a MotionCortex (mt=...)")
         self.eye = EyeGraph(size, persistence=persistence, learn_motor=False)
         # The camera's motion, as the shift of the view's content per frame (to the
         # sub-pixel, from the frames themselves), and how far it has moved in all.
@@ -66,14 +74,35 @@ class VideoGraph:
         self.velocity += 0.5 * (content - self.velocity)
         self.travelled -= content
         recentre(self.eye)
+        sensed = self._learned_flow(gray) if self.motion_source == "learned" else None
         if self.motion is not None and self.previous is not None:
             parts = {
                 node.id: self.graph._alpha(node) > 0.5
                 for node in self.graph.nodes
                 if node.state == "seen"
             }
-            self.motion.observe(self.previous, gray, parts)
+            if self.motion_source == "learned":
+                if sensed is not None:
+                    self.motion.observe(self.previous, gray, parts, flow=sensed)
+            else:
+                self.motion.observe(self.previous, gray, parts)
         self.previous, self._previous_code = gray, code
+
+    def _learned_flow(self, gray: np.ndarray) -> np.ndarray | None:
+        """The motion MT's cells sense, ``[H, W, 2]`` in this graph's pixels."""
+
+        import torch
+        from torch.nn import functional as F
+
+        from ..cortex.engine import RETINA_SIZE
+
+        small = cv2.resize(gray, RETINA_SIZE, interpolation=cv2.INTER_AREA)
+        velocity = self.mt.step(torch.from_numpy(small)[None, None], learn=False)
+        if velocity is None:
+            return None
+        scale = self.size[0] / RETINA_SIZE[0]
+        velocity = F.interpolate(velocity, size=self.size[::-1], mode="bilinear") * scale
+        return velocity[0].permute(1, 2, 0).cpu().numpy().astype(np.float32)
 
     def expect(self) -> np.ndarray:
         """The next frame, ``[H, W]`` brightness."""

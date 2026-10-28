@@ -8,6 +8,7 @@ split while developing; the test split is the protocol.
 import argparse
 import functools
 import json
+import os
 import random
 import time
 from pathlib import Path
@@ -51,11 +52,30 @@ def part_motion():
     return VideoGraph(front=NormalisedFront())
 
 
+MT_CHECKPOINT = os.environ.get("SCENE_MT")
+
+
+def learned_motion(silenced: bool = False):
+    """v0.7: part motion read from learned MT cells (protocol 17)."""
+
+    from cortical_mirror.cortex.mt import MotionCortex
+
+    cortex = MotionCortex.load(MT_CHECKPOINT)
+    cortex.silenced = silenced
+    return VideoGraph(front=NormalisedFront(), motion_source="learned", mt=cortex)
+
+
+def mt_silenced():
+    return learned_motion(silenced=True)
+
+
 CONDITIONS = {
     "v0.4": Plain,
     "registration_luminance": registration_luminance,
     "registration_normalised": registration_normalised,
     "part_motion": part_motion,
+    "learned_motion": learned_motion,
+    "mt_silenced": mt_silenced,
 }
 
 
@@ -86,15 +106,23 @@ def main() -> None:
     parser.add_argument("--scored-from", type=int, default=50)
     parser.add_argument("--seed", type=int, default=0, help="which clips are drawn")
     parser.add_argument(
-        "--exclude-seed", type=int, help="leave out the clips another seed drew (fresh clips)"
+        "--exclude-seed",
+        type=int,
+        action="append",
+        help="leave out the clips another seed drew (fresh clips); may be repeated",
     )
     parser.add_argument("--conditions", help="comma-separated; default: all")
+    parser.add_argument("--mt", type=Path, help="MT adult, for the learned-motion conditions")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
+    if args.mt:
+        # Read by the worker processes, which build their own conditions.
+        os.environ["SCENE_MT"] = str(args.mt)
+        globals()["MT_CHECKPOINT"] = str(args.mt)
     videos = sorted(getattr(split_videos(args.data), args.split))
-    if args.exclude_seed is not None:
-        used = set(random.Random(args.exclude_seed).sample(videos, min(args.videos, len(videos))))
+    for excluded in args.exclude_seed or []:
+        used = set(random.Random(excluded).sample(videos, min(args.videos, len(videos))))
         videos = [v for v in videos if v not in used]
     chosen = random.Random(args.seed).sample(videos, min(args.videos, len(videos)))
     report = {"split": args.split, "seed": args.seed, "videos": [v.name for v in chosen]}
