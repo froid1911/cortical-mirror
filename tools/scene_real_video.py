@@ -35,14 +35,27 @@ class Plain:
         return self.graph.expect(shade=True)
 
 
+def registration_luminance():
+    return VideoGraph(motion=None)
+
+
 def registration_normalised():
+    """v0.5: camera registration, the normalised code, the graph's own expectation."""
+
+    return VideoGraph(front=NormalisedFront(), motion=None)
+
+
+def part_motion():
+    """v0.6: the next frame from the smoothed affine motion of the graph's parts."""
+
     return VideoGraph(front=NormalisedFront())
 
 
 CONDITIONS = {
     "v0.4": Plain,
-    "registration_luminance": VideoGraph,
+    "registration_luminance": registration_luminance,
     "registration_normalised": registration_normalised,
+    "part_motion": part_motion,
 }
 
 
@@ -71,13 +84,22 @@ def main() -> None:
     parser.add_argument("--videos", type=int, default=40)
     parser.add_argument("--frames", type=int, default=150)
     parser.add_argument("--scored-from", type=int, default=50)
+    parser.add_argument("--seed", type=int, default=0, help="which clips are drawn")
+    parser.add_argument(
+        "--exclude-seed", type=int, help="leave out the clips another seed drew (fresh clips)"
+    )
+    parser.add_argument("--conditions", help="comma-separated; default: all")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
     videos = sorted(getattr(split_videos(args.data), args.split))
-    chosen = random.Random(0).sample(videos, min(args.videos, len(videos)))
-    report = {"split": args.split, "videos": [v.name for v in chosen]}
-    for name in CONDITIONS:
+    if args.exclude_seed is not None:
+        used = set(random.Random(args.exclude_seed).sample(videos, min(args.videos, len(videos))))
+        videos = [v for v in videos if v not in used]
+    chosen = random.Random(args.seed).sample(videos, min(args.videos, len(videos)))
+    report = {"split": args.split, "seed": args.seed, "videos": [v.name for v in chosen]}
+    names = args.conditions.split(",") if args.conditions else list(CONDITIONS)
+    for name in names:
         started = time.time()
         clips = seed_map(
             functools.partial(

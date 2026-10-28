@@ -16,12 +16,21 @@ import numpy as np
 from .eye import EyeGraph, recentre
 from .front import LuminanceFront
 from .graph import _as_gray
+from .motion import PartMotion
 
 
 class VideoGraph:
-    def __init__(self, size: tuple[int, int] = (256, 192), front=None, persistence: float = 30.0):
+    def __init__(
+        self,
+        size: tuple[int, int] = (256, 192),
+        front=None,
+        persistence: float = 30.0,
+        motion: PartMotion | None | str = "parts",
+    ):
         self.size = size
         self.front = front or LuminanceFront()
+        # v0.6: the next frame from how the graph's parts move (None: v0.5's expectation).
+        self.motion = PartMotion() if motion == "parts" else motion
         self.eye = EyeGraph(size, persistence=persistence, learn_motor=False)
         # The camera's motion, as the shift of the view's content per frame (to the
         # sub-pixel, from the frames themselves), and how far it has moved in all.
@@ -57,6 +66,13 @@ class VideoGraph:
         self.velocity += 0.5 * (content - self.velocity)
         self.travelled -= content
         recentre(self.eye)
+        if self.motion is not None and self.previous is not None:
+            parts = {
+                node.id: self.graph._alpha(node) > 0.5
+                for node in self.graph.nodes
+                if node.state == "seen"
+            }
+            self.motion.observe(self.previous, gray, parts)
         self.previous, self._previous_code = gray, code
 
     def expect(self) -> np.ndarray:
@@ -64,6 +80,8 @@ class VideoGraph:
 
         if self.previous is None:
             return np.zeros(self.size[::-1], np.float32)
+        if self.motion is not None:
+            return self.motion.predict(self.previous)
         graph = self.graph
         explained = graph.confidence > 0.5
         for node in graph.nodes:
