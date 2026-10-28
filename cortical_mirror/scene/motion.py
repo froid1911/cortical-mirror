@@ -65,11 +65,15 @@ class PartMotion:
     def ready(self) -> bool:
         return bool(self.regions)
 
-    def observe(self, previous: np.ndarray, now: np.ndarray, parts: dict) -> None:
+    def observe(
+        self, previous: np.ndarray, now: np.ndarray, parts: dict, flow: np.ndarray | None = None
+    ) -> None:
         """Fit every part's motion from ``previous`` to ``now``. ``parts`` maps an
-        object node's id to its region (a boolean mask) in ``now``."""
+        object node's id to its region (a boolean mask) in ``now``. ``flow`` is the
+        motion sensed (``[H, W, 2]``); without it, optical flow is used."""
 
-        flow = dense_flow(previous, now)
+        if flow is None:
+            flow = dense_flow(previous, now)
         h, w = now.shape
         claimed = np.zeros((h, w), bool)
         regions = {}

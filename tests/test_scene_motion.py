@@ -54,3 +54,29 @@ def test_the_video_graph_predicts_from_part_motion_by_default():
 
     assert VideoGraph().motion is not None
     assert VideoGraph(motion=None).motion is None
+
+
+def test_part_motion_can_use_a_given_flow():
+    a = np.zeros((40, 40), np.float32)
+    a[10:20, 10:20] = 1.0
+    b = np.roll(a, 3, axis=1)
+    flow = np.zeros((40, 40, 2), np.float32)
+    flow[..., 0] = 3.0
+    motion = PartMotion(strength=1.0, history=1)
+    motion.observe(a, b, parts={}, flow=flow)
+    predicted = motion.predict(b)
+    future = np.roll(b, 3, axis=1)
+    assert np.abs(predicted - future).mean() < np.abs(b - future).mean()
+
+
+def test_a_video_graph_with_silenced_learned_motion_predicts_no_motion():
+    from cortical_mirror.cortex.mt import MotionCortex
+    from cortical_mirror.scene.video import VideoGraph
+
+    cortex = MotionCortex(types=4, seed=0, settle=5)
+    cortex.silenced = True
+    graph = VideoGraph(motion_source="learned", mt=cortex)
+    images = [image for image, *_ in frames(8)]
+    for image in images[:-1]:
+        graph.observe(image)
+    assert np.allclose(graph.expect(), images[-2], atol=1e-4)

@@ -153,6 +153,8 @@ DEMO_ASSETS = {
     **{f"cortex-adult-p{p}.pt": f"{RELEASES}/v0.3.0/cortex-adult-p{p}.pt" for p in (1, 2, 3)},
     # The scene graph's adult: the persistence it learned from occlusion scenes.
     "scene-adult.pt": f"{RELEASES}/v0.4.0/scene-adult.pt",
+    # The motion cells MT learned from video (v0.7), with the V1 they read.
+    "mt-adult.pt": f"{RELEASES}/v0.7.0/mt-adult.pt",
 }
 
 
@@ -176,6 +178,8 @@ def fetch(name: str, folder: Path) -> Path:
                 alternative = "pass --adult with a checkpoint you have"
             elif name == "scene-adult.pt":
                 alternative = "pass --newborn, or --adult with a scene checkpoint"
+            elif name == "mt-adult.pt":
+                alternative = "pass --motion flow, or --mt with a motion checkpoint"
             else:
                 alternative = "leave out --pretrained to start untrained"
             raise SystemExit(
@@ -265,6 +269,9 @@ def twins_engine(args):
 def scene_arguments(args) -> None:
     if args.adult is None and not args.newborn:
         args.adult = fetch("scene-adult.pt", args.assets)
+    learned = getattr(args, "motion", "flow") == "learned" and args.source != "world"
+    if learned and getattr(args, "mt", None) is None:
+        args.mt = fetch("mt-adult.pt", args.assets)
 
 
 def scene_graph(args):
@@ -333,6 +340,13 @@ def main() -> None:
     )
     scene.add_argument("--adult", type=Path, help="scene adult (default: download it)")
     scene.add_argument("--newborn", action="store_true", help="forget what it cannot see")
+    scene.add_argument(
+        "--motion",
+        choices=("learned", "flow"),
+        default="learned",
+        help="for a camera or video: motion from learned MT cells (v0.7) or optical flow (v0.6)",
+    )
+    scene.add_argument("--mt", type=Path, help="MT adult (default: download it)")
     scene.add_argument("--assets", type=Path, default=Path.home() / ".cache" / "cortical-mirror")
     scene.add_argument(
         "--device",
@@ -374,7 +388,18 @@ def main() -> None:
         else:
             # A camera or a video: register the camera's own motion, and match in the
             # normalised code, which ignores changes of exposure.
-            video = VideoGraph(front=NormalisedFront(), persistence=scene_graph(args).persistence)
+            persistence = scene_graph(args).persistence
+            if args.motion == "learned":
+                from .cortex.mt import MotionCortex
+
+                video = VideoGraph(
+                    front=NormalisedFront(),
+                    persistence=persistence,
+                    motion_source="learned",
+                    mt=MotionCortex.load(args.mt),
+                )
+            else:
+                video = VideoGraph(front=NormalisedFront(), persistence=persistence)
             state = SceneLive(VideoSource(args.source), video=video)
         serve_scene(state, args.host, args.port)
         return

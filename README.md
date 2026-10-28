@@ -4,6 +4,8 @@ A live mirror that shows what the camera will see next — and keeps learning to
 
 A small predictive-coding hierarchy predicts the next webcam frame from the frames it has already seen. Every prediction is scored only against the frame it was issued for, and that error is the only teaching signal: offline on natural video, and online, continuously, on the camera stream in front of it. Started from random weights, it begins as an exact copy of the last frame. On a person moving in front of a still camera it learns, within about a minute, to predict better than that copy; on short, generic action clips it ends about even with it.
 
+**New in v0.7:** [motion, learned](#v07-motion-learned). Motion cells learn from video, with no motion detector built in. On fresh UCF101 test clips, real video is now predicted from motion the cortex itself learned: 0.88 × the error of repeating the last frame. Silencing those cells removes all motion from the prediction.
+
 **New in v0.6:** [real video, predicted from moving parts](#v06-real-video-from-moving-parts). On fresh UCF101 test clips the scene level now predicts the next frame at 0.77 × the error of repeating the last frame, better on 95% of clips. The adult also keeps hidden objects. Much of this rests on engineered parts, labelled as such below. v0.7 turns back to learning them.
 
 **New in v0.5:** [parts and wholes, light, real video and a GPU](#v05-parts-and-wholes-light-real-video-gpu). Pieces that move together become one creature you can delete in one click. Objects survive changes of light, the camera's own motion is registered away, and the graph's search runs on a GPU. Of the five v0.5 protocol runs, one passes and four fail; see the table.
@@ -384,6 +386,36 @@ Learned with local rules are each object's appearance and shape, depth order, bi
 
 v0.7 starts replacing the scaffolding with learned representations, beginning with motion: direction-selective cells in the cortex, which failed to emerge in v0.3, in place of optical flow.
 
+### v0.7: motion, learned
+
+v0.6 predicted real video from engineered optical flow. v0.7 replaces it with motion the cortex learns ([design](docs/superpowers/specs/2026-10-28-v0.7-design.md)).
+
+**Why v0.3 failed at motion.** Its V1 learned identical weights for the current and the previous frame (cosine similarity 0.997–1.000), so its cells were blind to direction by construction ([diagnosis](reports/cortex/README.md)). Every mechanism in the literature that does produce direction selectivity has something asymmetric in time.
+
+**What v0.7 does:**
+- **A new level, MT, of 16 motion cell types** (at two scales) above the frozen V1 adult.
+- **Each type is a guess about where activity goes next:** one non-negative spatial kernel.
+- **Competition and learning:**
+  - at every place, the types compete to explain how V1's activity changed from one frame to the next;
+  - each learns, by a local delta rule weighted by its responsibility, toward the future.
+- **A newborn's types all say "nothing moves",** with tiny random differences.
+
+Within minutes of video the types specialise into all eight compass directions and two speeds, plus "still". What a type means is read from its own kernel, and the population of types gives a velocity at every place. That velocity replaces optical flow in the scene graph's part motion.
+
+| Protocol | Verdict |
+|---|---|
+| [16](docs/protocols/16-motion-cells.md) Motion cells | **Two of three pass.** The adult's types cover all 8 directions (untrained: none), and they decode a texture's direction to within 1.4° (untrained: 67°). Fails: each type's preferred *grating* direction lies about 60° off its own learned direction. That is the aperture problem: slow gratings cannot show the direction of cells tuned to fast motion. The criterion was amended before the adult measurement, because the original one is met by random cells by construction; both are reported. |
+| [17](docs/protocols/17-learned-motion-used.md) Learned motion used | **Passes.** On 40 fresh test clips, learned motion predicts at 0.878 × the error of repeating the last frame, better on 88% of clips. Silenced, it is exactly 1.000. Engineered flow, the yardstick, reaches 0.822. |
+
+The learned path contains no engineered motion detector. Phase correlation still aligns the graph's canvas, as labelled scaffolding outside the prediction.
+
+```bash
+.venv/bin/cortical-mirror scene --source 0                 # learned motion (downloads the MT adult)
+.venv/bin/cortical-mirror scene --source 0 --motion flow   # v0.6's optical flow
+.venv/bin/python tools/train_mt.py --data data/ucf101/UCF-101 --v1 checkpoints/cortex-adult-p1.pt \
+  --hours 2 --output checkpoints/mt-adult.pt --log reports/cortex/train-mt.jsonl
+```
+
 ### References for the scene graph
 
 - E. S. Spelke. Principles of object perception. *Cognitive Science* 14, 1990.
@@ -396,6 +428,9 @@ v0.7 starts replacing the scaffolding with learned representations, beginning wi
 - J. Schmidhuber. Curious model-building control systems. *IJCNN*, 1991.
 - P. J. Kellman and E. S. Spelke. Perception of partly occluded objects in infancy. *Cognitive Psychology* 15, 1983.
 - E. H. Land and J. J. McCann. Lightness and retinex theory. *JOSA* 61, 1971.
+- E. H. Adelson and J. R. Bergen. Spatiotemporal energy models for the perception of motion. *JOSA A* 2, 1985.
+- R. P. N. Rao and T. J. Sejnowski. Spike-timing-dependent Hebbian plasticity as temporal difference learning. *Neural Computation* 13, 2001.
+- Y. Li, D. Fitzpatrick and L. E. White. The development of direction selectivity in ferret visual cortex requires early visual experience. *Nature Neuroscience* 9, 2006.
 
 ## Setup
 
@@ -630,6 +665,10 @@ Tests cover causal counterfactuals, forward-warp direction, the group-disjoint s
 - Live learning needs an NVIDIA GPU. On a CPU the learner manages under one step per second.
 - The mirror has no object permanence, explicit egomotion, or multimodal future; pixel warping and blending can soften detail. The v0.4 scene level has objects and a self, but only in synthetic worlds: on real video it is worse than repeating the last frame, and its adult fails the permanence protocol.
 - The pretrained DMVFN expert is not part of the self-organizing story; ablations without it are reported.
+
+## Changes in v0.7
+
+v0.7 learns motion. A new MT level of motion cells competes to explain V1's transitions and learns toward the future; their velocity replaces optical flow in predicting real video. Learned motion predicts fresh UCF101 clips at 0.88 × repeating the last frame (engineered flow: 0.82), and silencing it removes all motion. The motion cells cover all directions and decode direction to 1.4°, but their grating tuning fails (the aperture problem). `cortical-mirror scene --source 0` uses learned motion by default.
 
 ## Changes in v0.6
 

@@ -106,3 +106,24 @@ def test_the_scene_graph_takes_the_adults_persistence(tmp_path):
 
 def test_the_scene_adult_has_a_download():
     assert "scene-adult.pt" in cli.DEMO_ASSETS
+
+
+def test_a_camera_scene_downloads_the_learned_motion_cells(monkeypatch):
+    fetched = []
+    monkeypatch.setattr(cli, "fetch", lambda name, folder: fetched.append(name) or folder / name)
+    args = Namespace(
+        adult=None, newborn=False, assets=Path("/assets"), source="0", motion="learned", mt=None
+    )
+    cli.scene_arguments(args)
+    assert fetched == ["scene-adult.pt", "mt-adult.pt"]
+    assert args.mt == Path("/assets/mt-adult.pt")
+
+
+def test_engineered_flow_needs_no_motion_cells(monkeypatch):
+    fetched = []
+    monkeypatch.setattr(cli, "fetch", lambda name, folder: fetched.append(name) or folder / name)
+    args = Namespace(
+        adult=None, newborn=True, assets=Path("/assets"), source="0", motion="flow", mt=None
+    )
+    cli.scene_arguments(args)
+    assert fetched == []

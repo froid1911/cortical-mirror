@@ -448,3 +448,84 @@ def habituation_of_orienting(
             "gaze": _gaze_statistics(decisions),
         }
     return report
+
+
+@torch.no_grad()
+def motion_cells(cortex, texture_seeds=range(10), frames_grating: int = 16) -> dict:
+    """Protocol 16. Direction selectivity of MT's types on drifting gratings, the
+    compass directions their learned displacements cover, and the direction error
+    of the decoded velocity on translating textures."""
+
+    level, directions, period = cortex.fine, 12, 8.0
+    rows, cols = slice(HEIGHT // 4 - 6, HEIGHT // 4 + 6), slice(WIDTH // 4 - 8, WIDTH // 4 + 8)
+    curves = torch.zeros(2, directions, level.types)
+    for s, speed in enumerate((1.0, 2.0)):
+        for d in range(directions):
+            angle = 360.0 * d / directions
+            cortex.reset()
+            seen = []
+            for t in range(frames_grating):
+                frame = grating(angle, -2 * math.pi * speed * t / period, period)
+                cortex.step(frame, learn=False)
+                if t >= 3:
+                    before = cortex._last_pair
+                    r = level.responsibilities(*before)
+                    seen.append(r[0, :, rows, cols].mean((1, 2)).cpu())
+            curves[s, d] = torch.stack(seen).mean(0)
+    dsi = []
+    for m in range(level.types):
+        speed = int(curves[:, :, m].max(1).values.argmax())
+        curve = curves[speed, :, m]
+        best = int(curve.argmax())
+        if float(curve[best]) < 0.05:
+            continue
+        dsi.append(direction_index(float(curve[best]), float(curve[(best + 6) % 12])))
+    displacements = level.displacements().cpu()
+    long = displacements[displacements.norm(dim=1) >= 0.5]
+    sectors = {
+        int(((math.degrees(math.atan2(float(dy), float(dx))) + 22.5) % 360) // 45)
+        for dx, dy in long
+    }
+    errors = []
+    for seed in texture_seeds:
+        image = _texture(96 + 100, 128 + 100, seed)
+        for k in range(8):
+            angle = 2 * math.pi * k / 8
+            for speed in (1.0, 2.0, 4.0):
+                cortex.reset()
+                decoded = []
+                for t in range(20):
+                    dx, dy = speed * t * math.cos(angle), speed * t * math.sin(angle)
+                    x0, y0 = int(round(50 - dx)), int(round(50 - dy))
+                    x0, y0 = min(max(x0, 0), 100), min(max(y0, 0), 100)
+                    v = cortex.step(image[..., y0 : y0 + 96, x0 : x0 + 128], learn=False)
+                    if v is not None and t >= 3:
+                        decoded.append(v[0, :, 24:72, 32:96].mean((1, 2)).cpu())
+                vx, vy = torch.stack(decoded).mean(0).tolist()
+                error = math.degrees(math.atan2(vy, vx) - angle)
+                errors.append(abs((error + 180) % 360 - 180))
+    # Amended criterion: does a type's preferred grating direction agree with the
+    # direction of its own learned displacement?
+    agreeing, judged = 0, 0
+    for m in range(level.types):
+        dx, dy = displacements[m].tolist()
+        if math.hypot(dx, dy) < 0.5:
+            continue
+        speed = int(curves[:, :, m].max(1).values.argmax())
+        if float(curves[speed, :, m].max()) < 0.05:
+            continue
+        judged += 1
+        preferred = 360.0 * int(curves[speed, :, m].argmax()) / directions
+        learned = math.degrees(math.atan2(dy, dx))
+        agreeing += abs((preferred - learned + 180) % 360 - 180) <= 45
+    return {
+        "dsi": dsi,
+        "fraction_dsi_over_half": sum(v > 0.5 for v in dsi) / level.types,
+        "types_judged": judged,
+        "tuning_agreement": agreeing / judged if judged else 0.0,
+        "responsive_types": len(dsi),
+        "sectors_covered": len(sectors),
+        "displacements": displacements.tolist(),
+        "median_direction_error": float(torch.tensor(errors).median()),
+        "curves": curves.tolist(),
+    }
