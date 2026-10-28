@@ -237,3 +237,13 @@ The adult now keeps hidden objects and knows where they are: v0.5 kept 0.55, v0.
 | Creature delete ≤ 0.75 × bitmap | 1.09 × (3 creatures) | **fail** |
 
 Grouping did not improve. Deleting a creature is now worse than the bitmap, but only 3 creatures were fully matched (v0.5: 9), so that number rests on very few cases.
+
+### v0.4's protocols on v0.6's code (`v0.6-carryover.json`, same seeds as before)
+
+| Protocol | Result | Verdict |
+|---|---|---|
+| 8 Discovery | IoU 0.82 (frozen 0.30, motion baseline 0.54), counts right 0.94 | pass |
+| 10 Manipulation | delete 0.21 ×, move 0.43 × the bitmap; 96 of 100 matched | pass |
+| 12 Self vs world | commanded 0.0, uncommanded 1.0, prediction 0.02; newborn 1.0 | pass |
+
+Run on flank's GPU 3. The first attempt crashed at its last step (the checkpoint folder was missing in a fresh worktree) and was re-run in full.

@@ -372,7 +372,7 @@ SCENE_WORKERS=20 SCENE_DEVICE=cuda .venv/bin/python tools/scene_report.py --prot
 | [15](docs/protocols/15-real-video.md) Real video | **Passes.** 0.77 × the error of repeating the last frame on 40 fresh test clips, better on 95% of them; v0.5's prediction scored 0.905 on the same clips. |
 | [9](docs/protocols/09-object-permanence.md) Permanence | **Fails one criterion.** The adult keeps hidden objects (0.80) and knows where they are (3.7 px). Its surprise when one fails to reappear is 1.2 × its surprise when one returns; the protocol needs 2 ×. |
 | [13](docs/protocols/13-parts-and-wholes.md) Parts and wholes | **Fails.** Recall 0.60; deleting a creature is 1.09 × the bitmap's error, on only 3 creatures. |
-| 8, 10, 12 re-run | CARRY_V06 |
+| 8, 10, 12 re-run | **All pass:** discovery IoU 0.82 with node counts right 94% of the time; deleting an object 0.21 ×, moving it 0.43 × the bitmap's error; self vs world unchanged. |
 
 **What is engineered, and what is learned.** The goal is a cortex that learns. These parts of the scene level are engineered scaffolding, kept as a baseline until learned ones replace them:
 - dense optical flow (Farnebäck) as motion sensing;
