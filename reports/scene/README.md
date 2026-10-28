@@ -197,3 +197,43 @@ A single filtered estimate gains a little permanence and loses discovery, so it 
 | Discovery IoU / counts right | 0.81 / 0.91 | 0.56 / 0.28 |
 
 The node's position, the mean of its hypotheses, jitters from frame to frame. Shape learning then fails and nodes fragment. The code stays on branch `feat/v0.6-particles` and is not merged.
+
+## v0.6
+
+The design and its amendment (made before any test measurement) are in `docs/superpowers/specs/2026-10-28-v0.6-design.md`. Two changes:
+
+- **Part motion:** the next frame is predicted from the smoothed affine motion of the graph's parts (object nodes, and background blocks).
+- **Velocity from complete views:** an established node's velocity, like its shape, is learned only from complete views.
+
+### Protocol 15: real video (`v0.6-real-video.json`, 40 fresh UCF101 test clips, seed 1, excluding v0.5's)
+
+| Condition | Expectation ÷ last frame | Clips better than the last frame |
+|---|---|---|
+| v0.4 graph | 5.18 | 0% |
+| v0.5, registration, brightness | 0.91 | 45% |
+| v0.5, registration, normalised | 0.905 | 45% |
+| **v0.6, part motion** | **0.765** | **95%** |
+
+**Passes** (below 0.95). These clips are easier than v0.5's: v0.5's own prediction scores 0.905 here, against 1.04 on its clips. The fair comparison is on the same clips: part motion 0.765 against 0.905, about 15% less error, and better than the last frame on 95% of clips against 45%.
+
+### Protocol 9: permanence (`v0.6-permanence.json`, seeds 3040–3059, adult raised afresh)
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| Adult kept ≥ 0.8 | 0.80 | pass |
+| Adult median position error ≤ 4 px | 3.7 | pass |
+| Adult violation ratio ≥ 2 | 1.19 | **fail** |
+| Newborn kept ≤ 0.2, violation ratio < 1 | 0.0, 0.0 | pass |
+| Magic-world τ < half the adult's | 3.9 vs 112.7 | pass |
+
+The adult now keeps hidden objects and knows where they are: v0.5 kept 0.55, v0.4 0.40–0.50. It is surprised when one fails to reappear, but not twice as surprised as when it comes back.
+
+### Protocol 13: parts and wholes (`v0.6-parts.json`, seeds 6020–6039)
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| Grouping recall ≥ 0.7 | 0.60 | **fail** |
+| Grouping specificity ≥ 0.9 | 0.94 | pass |
+| Creature delete ≤ 0.75 × bitmap | 1.09 × (3 creatures) | **fail** |
+
+Grouping did not improve. Deleting a creature is now worse than the bitmap, but only 3 creatures were fully matched (v0.5: 9), so that number rests on very few cases.

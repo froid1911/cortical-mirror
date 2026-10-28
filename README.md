@@ -4,6 +4,8 @@ A live mirror that shows what the camera will see next — and keeps learning to
 
 A small predictive-coding hierarchy predicts the next webcam frame from the frames it has already seen. Every prediction is scored only against the frame it was issued for, and that error is the only teaching signal: offline on natural video, and online, continuously, on the camera stream in front of it. Started from random weights, it begins as an exact copy of the last frame. On a person moving in front of a still camera it learns, within about a minute, to predict better than that copy; on short, generic action clips it ends about even with it.
 
+**New in v0.6:** [real video, predicted from moving parts](#v06-real-video-from-moving-parts). On fresh UCF101 test clips the scene level now predicts the next frame at 0.77 × the error of repeating the last frame, better on 95% of clips. The adult also keeps hidden objects. Much of this rests on engineered parts, labelled as such below. v0.7 turns back to learning them.
+
 **New in v0.5:** [parts and wholes, light, real video and a GPU](#v05-parts-and-wholes-light-real-video-gpu). Pieces that move together become one creature you can delete in one click. Objects survive changes of light, the camera's own motion is registered away, and the graph's search runs on a GPU. Of the five v0.5 protocol runs, one passes and four fail; see the table.
 
 **New in v0.4:** [the world as a scene graph](#the-world-as-a-scene-graph-v04). It explains what it sees as things: a remembered background, and objects with a shape, a place, a motion and a depth. The eye is one of its nodes. Edit the graph, by deleting an object or moving it, and it renders what the world would look like then. `cortical-mirror scene` runs it in your browser.
@@ -355,6 +357,33 @@ SCENE_WORKERS=20 SCENE_DEVICE=cuda .venv/bin/python tools/scene_report.py --prot
 .venv/bin/python tools/scene_real_video.py --data data/ucf101/UCF-101 --split test --output reports/scene/v0.5-real-video.json
 ```
 
+### v0.6: real video from moving parts
+
+- **Moving parts:**
+  - Each object node in view, and each block of background, gets an affine motion fitted to dense optical flow.
+  - Each part's motion is averaged over three frames and carried forward at half strength.
+  - Why: a headroom measurement (`tools/video_headroom.py`) showed that raw motion does not continue in real video but smoothed motion does, and that affine motion per region gets almost all of what dense flow gets.
+- **Velocity from complete views:**
+  - A case-by-case diagnosis of the lost hidden objects showed that a node's velocity decayed while its object slid behind a screen.
+  - An established node's velocity, like its shape, is now learned only from complete views.
+
+| Protocol | Verdict |
+|---|---|
+| [15](docs/protocols/15-real-video.md) Real video | **Passes.** 0.77 × the error of repeating the last frame on 40 fresh test clips, better on 95% of them; v0.5's prediction scored 0.905 on the same clips. |
+| [9](docs/protocols/09-object-permanence.md) Permanence | **Fails one criterion.** The adult keeps hidden objects (0.80) and knows where they are (3.7 px). Its surprise when one fails to reappear is 1.2 × its surprise when one returns; the protocol needs 2 ×. |
+| [13](docs/protocols/13-parts-and-wholes.md) Parts and wholes | **Fails.** Recall 0.60; deleting a creature is 1.09 × the bitmap's error, on only 3 creatures. |
+| 8, 10, 12 re-run | CARRY_V06 |
+
+**What is engineered, and what is learned.** The goal is a cortex that learns. These parts of the scene level are engineered scaffolding, kept as a baseline until learned ones replace them:
+- dense optical flow (Farnebäck) as motion sensing;
+- the object slots and the template search that tracks them;
+- the normalisation of brightness at surface scale;
+- camera registration by phase correlation.
+
+Learned with local rules are each object's appearance and shape, depth order, binding into wholes, persistence of belief, the eye's motor map, and the value of where to look.
+
+v0.7 starts replacing the scaffolding with learned representations, beginning with motion: direction-selective cells in the cortex, which failed to emerge in v0.3, in place of optical flow.
+
 ### References for the scene graph
 
 - E. S. Spelke. Principles of object perception. *Cognitive Science* 14, 1990.
@@ -601,6 +630,10 @@ Tests cover causal counterfactuals, forward-warp direction, the group-disjoint s
 - Live learning needs an NVIDIA GPU. On a CPU the learner manages under one step per second.
 - The mirror has no object permanence, explicit egomotion, or multimodal future; pixel warping and blending can soften detail. The v0.4 scene level has objects and a self, but only in synthetic worlds: on real video it is worse than repeating the last frame, and its adult fails the permanence protocol.
 - The pretrained DMVFN expert is not part of the self-organizing story; ablations without it are reported.
+
+## Changes in v0.6
+
+v0.6 predicts real video from the smoothed affine motion of the scene graph's parts, and learns an established object's velocity only from complete views. Real video now passes (0.77 × repeating the last frame). Permanence fails only on the strength of its surprise, and parts and wholes still fail. Engineered parts are labelled; v0.7 turns to replacing them with learned ones.
 
 ## Changes in v0.5
 
