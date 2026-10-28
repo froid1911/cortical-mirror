@@ -12,11 +12,11 @@ import time
 from pathlib import Path
 
 import torch
+from train_cortex import Streams
 
 from cortical_mirror.cortex.engine import RETINA_SIZE
 from cortical_mirror.cortex.mt import MotionCortex
 from cortical_mirror.data import split_videos
-from train_cortex import Streams
 
 
 def main() -> None:
