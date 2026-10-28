@@ -49,6 +49,7 @@ def self_world() -> dict:
     import torch
 
     motor = train_motor()
+    ADULT.parent.mkdir(parents=True, exist_ok=True)
     torch.save({"motor": torch.tensor(motor)}, ADULT.with_name("scene-adult-eye.pt"))
     return {
         "adult_motor": motor.round(2).tolist(),
@@ -63,6 +64,7 @@ def attention() -> dict:
     import torch
 
     weights = train_attention()
+    ADULT.parent.mkdir(parents=True, exist_ok=True)
     torch.save({"weights": torch.tensor(weights)}, ADULT.with_name("scene-adult-gaze.pt"))
     return {
         "adult_weights": weights.round(4).tolist(),
