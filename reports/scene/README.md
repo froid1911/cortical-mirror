@@ -156,3 +156,16 @@ Run on flank's GPU 3 with `SCENE_DEVICE=cuda`.
 All three fail. Unlike v0.4, the adult is now better than random gaze on every measure. The learned feature weights are still negative for "unknown" (−0.21), "error" (−0.09) and "novelty" (−0.06). What pulls the gaze is mostly each place's learned value.
 
 **Fixed after this run:** the eye graph's error, visit and progress maps were not shifted when registration found the world itself moving. With the true motor map used here, that shift is essentially zero, so the numbers above stand.
+
+## After v0.5: Kalman tracking (development seeds only, no protocol run)
+
+`SceneGraph(tracking="kalman")` fuses each search result with a constant-velocity prediction, weighted by how much of the node was seen (noise ∝ 1/visibility⁴), and coasts while the node is hidden, widening its search with its uncertainty. It was compared with v0.5's direct tracking on development seeds only: permanence 3100–3119, grouping 600–619, discovery 0–19.
+
+| Tracker | Permanence: kept, violation ratio | Grouping: recall, specificity | Discovery: IoU, counts right |
+|---|---|---|---|
+| Direct (v0.5, default) | 0.65, 0.45 | 0.72, 0.97 | 0.81, 0.91 |
+| Kalman, acceleration 0.02, power 4 | 0.70, 0.60 | 0.73, 0.95 | 0.77, 0.79 |
+| Kalman, 0.01, power 5 | 0.70, 0.72 | 0.52, 0.98 | 0.77, 0.79 |
+| Kalman, 0.02, power 6 | 0.65, 0.72 | 0.56, 0.97 | 0.78, 0.82 |
+
+A single filtered estimate gains a little permanence and loses discovery, so it is not the fix, and it stays an option, not the default. No pre-registered protocol was run. Getting past a screen likely needs several hypotheses per hidden object (multi-hypothesis or particle tracking), not one estimate weighted more or less.

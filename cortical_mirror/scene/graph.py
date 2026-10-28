@@ -36,9 +36,9 @@ SEARCH = 8
 SLOTS = 8
 # Kalman tracking: how much a node's velocity may change per frame (variance), the
 # variance of a position found from a complete view, and of a newborn's state.
-ACCELERATION = 0.1
+ACCELERATION = 0.02
 MEASUREMENT = 0.5
-VISIBILITY_POWER = 2.0
+VISIBILITY_POWER = 4.0
 NEWBORN_COV = (4.0, 4.0, 4.0, 4.0)
 _F = np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], float)
 _Q = ACCELERATION * np.array(
