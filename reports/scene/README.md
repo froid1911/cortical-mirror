@@ -79,3 +79,51 @@ The noise is a real trap: the surprise reflex spends 63% of its fixations on it,
 - **Protocol 10, bitmap baseline:** the code inpaints the mask dilated by one pixel, where the protocol says the mask itself. That gives the baseline a slightly larger hole. It probably costs the baseline a little, and it does not change which wins.
 - **Speed on real video:** recognising forgotten objects searches widely and can slow the live page well below 25 fps on busy footage.
 - **The eye graph** keeps its gaze inside its canvas only because the protocol drivers keep it there; it is not part of the live page.
+
+## v0.5
+
+Protocols 13–15 were written before measuring; 9 and 11 were re-run on fresh test seeds. The design and its amendments (all made before any test measurement) are in `docs/superpowers/specs/2026-10-28-v0.5-design.md`.
+
+### Protocol 13: parts and wholes (`v0.5-parts.json`)
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| Grouping recall ≥ 0.7 | 0.62 | **fail** |
+| Grouping specificity ≥ 0.9 | 0.95 | pass |
+| Creature delete ≤ 0.75 × bitmap | 0.31 × (9 creatures) | pass |
+
+Proximity alone (reported, no criterion) groups almost every same-creature pair (recall 0.98), but also wrongly groups 11% of pairs of different creatures (specificity 0.89). Binding by common fate is cleaner, but it misses about 4 pairs in 10. On the development seeds it reached recall 0.72, so the test seeds were harder.
+
+### Protocol 14: objects under changing light (`v0.5-lighting.json`)
+
+| Code | Changing light: IoU, counts right | Constant light: IoU, counts right |
+|---|---|---|
+| Normalised (v0.5) | 0.87, 0.54 | 0.86, 0.69 |
+| Brightness (v0.4) | 0.24, 0.00 | 0.81, 0.90 |
+| V1's code (reported) | 0.27, 0.55 | 0.27, 0.38 |
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| Changing light: normalised IoU ≥ 0.6 | 0.87 | pass |
+| … and ≥ brightness + 0.15 | +0.63 | pass |
+| Constant light: not more than 0.05 below brightness | +0.06 | pass |
+
+Passes as written. The pre-registered criteria are on IoU. Count accuracy is lower than on the development seeds (0.54 and 0.69 against 0.99 and 0.90), and lower than brightness under constant light: the normalised code makes more spurious nodes. V1's learned code finds only outlines.
+
+### Protocol 9 re-run (`v0.5-permanence_v05.json`, seeds 3020–3039)
+
+Newborn: kept 0.0, violation ratio 0.0, pass. τ: 118 frames in the normal world, 4.0 in the magic world, pass. Adult: kept 0.55, **fail**; position error 1.7 px, pass; violation ratio 0.76, **fail**. A built-in τ = 60 scores the same. Permanence still fails on tracking behind a screen the graph has not seen before. The two remedies tried in development both made it worse and are not in v0.5.
+
+### Protocol 15: real video (`v0.5-real-video.json`, 40 UCF101 test clips)
+
+| Condition | Expectation ÷ last frame | Clips better than the last frame |
+|---|---|---|
+| v0.4 graph | 4.59 | 0% |
+| v0.5, registration, brightness | 1.04 | 35% |
+| v0.5, registration, normalised | 1.04 | 40% |
+
+**Fails** (needs below 0.95). Registering the camera's motion and predicting only what it explains takes the graph from 4.6 × worse than doing nothing to about even with it. On development, the last frame shifted by the camera alone reached 0.99. In this footage, what changes between frames is mostly non-rigid motion and noise, which a graph of rigid objects does not predict.
+
+### On a GPU
+
+`SceneGraph(device="cuda")` (or `SCENE_DEVICE=cuda`) runs the search, 78% of the time, on a torch device. The placements are the same as on the CPU (`tests/test_scene_device.py`). On flank: 40 ms per frame on the CPU arrays, 12.9 ms on one GPU. Protocol seeds run in parallel processes (`SCENE_WORKERS`).
