@@ -25,12 +25,15 @@ As in protocol 8. From frame 200 on, every 10th frame, nodes are matched to the 
 
 ## Conditions
 
-1. **Cortex code:** the graph as built for v0.5.
+1. **Normalised code:** the graph as built for v0.5. It matches objects on brightness as a local z-score, σ = 24 px.
 2. **Luminance:** the same graph matching on brightness, as in v0.4.
+3. **V1 code (reported, no criterion):** the same graph matching on the v0.3 phase 1 adult's V1 rendering of the retinal code.
+
+**Amendment before any test measurement:** the first draft named V1's code as the v0.5 condition. On the development seeds it found only outlines (see the design's amendment), so the normalised code took its place, and V1 is reported as a third condition. The criteria below refer to the normalised code ("the cortex graph" in the first draft).
 
 ## Pass criteria (declared in advance)
 
-- **Changing light:** the cortex graph's mean IoU is ≥ 0.6, and at least 0.15 above the luminance graph's.
-- **Constant light:** the cortex graph's mean IoU is no more than 0.05 below the luminance graph's.
+- **Changing light:** the normalised graph's mean IoU is ≥ 0.6, and at least 0.15 above the luminance graph's.
+- **Constant light:** the normalised graph's mean IoU is no more than 0.05 below the luminance graph's.
 
 Failures are reported as failures.

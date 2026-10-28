@@ -56,3 +56,24 @@ class CortexFront:
         contrast = (rendered[0] - rendered[1]).clamp(-1.0, 1.0).numpy()
         code = 0.5 + 0.5 * cv2.resize(contrast, (width, height), interpolation=cv2.INTER_LINEAR)
         return code.astype(np.float32)
+
+
+class NormalisedFront:
+    """Brightness divided by its surroundings: each pixel as a z-score against the
+    mean and spread of its neighbourhood (σ = 24 px).
+
+    This is the retina's divisive normalisation of contrast, applied at the scale of
+    surfaces rather than edges. It keeps what an object's surface looks like
+    relative to its surroundings, and drops the overall gain and offset of the light.
+    """
+
+    name = "normalised"
+
+    def __init__(self, scale: float = 24.0):
+        self.scale = scale
+
+    def code(self, image: np.ndarray) -> np.ndarray:
+        mean = cv2.GaussianBlur(image, (0, 0), self.scale)
+        deviation = image - mean
+        spread = np.sqrt(cv2.GaussianBlur(deviation * deviation, (0, 0), self.scale))
+        return np.clip(0.5 + 0.15 * deviation / (spread + 0.02), 0.0, 1.0).astype(np.float32)

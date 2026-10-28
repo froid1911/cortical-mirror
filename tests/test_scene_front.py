@@ -27,3 +27,12 @@ def test_cortex_code_barely_changes_when_the_light_does(front):
     code_change = np.abs(front.code(brighter) - front.code(image)).mean()
     light_change = np.abs(brighter - image).mean()
     assert code_change < 0.25 * light_change
+
+
+def test_normalised_code_ignores_the_gain_and_offset_of_the_light():
+    from cortical_mirror.scene.front import NormalisedFront
+
+    image = SpriteWorld(seed=0, objects=2).render()
+    lit = np.clip(1.3 * image + 0.08, 0, 1)
+    front = NormalisedFront()
+    assert np.abs(front.code(lit) - front.code(image)).mean() < 0.01
