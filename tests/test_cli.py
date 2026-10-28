@@ -77,3 +77,32 @@ def test_a_failed_adult_download_says_to_pass_an_adult(monkeypatch, tmp_path):
     monkeypatch.setattr(cli.urllib.request, "urlopen", offline)
     with pytest.raises(SystemExit, match="--adult"):
         cli.fetch("cortex-adult-p1.pt", tmp_path)
+
+
+def test_the_scene_command_downloads_the_adult_and_plays_the_sprite_world(monkeypatch):
+    fetched = []
+    monkeypatch.setattr(cli, "fetch", lambda name, folder: fetched.append(name) or folder / name)
+    args = Namespace(adult=None, newborn=False, assets=Path("/assets"), source="world")
+    cli.scene_arguments(args)
+    assert fetched == ["scene-adult.pt"] and args.adult == Path("/assets/scene-adult.pt")
+
+
+def test_a_newborn_scene_needs_no_download(monkeypatch):
+    fetched = []
+    monkeypatch.setattr(cli, "fetch", lambda name, folder: fetched.append(name) or folder / name)
+    args = Namespace(adult=None, newborn=True, assets=Path("/assets"), source="world")
+    cli.scene_arguments(args)
+    assert fetched == [] and args.adult is None
+
+
+def test_the_scene_graph_takes_the_adults_persistence(tmp_path):
+    from cortical_mirror.scene.graph import NEWBORN_PERSISTENCE, SceneGraph
+
+    SceneGraph(persistence=99.0).save(tmp_path / "adult.pt")
+    graph = cli.scene_graph(Namespace(adult=tmp_path / "adult.pt", newborn=False))
+    assert graph.persistence == 99.0
+    assert cli.scene_graph(Namespace(adult=None, newborn=True)).persistence == NEWBORN_PERSISTENCE
+
+
+def test_the_scene_adult_has_a_download():
+    assert "scene-adult.pt" in cli.DEMO_ASSETS
