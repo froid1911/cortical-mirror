@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cortical-mirror"
-version = "0.4.0"
+version = "0.5.0"
 description = "Live causal video prediction with hierarchical predictive coding"
 readme = "README.md"
 requires-python = ">=3.10"

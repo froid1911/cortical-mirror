@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import copy
 import math
+import os
 from dataclasses import dataclass
 
 import cv2
@@ -33,6 +34,8 @@ from numpy.lib.stride_tricks import sliding_window_view
 SPRITE = 48
 SEARCH = 8
 SLOTS = 8
+# Padding of the frame kept on a device: room for the widest search (recognition).
+FRAME_PAD = SPRITE // 2 + 24
 # What an unknown background costs to explain a pixel (a squared luminance error):
 # where the background has not been seen still, it explains nothing well.
 UNEXPLAINED = 0.004
@@ -50,6 +53,20 @@ CONTINUITY = 0.0001
 MEMORY = 150
 # A newborn forgets what it cannot see within a few frames.
 NEWBORN_PERSISTENCE = 1.0
+# Frames over which two nodes' common fate is judged, the binding's learning rate
+# (a time constant of about ten frames), and the reach of binding.
+BIND_WINDOW = 10
+BIND_RATE = 0.15
+# Nodes that touch and keep within this many pixels of each other's displacement for
+# this many frames in a row move rigidly: they are one object, merged. Parts that
+# move together without moving rigidly (a limb) are bound instead.
+RIGID = 1.5
+RIGID_FRAMES = 8
+DUPLICATE = 2.5
+DUPLICATE_FRAMES = 5
+# Frames a node counts as a possible fragment of its neighbour after its birth.
+FRAGMENT_AGE = 15
+BIND_REACH = 50
 
 
 @dataclass
@@ -75,6 +92,8 @@ class Node:
     looked: int = 0
     # How much of it was seen in the last frame.
     visibility: float = 1.0
+    # Its brightness, for the picture, beside the code it is matched in.
+    shade: np.ndarray | None = None
 
     def displacement(self, frames: int = 5) -> tuple[float, float] | None:
         if not self.trail or len(self.trail) <= frames:
@@ -109,8 +128,12 @@ class SceneGraph:
         persistence: float = 30.0,
         learn: bool = True,
         learn_persistence: bool = False,
+        device: str | None = None,
     ):
         self.width, self.height, self.slots = width, height, slots
+        # Where the search runs: on the CPU in arrays (None), or on a torch device.
+        # SCENE_DEVICE sets it for every graph a run makes (protocols, eye, video).
+        self.device = device if device is not None else (os.environ.get("SCENE_DEVICE") or None)
         # Frames an unseen node stays believed (the time constant of its belief).
         # Unlike everything else in the graph, it carries over from scene to scene:
         # it is what development changes.
@@ -155,7 +178,12 @@ class SceneGraph:
 
     def reset(self) -> None:
         self.nodes: list[Node] = []
+        self._cost_cache = None
+        self._frame_on_device = None
+        # Bumped whenever the background changes within a frame.
+        self._cost_version = 0
         self.background: np.ndarray | None = None
+        self.background_shade: np.ndarray | None = None
         # How sure the graph is of each background pixel: it grows where the input stays still.
         self.confidence = np.zeros((self.height, self.width), np.float32)
         self.front = np.zeros((self.height, self.width), np.float32)
@@ -169,6 +197,8 @@ class SceneGraph:
         self.memory: list[tuple[Node, int]] = []
         # Frames each pair of nodes has touched while moving together.
         self._together: dict[tuple[int, int], int] = {}
+        # How strongly each pair of nodes is bound into one whole (parts of a body).
+        self.binding: dict[tuple[int, int], float] = {}
 
     # Rendering -----------------------------------------------------------------
 
@@ -179,21 +209,24 @@ class SceneGraph:
             out[placed[0]] = node.mask[placed[1]]
         return out
 
-    def render(self, nodes: list[Node] | None = None) -> np.ndarray:
-        """The graph's picture of the world, ``[H, W]`` float32 in [0, 1]."""
+    def render(self, nodes: list[Node] | None = None, shade: bool = False) -> np.ndarray:
+        """The graph's picture of the world, ``[H, W]`` float32 in [0, 1]: in the code
+        it matches in, or with ``shade`` in brightness."""
 
         if self.background is None:
             return np.zeros((self.height, self.width), np.float32)
-        image = self.background.copy()
+        background = self.background_shade if shade else self.background
+        image = background.copy()
         for node in sorted(self.nodes if nodes is None else nodes, key=lambda n: n.depth):
             placed = _place(self.width, self.height, node.x, node.y)
             if not placed:
                 continue
             world, sprite = placed
             alpha = node.mask[sprite]
-            image[world] = alpha * node.template[sprite] + (1 - alpha) * image[world]
+            surface = node.shade if shade else node.template
+            image[world] = alpha * surface[sprite] + (1 - alpha) * image[world]
         # Surfaces known to stand in front of objects hide them.
-        return self.front * self.background + (1 - self.front) * image
+        return self.front * background + (1 - self.front) * image
 
     def edit(
         self,
@@ -201,6 +234,7 @@ class SceneGraph:
         delete: set | None = None,
         depth: dict | None = None,
         duplicate: dict | None = None,
+        shade: bool = False,
     ) -> np.ndarray:
         """Render the world as it would be if changed; the graph itself is untouched."""
 
@@ -220,12 +254,12 @@ class SceneGraph:
             twin.x, twin.y = twin.x + mx + dx, twin.y + my + dy
             twin.depth = original.depth + 0.5
             nodes.append(twin)
-        return self.render(nodes)
+        return self.render(nodes, shade=shade)
 
-    def expect(self) -> np.ndarray:
+    def expect(self, shade: bool = False) -> np.ndarray:
         """The graph's picture of the next frame: every node moved on by its velocity."""
 
-        return self.edit(move={n.id: (n.vx, n.vy) for n in self.nodes})
+        return self.edit(move={n.id: (n.vx, n.vy) for n in self.nodes}, shade=shade)
 
     # Inference -----------------------------------------------------------------
 
@@ -252,20 +286,30 @@ class SceneGraph:
                 return None
             return sliding_window_view(out, (SPRITE, SPRITE))
 
-        views = [window(image, 0.0), window(self._background_cost(image), 0.0), window(cover, 1.0)]
-        if any(v is None for v in views):
-            return node.x, node.y, 0.0, 0.0
-        seen, behind, covered = views
-        weight = node.mask * (1 - covered)
-        # Evidence against a placement is capped: a pixel the node cannot explain may
-        # be something known standing in front of it.
-        evidence = behind - (seen - node.template) ** 2
-        # Where the known background explains the pixel, it may stand in front of the
-        # node: no evidence against it there at all.
-        evidence = np.where(
-            behind < 0.002, np.maximum(evidence, 0.0), np.maximum(evidence, -AGAINST)
-        )
-        gain = (weight * evidence).sum((-1, -2))
+        if self.device is not None:
+            found = self._gain_on_device(node, image, cover, radius)
+            if found is None:
+                return node.x, node.y, 0.0, 0.0
+            gain, seen_at = found
+        else:
+            views = [window(image, 0.0), window(self._cost(image), 0.0), window(cover, 1.0)]
+            if any(v is None for v in views):
+                return node.x, node.y, 0.0, 0.0
+            seen, behind, covered = views
+            weight = node.mask * (1 - covered)
+            # Evidence against a placement is capped: a pixel the node cannot explain may
+            # be something known standing in front of it.
+            evidence = behind - (seen - node.template) ** 2
+            # Where the known background explains the pixel, it may stand in front of the
+            # node: no evidence against it there at all.
+            evidence = np.where(
+                behind < 0.002, np.maximum(evidence, 0.0), np.maximum(evidence, -AGAINST)
+            )
+            gain = (weight * evidence).sum((-1, -2))
+
+            def seen_at(index):
+                return seen[index], weight[index]
+
         mass = max(node.mass, 1e-6)
         # Continuity: things keep moving as they did; each pixel off the prediction
         # costs a little, so a partial view does not drag a node off its path.
@@ -278,8 +322,9 @@ class SceneGraph:
         best = np.unravel_index(int(np.argmax(gain)), gain.shape)
         # How much of the node is seen: not hidden by anything known, and explained by
         # its template where it is placed (an unknown occluder hides the rest).
-        explained = (seen[best] - node.template) ** 2 < 0.003
-        visibility = float((weight[best] * explained).sum() / mass)
+        seen_best, weight_best = seen_at(best)
+        explained = (seen_best - node.template) ** 2 < 0.003
+        visibility = float((weight_best * explained).sum() / mass)
         return (
             node.x + best[1] - radius,
             node.y + best[0] - radius,
@@ -287,20 +332,96 @@ class SceneGraph:
             visibility,
         )
 
+    def _gain_on_device(self, node: Node, image: np.ndarray, cover: np.ndarray, radius: int):
+        """The search's evidence for every placement, computed on the device at once:
+        the same numbers as the array version, as a ``[2r+1, 2r+1]`` gain and a
+        function giving the window and weight at one placement."""
+
+        import torch
+        from torch.nn import functional as F
+
+        pad = SPRITE // 2 + radius
+        size = SPRITE + 2 * radius
+        cx, cy = int(round(node.x)), int(round(node.y))
+        y0, x0 = cy + pad - SPRITE // 2 - radius, cx + pad - SPRITE // 2 - radius
+        if not (
+            0 <= y0
+            and 0 <= x0
+            and y0 + size <= self.height + 2 * pad
+            and x0 + size <= self.width + 2 * pad
+        ):
+            return None
+        frame, cost = self._device_frame(image)
+        offset = FRAME_PAD - pad
+        rows = slice(offset + y0, offset + y0 + size)
+        columns = slice(offset + x0, offset + x0 + size)
+        covered_full = torch.from_numpy(np.pad(cover, pad, constant_values=1.0))
+        covered = covered_full[y0 : y0 + size, x0 : x0 + size].to(self.device)
+        windows = torch.stack([frame[rows, columns], cost[rows, columns], covered])
+        patches = F.unfold(windows[:, None], SPRITE)  # [3, S*S, placements]
+        seen, behind, hidden = patches[0], patches[1], patches[2]
+        template = torch.from_numpy(node.template).to(self.device).reshape(-1, 1)
+        mask = torch.from_numpy(node.mask).to(self.device).reshape(-1, 1)
+        weight = mask * (1 - hidden)
+        evidence = behind - (seen - template) ** 2
+        evidence = torch.where(
+            behind < 0.002, evidence.clamp(min=0.0), evidence.clamp(min=-AGAINST)
+        )
+        side = 2 * radius + 1
+        gain = (weight * evidence).sum(0).reshape(side, side).double().cpu().numpy()
+
+        def seen_at(index):
+            column = index[0] * side + index[1]
+            shape = (SPRITE, SPRITE)
+            return (
+                seen[:, column].reshape(shape).cpu().numpy(),
+                weight[:, column].reshape(shape).cpu().numpy(),
+            )
+
+        return gain, seen_at
+
+    def _device_frame(self, image: np.ndarray):
+        """The frame and the background's cost on the device, padded once per frame."""
+
+        import torch
+
+        key = (self.frame_count, self._cost_version)
+        if self._frame_on_device is None or self._frame_on_device[0] != key:
+            frame = np.pad(image, FRAME_PAD, constant_values=0.0)
+            cost = np.pad(self._cost(image), FRAME_PAD, constant_values=0.0)
+            self._frame_on_device = (
+                key,
+                torch.from_numpy(frame).to(self.device),
+                torch.from_numpy(cost).to(self.device),
+            )
+        return self._frame_on_device[1], self._frame_on_device[2]
+
+    def _cost(self, image: np.ndarray) -> np.ndarray:
+        """The background's cost for this frame, computed once until the background
+        is learned again."""
+
+        key = (self.frame_count, self._cost_version)
+        if self._cost_cache is None or self._cost_cache[0] != key:
+            self._cost_cache = (key, self._background_cost(image))
+        return self._cost_cache[1]
+
     def _background_cost(self, image: np.ndarray) -> np.ndarray:
         """How badly the background explains each pixel of the input."""
 
         known = self.confidence * (image - self.background) ** 2
         return known + (1 - self.confidence) * UNEXPLAINED
 
-    def observe(self, image: np.ndarray) -> dict:
-        """One frame of the world, gray ``[H, W]`` in [0, 1] (or uint8 BGR)."""
+    def observe(self, image: np.ndarray, shade: np.ndarray | None = None) -> dict:
+        """One frame, ``[H, W]`` in [0, 1] (or uint8 BGR): the code objects are matched
+        in, and its brightness for the picture (the same image if not given)."""
 
         image = _as_gray(image, self.width, self.height)
+        self.shade = image if shade is None else _as_gray(shade, self.width, self.height)
         self.frame_count += 1
         self.events = []
         if self.background is None:
             self.background = image.copy()
+            self.background_shade = self.shade.copy()
             self.previous = image
             self._recent = [image]
             return {"nodes": 0}
@@ -342,7 +463,7 @@ class SceneGraph:
             # Recentring moves the frame, not the object: the trail follows the object.
             shift = self._recentre(node) if node.visibility >= COMPLETE else (0, 0)
             node.trail = [(x + shift[0], y + shift[1]) for x, y in node.trail or []]
-            node.trail = [*node.trail, (node.x, node.y)][-12:]
+            node.trail = [*node.trail, (node.x, node.y)][-30:]
             if node.state == "seen" and node.visibility >= COMPLETE and len(node.trail) >= 6:
                 # Velocity as the slope of the recent path: single-frame steps are whole
                 # pixels, and averaging them is slow and biased.
@@ -353,9 +474,60 @@ class SceneGraph:
             moved = node.displacement()
             moving = moved is None or math.hypot(*moved) > 1.5
             node.still = 0 if moving or node.state != "seen" else node.still + 1
+        self._bind()
         self.previous = image
         self._recent = (self._recent + [image])[-STILL_LAG:]
         return {"nodes": len(self.nodes)}
+
+    # Parts and wholes ------------------------------------------------------------
+
+    def _bind(self) -> None:
+        """Hebbian binding by common fate: two nodes that keep their distance while
+        both travel, and are close, become parts of one whole. Their directions may
+        differ, as a limb's does from its torso's."""
+
+        ids = {n.id for n in self.nodes}
+        self.binding = {k: v for k, v in self.binding.items() if k[0] in ids and k[1] in ids}
+        moving = [
+            n for n in self.nodes if n.state == "seen" and n.trail and len(n.trail) > BIND_WINDOW
+        ]
+        for i, a in enumerate(moving):
+            for b in moving[i + 1 :]:
+                (ax0, ay0), (ax1, ay1) = a.trail[-BIND_WINDOW - 1], a.trail[-1]
+                (bx0, by0), (bx1, by1) = b.trail[-BIND_WINDOW - 1], b.trail[-1]
+                travel = (math.hypot(ax1 - ax0, ay1 - ay0) + math.hypot(bx1 - bx0, by1 - by0)) / 2
+                if travel < 5:
+                    continue  # standing still says nothing about belonging together
+                before = math.hypot(ax0 - bx0, ay0 - by0)
+                now = math.hypot(ax1 - bx1, ay1 - by1)
+                fate = max(0.0, 1.0 - abs(now - before) / (0.5 * travel + 2.0))
+                fate *= float(now < BIND_REACH)
+                key = (min(a.id, b.id), max(a.id, b.id))
+                old = self.binding.get(key, 0.0)
+                self.binding[key] = old + BIND_RATE * (fate - old)
+
+    def groups(self) -> list[dict]:
+        """Wholes: nodes bound above one half, taken transitively, two or more each."""
+
+        parent = {n.id: n.id for n in self.nodes}
+
+        def root(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+
+        for (a, b), strength in self.binding.items():
+            if strength > 0.5 and a in parent and b in parent:
+                parent[root(a)] = root(b)
+        members: dict[int, list[int]] = {}
+        for node in self.nodes:
+            members.setdefault(root(node.id), []).append(node.id)
+        return [
+            {"id": f"g{min(ids)}", "members": sorted(ids)}
+            for ids in members.values()
+            if len(ids) > 1
+        ]
 
     def _unseen(self, node: Node, visibility: float) -> None:
         inside = 0 <= node.x < self.width and 0 <= node.y < self.height
@@ -377,7 +549,7 @@ class SceneGraph:
             seen, behind = image[world], self.background[world]
             template, mask = node.template[sprite], node.mask[sprite]
             by_node = (seen - template) ** 2
-            by_background = self._background_cost(image)[world]
+            by_background = self._cost(image)[world]
             remembered = self.confidence[world] > 0.5
             if node.state == "seen":
                 free = 1 - nearer
@@ -403,7 +575,10 @@ class SceneGraph:
                 # matches, so a moment out of step does not overwrite the object with
                 # whatever lies there. Never where the known background is seen.
                 rate = np.where(mask < 0.3, 0.1, 0.3 * (by_node < 0.01))
-                template += free * ~background_here * rate * (seen - template)
+                step = free * ~background_here * rate
+                template += step * (seen - template)
+                surface = node.shade[sprite]
+                surface += step * (self.shade[world] - surface)
             # A node still partly in view, whose expected pixels the background explains
             # instead: something remembered stands in front of it. Not once it is out
             # of sight: a hidden thing that fails to reappear is not explained away.
@@ -427,7 +602,9 @@ class SceneGraph:
             0.1 * free * (still * (1 - self.confidence) - (1 - still) * self.confidence)
         )
         rate = free * (0.01 + 0.25 * still)
+        self._cost_version += 1
         self.background += rate * (image - self.background)
+        self.background_shade += rate * (self.shade - self.background_shade)
 
     def _vote_depth(self, image: np.ndarray) -> None:
         for i, a in enumerate(self.nodes):
@@ -485,10 +662,12 @@ class SceneGraph:
             if self._recognise(image, x, y):
                 continue
             template = np.zeros((SPRITE, SPRITE), np.float32)
+            surface = np.zeros((SPRITE, SPRITE), np.float32)
             mask = np.zeros((SPRITE, SPRITE), np.float32)
             placed = _place(self.width, self.height, x, y)
             world, sprite = placed
             template[sprite] = image[world]
+            surface[sprite] = self.shade[world]
             mask[sprite] = 0.6 * (labels[world] == label)
             # Something appearing over a known node came out from behind it.
             overlapping = [
@@ -498,7 +677,9 @@ class SceneGraph:
                 depth = min(overlapping) - 1.0
             else:
                 depth = max((n.depth for n in self.nodes), default=0.0) + 1.0
-            self.nodes.append(Node(self._next_id, template, mask, x, y, depth=depth, origin=(x, y)))
+            self.nodes.append(
+                Node(self._next_id, template, mask, x, y, depth=depth, origin=(x, y), shade=surface)
+            )
             self.events.append({"born": self._next_id})
             self._next_id += 1
 
@@ -574,19 +755,25 @@ class SceneGraph:
         survivors: list[Node] = []
         together = {}
         for node in keep:
-            touching = cv2.dilate((self._alpha(node) > 0.3).astype(np.uint8), np.ones((5, 5)))
+            mine = self._alpha(node) > 0.3
+            touching = cv2.dilate(mine.astype(np.uint8), np.ones((5, 5)))
             partner = None
             for other in survivors:
                 pair = (other.id, node.id)
                 a, b = node.displacement(), other.displacement()
-                if (
-                    a is not None
-                    and b is not None
-                    and (touching & (self._alpha(other) > 0.3)).any()
-                    and math.hypot(a[0] - b[0], a[1] - b[1]) < 2.5
-                ):
+                theirs = self._alpha(other) > 0.3
+                if a is None or b is None or not (touching & theirs).any():
+                    continue
+                # Two views of one thing (overlapping a lot, or a fragment just born at
+                # its edge) merge readily; established parts that merely touch merge
+                # only if they move rigidly.
+                overlap = (mine & theirs).sum() > 0.4 * max(min(mine.sum(), theirs.sum()), 1)
+                fragment = min(node.age, other.age) < FRAGMENT_AGE
+                lenient = overlap or fragment
+                limit, frames = (DUPLICATE, DUPLICATE_FRAMES) if lenient else (RIGID, RIGID_FRAMES)
+                if math.hypot(a[0] - b[0], a[1] - b[1]) < limit:
                     together[pair] = self._together.get(pair, 0) + 1
-                    if together[pair] >= 5:
+                    if together[pair] >= frames:
                         partner = other
                         break
             if partner is None:
@@ -607,8 +794,12 @@ class SceneGraph:
         if placed:
             world, sprite = placed
             alpha = node.mask[sprite]
+            self._cost_version += 1
             self.background[world] = (
                 alpha * node.template[sprite] + (1 - alpha) * self.background[world]
+            )
+            self.background_shade[world] = (
+                alpha * node.shade[sprite] + (1 - alpha) * self.background_shade[world]
             )
         self.events.append({"dissolved": node.id})
 
@@ -617,6 +808,7 @@ class SceneGraph:
         template, mask = _shift(gone.template, dx, dy), _shift(gone.mask, dx, dy)
         take = mask > keep.mask
         keep.template = np.where(take, template, keep.template)
+        keep.shade = np.where(take, _shift(gone.shade, dx, dy), keep.shade)
         keep.mask = np.maximum(keep.mask, mask)
         self._recentre(keep)
 
@@ -632,6 +824,7 @@ class SceneGraph:
         if dx == 0 and dy == 0:
             return 0, 0
         node.template = _shift(node.template, -dx, -dy)
+        node.shade = _shift(node.shade, -dx, -dy)
         node.mask = _shift(node.mask, -dx, -dy)
         node.x, node.y = node.x + dx, node.y + dy
         return dx, dy
@@ -668,10 +861,15 @@ class SceneGraph:
                 speed = math.hypot(a.vx, a.vy) + math.hypot(b.vx, b.vy)
                 if speed > 0.5 and math.hypot(a.vx - b.vx, a.vy - b.vy) < 0.2 * speed:
                     edges.append({"relation": "moves_with", "from": a.id, "to": b.id})
+        groups = self.groups()
+        for group in groups:
+            for member in group["members"]:
+                edges.append({"relation": "part_of", "from": member, "to": group["id"]})
         return {
             "frame": self.frame_count,
             "nodes": nodes,
             "edges": edges,
+            "groups": groups,
             "self": {"kind": "eye", "gaze": None},
         }
 

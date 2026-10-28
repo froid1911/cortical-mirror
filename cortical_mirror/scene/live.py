@@ -20,7 +20,7 @@ import cv2
 import numpy as np
 
 from .graph import SceneGraph, _as_gray
-from .world import SpriteWorld
+from .world import CreatureWorld
 
 VIEWS = ("seen", "explained")
 SIZE = (256, 192)
@@ -28,7 +28,7 @@ DUPLICATE_OFFSET = (36, 0)
 
 
 class SpriteSource:
-    """The sprite world with a screen, played forever, a new scene every 600 frames."""
+    """Creatures and a screen, played forever, a new scene every 600 frames."""
 
     def __init__(self, seed: int = 0, scene_frames: int = 600):
         self.seed, self.scene_frames, self.frame = seed, scene_frames, 0
@@ -37,9 +37,7 @@ class SpriteSource:
         self._world()
 
     def _world(self) -> None:
-        self.world = SpriteWorld(
-            seed=self.seed, objects=3, occluders=1, occluder_width=40, radius=(9, 14)
-        )
+        self.world = CreatureWorld(seed=self.seed, creatures=2, occluders=1, occluder_width=40)
 
     def read(self) -> np.ndarray:
         self.new_scene = bool(self.frame) and self.frame % self.scene_frames == 0
@@ -77,9 +75,11 @@ def _jpeg(image: np.ndarray) -> bytes:
 
 
 class SceneLive:
-    def __init__(self, source, graph: SceneGraph | None = None, fps: float = 25.0):
+    def __init__(self, source, graph: SceneGraph | None = None, fps: float = 25.0, video=None):
         self.source = source
-        self.graph = graph or SceneGraph(*SIZE)
+        # A video graph (camera registration, its own code) wraps a scene graph.
+        self.video = video
+        self.graph = video.graph if video is not None else (graph or SceneGraph(*SIZE))
         self.fps = fps
         self.running = True
         self.error: str | None = None
@@ -103,6 +103,10 @@ class SceneLive:
             if key in command
         }
         by = _offset(command.get("by", (0, 0))) if "move" in command else (0.0, 0.0)
+        many = command.get("delete_all", [])
+        if not isinstance(many, list) or len(many) > 64:
+            raise ValueError("'delete_all' is a list of at most 64 node ids")
+        many = [_node_id(v) for v in many]
         with self._lock:
             if command.get("reset"):
                 self.deleted.clear()
@@ -110,6 +114,7 @@ class SceneLive:
                 self.duplicated.clear()
             if "delete" in ids:
                 self.deleted.add(ids["delete"])
+            self.deleted.update(many)
             if "restore" in ids:
                 self.deleted.discard(ids["restore"])
             if "move" in ids:
@@ -138,7 +143,10 @@ class SceneLive:
             # A different world: nothing known about it, and the old edits mean nothing.
             self.graph.reset()
             self.control({"reset": True})
-        self.graph.observe(image)
+        if self.video is not None:
+            self.video.observe(image)
+        else:
+            self.graph.observe(image)
         with self._lock:
             ids = {n.id for n in self.graph.nodes}
             # The picture shows what is explained in view; what is believed but
@@ -158,14 +166,15 @@ class SceneLive:
                     move={k: tuple(v) for k, v in self.moved.items() if k in ids},
                     delete=deleted | hidden,
                     duplicate={k: DUPLICATE_OFFSET for k in self.duplicated if k in ids},
+                    shade=True,
                 )
             except (ValueError, OverflowError, IndexError):
                 # An edit the graph cannot render is dropped, not allowed to stop the source.
                 self.deleted.clear()
                 self.moved.clear()
                 self.duplicated.clear()
-                self.explained = self.graph.render()
-            scene = self.graph.to_json()
+                self.explained = self.graph.render(shade=True)
+            scene = self.video.to_json() if self.video is not None else self.graph.to_json()
             scene["edits"] = self._edits()
             scene["size"] = list(SIZE)
             self._scene = scene

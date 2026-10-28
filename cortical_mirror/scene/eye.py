@@ -75,6 +75,7 @@ class EyeGraph:
 
         self.inner.reset()
         self.background = np.zeros(CANVAS[::-1], np.float32)
+        self.background_shade = np.zeros(CANVAS[::-1], np.float32)
         self.confidence = np.zeros(CANVAS[::-1], np.float32)
         self.front = np.zeros(CANVAS[::-1], np.float32)
         self.gaze = self.start
@@ -85,6 +86,9 @@ class EyeGraph:
         self.error = np.zeros(CANVAS[::-1], np.float32)
         # Frames the fovea has spent on each place.
         self.visits = np.zeros(CANVAS[::-1], np.float32)
+        # The learning progress each place has brought when looked at. Optimistic at
+        # first: an unexplored place is presumed to teach.
+        self.progress = np.full(CANVAS[::-1], 0.5, np.float32)
         self.fovea_errors: list[float] = []
 
     # Where the view lies on the canvas.
@@ -159,10 +163,12 @@ class EyeGraph:
         weight[h // 2 - half + 8 : h // 2 + half - 8, w // 2 - half + 8 : w // 2 + half - 8] = 1.0
         return weight * image + (1 - weight) * cv2.GaussianBlur(image, (0, 0), 3.0)
 
-    def observe(self, image: np.ndarray, command: int = 0) -> dict:
-        """One view, and the command issued just before it (the efference copy)."""
+    def observe(self, image: np.ndarray, command: int = 0, shade: np.ndarray | None = None) -> dict:
+        """One view, and the command issued just before it (the efference copy).
+        ``image`` is the code objects are matched in; ``shade`` its brightness."""
 
         image = self.foveate(_as_gray(image, *self.view))
+        shade = image if shade is None else self.foveate(_as_gray(shade, *self.view))
         self.command = command
         before = self._origin()
         planned = self.motor[command]
@@ -180,6 +186,10 @@ class EyeGraph:
             # the canvas had it at origin + remainder, so the canvas moves back by it.
             dx, dy = remainder
             self.background = _shift(self.background, -dx, -dy)
+            self.background_shade = _shift(self.background_shade, -dx, -dy)
+            self.error = _shift(self.error, -dx, -dy)
+            self.visits = _shift(self.visits, -dx, -dy)
+            self.progress = _shift(self.progress, -dx, -dy, fill=0.5)
             self.confidence = _shift(self.confidence, -dx, -dy)
             self.front = _shift(self.front, -dx, -dy)
             self.world_shift -= np.asarray(remainder, float)
@@ -190,25 +200,32 @@ class EyeGraph:
             None if self.inner.background is None else self._window(self.background, origin).copy()
         )
         if self.inner.background is not None:
+            self.inner.background_shade = self._window(self.background_shade, origin).copy()
             self.inner.confidence = self._window(self.confidence, origin).copy()
             self.inner.front = self._window(self.front, origin).copy()
         if self.inner.background is not None:
             # What the graph expected here, scored before it sees the frame.
             miss = (self.inner.expect() - image) ** 2
-            self._window(self.error, origin)[:] = (
-                0.7 * self._window(self.error, origin) + 0.3 * miss
-            )
+            before = self._window(self.error, origin)
+            # Where the error jumps at a place that used to be predicted well, something
+            # new appeared: worth a look again. Noise was never predicted well, so it
+            # never earns this.
+            jump = (cv2.GaussianBlur(miss, (0, 0), 4.0) > 2.0 * before + 0.005) & (before < 0.003)
+            progress = self._window(self.progress, origin)
+            progress[jump] = np.maximum(progress[jump], 0.8)
+            self._window(self.error, origin)[:] = 0.7 * before + 0.3 * miss
             w, h = self.view
             half = self.fovea_size // 2
             centre = (slice(h // 2 - half, h // 2 + half), slice(w // 2 - half, w // 2 + half))
             self.fovea_errors.append(float(miss[centre].mean()))
             self._window(self.visits, origin)[centre] += 1.0
-        result = self.inner.observe(image)
+        result = self.inner.observe(image, shade=shade)
         cx, cy = self.view[0] / 2, self.view[1] / 2
         for node in self.inner.nodes:
             if abs(node.x - cx) < self.fovea_size / 2 and abs(node.y - cy) < self.fovea_size / 2:
                 node.looked += 1
         self._window(self.background, origin)[:] = self.inner.background
+        self._window(self.background_shade, origin)[:] = self.inner.background_shade
         self._window(self.confidence, origin)[:] = self.inner.confidence
         self._window(self.front, origin)[:] = self.inner.front
         return {**result, "world_moved": (-remainder[0], -remainder[1])}
@@ -233,6 +250,14 @@ class EyeGraph:
         if self.inner.previous is not None:
             seen = _shift(np.ones_like(self.inner.previous), dx, dy) > 0
             self.inner.previous = np.where(seen, _shift(self.inner.previous, dx, dy), image)
+
+    def remember_progress(self, gaze, progress: float) -> None:
+        """Write what a fixation at ``gaze`` taught into the progress map."""
+
+        half = self.fovea_size // 2
+        x, y = int(round(gaze[0])), int(round(gaze[1]))
+        area = self.progress[y - half : y + half, x - half : x + half]
+        area += 0.5 * (min(max(progress, 0.0), 1.0) - area)
 
     def predict_view(self, command: int) -> tuple[np.ndarray, np.ndarray]:
         """What the graph expects to see after ``command``, from its canvas alone, and
@@ -267,3 +292,22 @@ class EyeGraph:
             "world_shift": [round(float(v), 1) for v in self.world_shift],
         }
         return data
+
+
+def recentre(graph: EyeGraph) -> tuple[int, int]:
+    """Move the canvas under a gaze that has wandered toward its edge, so a long pan
+    never runs off it. Only bookkeeping: what is known keeps its place relative to
+    the view. Returns the shift applied."""
+
+    x, y = graph.gaze
+    cx, cy = graph.start
+    margin_x, margin_y = graph.view[0] // 2 + REACH + 8, graph.view[1] // 2 + REACH + 8
+    if margin_x <= x <= CANVAS[0] - margin_x and margin_y <= y <= CANVAS[1] - margin_y:
+        return 0, 0
+    dx, dy = int(round(cx - x)), int(round(cy - y))
+    for name in ("background", "background_shade", "confidence", "front", "error", "visits"):
+        setattr(graph, name, _shift(getattr(graph, name), dx, dy))
+    # Unexplored canvas coming in is presumed to teach, as at the start.
+    graph.progress = _shift(graph.progress, dx, dy, fill=0.5)
+    graph.gaze = (x + dx, y + dy)
+    return dx, dy

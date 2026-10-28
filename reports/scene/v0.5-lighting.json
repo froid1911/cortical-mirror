@@ -1,0 +1,36 @@
+{
+  "lighting": {
+    "normalised": {
+      "changing": {
+        "mean_iou": 0.8670047723872502,
+        "count_accuracy": 0.535
+      },
+      "constant": {
+        "mean_iou": 0.8629141601473261,
+        "count_accuracy": 0.69
+      }
+    },
+    "luminance": {
+      "changing": {
+        "mean_iou": 0.2402007209803229,
+        "count_accuracy": 0.0
+      },
+      "constant": {
+        "mean_iou": 0.8062957462363947,
+        "count_accuracy": 0.895
+      }
+    },
+    "v1": {
+      "changing": {
+        "mean_iou": 0.26859931391002567,
+        "count_accuracy": 0.545
+      },
+      "constant": {
+        "mean_iou": 0.2705297384865562,
+        "count_accuracy": 0.375
+      }
+    },
+    "scenes": 20,
+    "seconds": 1099.7
+  }
+}

@@ -4,6 +4,8 @@ A live mirror that shows what the camera will see next — and keeps learning to
 
 A small predictive-coding hierarchy predicts the next webcam frame from the frames it has already seen. Every prediction is scored only against the frame it was issued for, and that error is the only teaching signal: offline on natural video, and online, continuously, on the camera stream in front of it. Started from random weights, it begins as an exact copy of the last frame. On a person moving in front of a still camera it learns, within about a minute, to predict better than that copy; on short, generic action clips it ends about even with it.
 
+**New in v0.5:** [parts and wholes, light, real video and a GPU](#v05-parts-and-wholes-light-real-video-gpu). Pieces that move together become one creature you can delete in one click. Objects survive changes of light, the camera's own motion is registered away, and the graph's search runs on a GPU. Of the five v0.5 protocol runs, one passes and four fail; see the table.
+
 **New in v0.4:** [the world as a scene graph](#the-world-as-a-scene-graph-v04). It explains what it sees as things: a remembered background, and objects with a shape, a place, a motion and a depth. The eye is one of its nodes. Edit the graph, by deleting an object or moving it, and it renders what the world would look like then. `cortical-mirror scene` runs it in your browser.
 
 ![The scene graph: what it sees beside what it explains; one object is deleted and the background behind it comes from memory](docs/images/scene-graph.gif)
@@ -312,6 +314,47 @@ Protocols 8–12 were written before measuring, on synthetic sprite worlds where
 .venv/bin/python tools/scene_report.py --protocols attention --output reports/scene/v0.4-attention.json
 ```
 
+### v0.5: parts and wholes, light, real video, GPU
+
+v0.4 found a person on the webcam as five unrelated pieces, compared raw brightness, took every camera pan for the world moving, and failed permanence and curiosity. v0.5 addresses all four ([design](docs/superpowers/specs/2026-10-28-v0.5-design.md), with its amendments made before any test measurement).
+
+- **Parts and wholes:**
+  - Every pair of nodes has a binding strength, learned by a Hebbian rule toward their common fate: they keep their distance while both travel. A limb swings about its torso but keeps its distance.
+  - Bound nodes form a group, a parent node with "part of" edges.
+  - On the page, a frame around a group deletes the whole creature in one click.
+- **Light:**
+  - Objects are matched on brightness normalised against its surroundings (a local z-score at the scale of surfaces), and the picture is kept in plain brightness.
+  - This is the retina's divisive normalisation, applied to surfaces.
+  - The learned V1 code was tried first and found only outlines; it is reported as a third condition.
+- **Real video:**
+  - Each frame's global shift is estimated from the frames and registered against a canvas, so the camera's own motion is not taken for the world moving.
+  - The graph predicts only what it explains, moved with the camera to the sub-pixel, and the last frame elsewhere.
+- **Curiosity:** each place keeps a learned value, the progress looking there brought. It starts optimistic, and is raised again only where something new appears in a place that used to be predicted well.
+- **GPU:**
+  - `SceneGraph(device="cuda")` runs the search on a torch device, with the same placements as on the CPU. The search is 78% of the time.
+  - One frame takes 12.9 ms on one GPU against 40 ms on the CPU arrays.
+  - Protocol seeds run in parallel processes.
+
+| Protocol | Verdict |
+|---|---|
+| [13](docs/protocols/13-parts-and-wholes.md) Parts and wholes | **Fails one criterion.** Specificity 0.95 (pass); deleting a creature renders 0.31 × the bitmap's error (pass). But recall is 0.62 against the 0.7 needed: about 4 in 10 part pairs of one creature are not bound. |
+| [14](docs/protocols/14-lighting.md) Changing light | **Passes.** Under changing light, objects keep IoU 0.87 with the normalised code, while brightness collapses to 0.24. Under constant light the code is as good as brightness. Its object counts are less reliable (0.54 under changing light, 0.69 under constant). |
+| [15](docs/protocols/15-real-video.md) Real video | **Fails.** On 40 UCF101 test clips the expectation went from 4.6 × worse than repeating the last frame (v0.4) to 1.04 ×, and is better on 40% of clips. It needed below 0.95. |
+| [9](docs/protocols/09-object-permanence.md) Permanence, re-run | **Fails for the adult**, as before: it keeps 55% of hidden objects, against 80% needed. The developmental contrast and the learned τ still pass. |
+| [11](docs/protocols/11-learned-attention.md) Curiosity, re-run | **Fails, but now better than random gaze on every measure.** Captured by the noise in 11% of fixations against random's 17%; it knows the world a little better (0.93 × random's error) and finds a newcomer sooner (134 vs 152 frames). The criteria needed 0.5 ×, 0.9 × and 0.5 ×. In v0.4 the adult was worse than random on two of the three. |
+
+v0.4's protocols re-run on v0.5's code (`reports/scene/v0.5-carryover.json`) still pass:
+- discovery: IoU 0.81, counts right 91% of the time;
+- manipulation: delete 0.22 ×, move 0.44 × the bitmap's error;
+- self vs world: commanded 0.0, uncommanded 1.0, prediction from memory 0.02.
+
+```bash
+.venv/bin/cortical-mirror scene                 # creatures and a screen; click a frame to delete a whole
+.venv/bin/cortical-mirror scene --source 0      # your camera: registered, normalised, on the GPU if there is one
+SCENE_WORKERS=20 SCENE_DEVICE=cuda .venv/bin/python tools/scene_report.py --protocols parts,lighting --output reports/scene/v0.5.json
+.venv/bin/python tools/scene_real_video.py --data data/ucf101/UCF-101 --split test --output reports/scene/v0.5-real-video.json
+```
+
 ### References for the scene graph
 
 - E. S. Spelke. Principles of object perception. *Cognitive Science* 14, 1990.
@@ -322,6 +365,8 @@ Protocols 8–12 were written before measuring, on synthetic sprite worlds where
 - H. von Helmholtz. *Handbuch der physiologischen Optik*, 1867; E. von Holst and H. Mittelstaedt. Das Reafferenzprinzip. *Naturwissenschaften* 37, 1950.
 - P.-Y. Oudeyer, F. Kaplan and V. V. Hafner. Intrinsic motivation systems for autonomous mental development. *IEEE Trans. Evolutionary Computation* 11, 2007.
 - J. Schmidhuber. Curious model-building control systems. *IJCNN*, 1991.
+- P. J. Kellman and E. S. Spelke. Perception of partly occluded objects in infancy. *Cognitive Psychology* 15, 1983.
+- E. H. Land and J. J. McCann. Lightness and retinex theory. *JOSA* 61, 1971.
 
 ## Setup
 
@@ -556,6 +601,10 @@ Tests cover causal counterfactuals, forward-warp direction, the group-disjoint s
 - Live learning needs an NVIDIA GPU. On a CPU the learner manages under one step per second.
 - The mirror has no object permanence, explicit egomotion, or multimodal future; pixel warping and blending can soften detail. The v0.4 scene level has objects and a self, but only in synthetic worlds: on real video it is worse than repeating the last frame, and its adult fails the permanence protocol.
 - The pretrained DMVFN expert is not part of the self-organizing story; ablations without it are reported.
+
+## Changes in v0.5
+
+v0.5 adds parts and wholes (binding by common fate, groups, deleting a whole), matching on brightness normalised against its surroundings, camera registration for real video, a progress memory for curiosity, the search on a GPU, and parallel protocol runs. Of five protocols, changing light passes; parts and wholes, real video, permanence and curiosity fail. Protocols 8, 10 and 12 were re-run on v0.5's code. The v0.2 mirror, the v0.3 cortex and v0.4's results are unchanged.
 
 ## Changes in v0.4
 

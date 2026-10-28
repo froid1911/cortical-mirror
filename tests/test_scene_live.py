@@ -157,3 +157,26 @@ def test_the_server_answers_bad_requests_with_400():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_a_whole_group_can_be_deleted_at_once():
+    state = SceneLive(SpriteSource(seed=1))
+    run(state, 30)
+    state.control({"delete_all": [0, 1, 2]})
+    assert state.scene()["edits"]["deleted"] == [0, 1, 2]
+    import pytest
+
+    with pytest.raises(ValueError):
+        state.control({"delete_all": [0, "x"]})
+    with pytest.raises(ValueError):
+        state.control({"delete_all": list(range(1000))})
+
+
+def test_video_sources_run_through_the_camera_registering_graph():
+    from cortical_mirror.scene.video import VideoGraph
+
+    state = SceneLive(SpriteSource(seed=1), video=VideoGraph())
+    run(state, 40)
+    scene = state.scene()
+    assert "camera" in scene and scene["nodes"]
+    assert state.graph is state.video.graph

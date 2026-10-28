@@ -1,0 +1,98 @@
+{
+  "discovery": {
+    "learning": {
+      "mean_iou": 0.8140676396529382,
+      "count_accuracy": 0.905
+    },
+    "frozen": {
+      "mean_iou": 0.29837782224823445,
+      "count_accuracy": 0.025
+    },
+    "motion_baseline": {
+      "mean_iou": 0.5395383952237546,
+      "count_accuracy": 0.7175
+    },
+    "samples": 10,
+    "scenes": 40,
+    "seconds": 173.5
+  },
+  "manipulation": {
+    "objects": 100,
+    "matched": 94,
+    "scenes": 40,
+    "delete": {
+      "edits": 94,
+      "graph_mse": 0.0005967990552666708,
+      "bitmap_mse": 0.002709445630898699,
+      "unchanged_mse": 0.019981676405493882,
+      "graph_over_bitmap": 0.22026611217465833,
+      "graph_wins": 0.9468085106382979
+    },
+    "move": {
+      "edits": 94,
+      "graph_mse": 0.0011268222973585386,
+      "bitmap_mse": 0.002560238314277314,
+      "unchanged_mse": 0.019423053800524708,
+      "graph_over_bitmap": 0.440123988097026,
+      "graph_wins": 0.9042553191489362
+    },
+    "seconds": 53.1
+  },
+  "self_world": {
+    "adult_motor": [
+      [
+        0.0,
+        0.0
+      ],
+      [
+        32.0,
+        0.0
+      ],
+      [
+        32.0,
+        -32.0
+      ],
+      [
+        0.0,
+        -32.0
+      ],
+      [
+        -32.0,
+        -32.0
+      ],
+      [
+        -32.0,
+        0.0
+      ],
+      [
+        -32.0,
+        32.0
+      ],
+      [
+        0.0,
+        32.0
+      ],
+      [
+        32.0,
+        32.0
+      ]
+    ],
+    "newborn": {
+      "commanded": 1.0,
+      "uncommanded": 1.0,
+      "prediction_error_from_memory": 0.011700301337987185,
+      "prediction_error_unchanged": 0.011764594307169318,
+      "prediction_ratio": 0.9945350457904908,
+      "trials": 20
+    },
+    "adult": {
+      "commanded": 0.0,
+      "uncommanded": 1.0,
+      "prediction_error_from_memory": 0.0002465702616973431,
+      "prediction_error_unchanged": 0.012029842473566532,
+      "prediction_ratio": 0.020496549496731815,
+      "trials": 20
+    },
+    "seconds": 375.1
+  }
+}

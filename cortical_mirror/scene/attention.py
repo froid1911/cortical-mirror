@@ -2,14 +2,20 @@
 
 Every few frames the eye picks one of the saccade commands. Each possible target
 is described by a few features of what the scene graph knows about the place the
-fovea would land on: how unknown its background is, how badly the graph has been
-predicting it, how new the objects there are, and how long the fovea has
-already spent there. A target's value is a weighted
-sum of its features. After the fixation, the weights change by a three-factor
-rule: the features of the fixation just made (presynaptic) times a global signal,
-the learning progress it brought (how much the graph's prediction error in the
-fovea fell) minus the progress the weights had promised, like a dopamine
-prediction error. A newborn's weights are zero, so it looks at random.
+fovea would land on:
+
+* how unknown its background is;
+* how badly the graph has been predicting it;
+* how new the objects there are;
+* how long the fovea has already spent there;
+A target's value is a weighted sum of its features, plus the place's own learned
+value: the progress looking there brought before, a map that starts optimistic
+and is raised again where something new appears. After the fixation, the
+weights change by a three-factor rule: the features of the fixation just made
+(presynaptic) times a global signal, the learning progress it brought (how much
+the graph's prediction error in the fovea fell) minus the progress the weights
+had promised, like a dopamine prediction error. A newborn's weights are zero,
+so it looks at random.
 
 ``policy="surprise"`` replaces the learned value by the prediction error alone:
 the reflex the v0.3 eye had built in.
@@ -29,6 +35,8 @@ ERROR_SCALE = 0.02
 # Frames in the fovea a node takes to lose most of its novelty, and a place to
 # count as fully familiar.
 FAMILIAR = 30.0
+# Frames a node must have lasted to count as a thing that is new.
+LASTING = 10
 
 
 class Attention:
@@ -66,14 +74,15 @@ class Attention:
         out = np.zeros((len(COMMANDS), len(FEATURES)))
         half = graph.fovea_size // 2
         positions = graph.world_positions()
-        looked = {node.id: node.looked for node in graph.inner.nodes}
+        # Only things that last count as new: noise throws up nodes that live a frame.
+        looked = {node.id: node.looked for node in graph.inner.nodes if node.age >= LASTING}
         for command in range(len(COMMANDS)):
             x, y = (int(round(v)) for v in self._target(graph, command))
-            area = (slice(y - half, y + half), slice(x - half, x + half))
+            area = (slice(max(y - half, 0), y + half), slice(max(x - half, 0), x + half))
             novelty = sum(
                 np.exp(-looked.get(node, 0) / FAMILIAR)
                 for node, nx, ny in positions
-                if abs(nx - x) < half and abs(ny - y) < half
+                if node in looked and abs(nx - x) < half and abs(ny - y) < half
             )
             out[command] = (
                 float(np.mean(1.0 - graph.confidence[area])),
@@ -94,7 +103,9 @@ class Attention:
         elif self.policy == "random":
             values = np.zeros(len(COMMANDS))
         else:
-            values = features @ self.weights
+            # The learned value of a target: its features, weighted, plus what looking
+            # at that very place has taught before (its own learned value).
+            values = features @ self.weights + self.place_values(graph)
         # Inhibition of return: places just looked at are worth less.
         for command in allowed:
             tx, ty = self._target(graph, command)
@@ -102,6 +113,15 @@ class Attention:
                 values[command] -= 1.0
         best = max(values[c] for c in allowed)
         return self.rng.choice([c for c in allowed if values[c] >= best - 1e-9])
+
+    def place_values(self, graph) -> np.ndarray:
+        half = graph.fovea_size // 2
+        out = np.zeros(len(COMMANDS))
+        for command in range(len(COMMANDS)):
+            x, y = (int(round(v)) for v in self._target(graph, command))
+            area = graph.progress[max(y - half, 0) : y + half, max(x - half, 0) : x + half]
+            out[command] = float(np.mean(area)) if area.size else 0.5
+        return out
 
     def learn(self, features: np.ndarray, progress: float) -> None:
         """Three-factor rule: the fixation's features times (progress − promise)."""
@@ -123,6 +143,7 @@ class Attention:
                 progress = float((start - end) / (start + 1e-4))
                 self._fixation["progress"] = progress
                 self.learn(self._fixation["features"], progress)
+                graph.remember_progress(self._fixation["target"], progress)
                 self.history.append(self._fixation)
         commands = [c for c in range(1, len(COMMANDS)) if allowed(c)] or [0]
         command = self.choose(graph, commands)
@@ -130,6 +151,7 @@ class Attention:
         self._recent = [*self._recent, self._target(graph, command)][-3:]
         self._fixation = {
             "command": command,
+            "target": self._target(graph, command),
             "features": features,
             "start": len(graph.fovea_errors) + 1,
         }

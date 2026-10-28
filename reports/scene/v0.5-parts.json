@@ -1,0 +1,22 @@
+{
+  "parts": {
+    "binding": {
+      "recall": 0.6190476190476191,
+      "specificity": 0.9543230016313213,
+      "pairs_same": 168,
+      "pairs_different": 613
+    },
+    "proximity": {
+      "recall": 0.9821428571428571,
+      "specificity": 0.8890701468189233,
+      "pairs_same": 168,
+      "pairs_different": 613
+    },
+    "creatures_deleted": 9,
+    "delete_graph_mse": 0.002511822337207074,
+    "delete_bitmap_mse": 0.008195931635176143,
+    "delete_ratio": 0.3064718507932126,
+    "scenes": 20,
+    "seconds": 188.2
+  }
+}

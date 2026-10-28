@@ -177,3 +177,110 @@ class SpriteWorld:
                 }
             )
         return out
+
+
+class CreatureWorld(SpriteWorld):
+    """Articulated creatures: a torso that drifts and bounces, and limbs that swing
+    about it at a fixed distance. Parts move together without moving rigidly."""
+
+    def __init__(
+        self,
+        seed: int = 0,
+        width: int = 256,
+        height: int = 192,
+        creatures: int = 2,
+        limbs: int | None = None,
+        speed: tuple[float, float] = (0.5, 1.5),
+        occluders: int = 0,
+        occluder_width: int = 14,
+    ):
+        super().__init__(
+            seed=seed,
+            width=width,
+            height=height,
+            objects=0,
+            occluders=occluders,
+            occluder_width=occluder_width,
+        )
+        # Screens are numbered apart from the creatures' parts, and stand in front of them.
+        for index, screen in enumerate(self.occluders):
+            screen.id = 1000 + index
+            screen.depth = 1000 + index
+        rng = np.random.default_rng(seed + 10_000)
+        self.creatures: list[dict] = []
+        self.time = 0
+        for index in range(creatures):
+            level = rng.uniform(0.35, 0.65)
+            angle, pace = rng.uniform(0, 2 * math.pi), rng.uniform(*speed)
+            torso = Thing(
+                id=len(self.objects),
+                texture=(level + 0.3 * (texture(SPRITE, SPRITE, rng) - 0.5))
+                .clip(0, 1)
+                .astype(np.float32),
+                mask=blob(rng, radius=(12, 16)),
+                x=float(rng.uniform(60, width - 60)),
+                y=float(rng.uniform(50, height - 50)),
+                vx=pace * math.cos(angle),
+                vy=pace * math.sin(angle),
+                depth=2 * index,
+            )
+            self.objects.append(torso)
+            parts, swings = [torso], []
+            count = limbs if limbs is not None else 1 + seed % 2
+            for limb_index in range(count):
+                shade = rng.uniform(0.25, 0.75)
+                limb = Thing(
+                    id=len(self.objects),
+                    texture=(shade + 0.3 * (texture(SPRITE, SPRITE, rng) - 0.5))
+                    .clip(0, 1)
+                    .astype(np.float32),
+                    mask=blob(rng, radius=(6, 9)),
+                    x=torso.x,
+                    y=torso.y,
+                    vx=0.0,
+                    vy=0.0,
+                    depth=2 * index + 1,
+                )
+                self.objects.append(limb)
+                parts.append(limb)
+                swings.append(
+                    {
+                        "reach": float(rng.uniform(22, 26)),
+                        "base": float(rng.uniform(0, 2 * math.pi)) + limb_index * math.pi,
+                        "swing": 0.6,
+                        "period": float(rng.uniform(60, 90)),
+                        "phase": float(rng.uniform(0, 2 * math.pi)),
+                    }
+                )
+            self.creatures.append({"parts": parts, "swings": swings})
+        self._place_limbs()
+
+    def _place_limbs(self) -> None:
+        for creature in self.creatures:
+            torso, *limbs = creature["parts"]
+            for limb, swing in zip(limbs, creature["swings"], strict=True):
+                angle = swing["base"] + swing["swing"] * math.sin(
+                    2 * math.pi * self.time / swing["period"] + swing["phase"]
+                )
+                limb.x = torso.x + swing["reach"] * math.cos(angle)
+                limb.y = torso.y + swing["reach"] * math.sin(angle)
+
+    def step(self) -> None:
+        # Torsos bounce far enough from the edge that their limbs stay in view.
+        margin = 40
+        self.time += 1
+        for creature in self.creatures:
+            torso = creature["parts"][0]
+            torso.x += torso.vx
+            torso.y += torso.vy
+            if not margin <= torso.x <= self.width - margin:
+                torso.vx = -torso.vx
+                torso.x = min(max(torso.x, margin), self.width - margin)
+            if not margin <= torso.y <= self.height - margin:
+                torso.vy = -torso.vy
+                torso.y = min(max(torso.y, margin), self.height - margin)
+        self._place_limbs()
+
+    def truth(self) -> list[dict]:
+        owner = {p.id: i for i, c in enumerate(self.creatures) for p in c["parts"]}
+        return [{**t, "creature": owner[t["id"]]} for t in super().truth()]

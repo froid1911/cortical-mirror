@@ -5,12 +5,15 @@ import json
 import time
 from pathlib import Path
 
+from cortical_mirror.scene.front import CortexFront, LuminanceFront, NormalisedFront
 from cortical_mirror.scene.graph import NEWBORN_PERSISTENCE, SceneGraph
 from cortical_mirror.scene.phenomena import (
     attention_trials,
+    lighting,
     manipulation,
     object_discovery,
     object_permanence,
+    parts_and_wholes,
     self_and_world,
     train_attention,
     train_motor,
@@ -69,12 +72,66 @@ def attention() -> dict:
     }
 
 
+V1_ADULT = Path.home() / ".cache" / "cortical-mirror" / "cortex-adult-p1.pt"
+
+
+def parts() -> dict:
+    """Protocol 13."""
+
+    return parts_and_wholes()
+
+
+def light() -> dict:
+    """Protocol 14: the v0.5 code, v0.4's brightness, and V1's code (reported)."""
+
+    return lighting(
+        {
+            "normalised": NormalisedFront(),
+            "luminance": LuminanceFront(),
+            "v1": CortexFront(V1_ADULT),
+        }
+    )
+
+
+def permanence_v05() -> dict:
+    """Protocol 9 re-run for v0.5 on fresh test seeds, with a freshly raised adult."""
+
+    adult, course = train_persistence()
+    magic, _ = train_persistence(magic=True)
+    seeds = range(3020, 3040)
+    return {
+        "adult_persistence": adult,
+        "magic_persistence": magic,
+        "adult_course": course,
+        "newborn": object_permanence(NEWBORN_PERSISTENCE, seeds=seeds),
+        "adult": object_permanence(adult, seeds=seeds),
+        "built_in": object_permanence(60.0, seeds=seeds),
+    }
+
+
+def attention_v05() -> dict:
+    """Protocol 11 re-run for v0.5 (gaze with a progress memory) on fresh test seeds."""
+
+    weights = train_attention()
+    seeds = range(5020, 5040)
+    return {
+        "adult_weights": weights.round(4).tolist(),
+        "newborn": attention_trials("random", seeds=seeds),
+        "surprise_reflex": attention_trials("surprise", seeds=seeds),
+        "adult": attention_trials("learned", weights, seeds=seeds),
+    }
+
+
 PROTOCOLS = {
     "discovery": object_discovery,
     "manipulation": manipulation,
     "permanence": permanence,
     "self_world": self_world,
     "attention": attention,
+    "parts": parts,
+    "lighting": light,
+    "permanence_v05": permanence_v05,
+    "attention_v05": attention_v05,
 }
 
 

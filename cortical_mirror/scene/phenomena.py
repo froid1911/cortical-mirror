@@ -6,13 +6,33 @@ the graph itself never sees it.
 
 from __future__ import annotations
 
+import functools
 import math
+import multiprocessing
+import os
+from concurrent.futures import ProcessPoolExecutor
 
 import cv2
 import numpy as np
 
 from .graph import SceneGraph
 from .world import SpriteWorld
+
+
+def seed_map(fn, items) -> list:
+    """``[fn(item) for item in items]``, in that order; across processes when the
+    environment variable SCENE_WORKERS asks for more than one. Every seed is
+    independent and deterministic, so the results are the same either way."""
+
+    items = list(items)
+    workers = min(int(os.environ.get("SCENE_WORKERS", "1")), len(items))
+    if workers <= 1:
+        return [fn(item) for item in items]
+    # Forking a process that already used CUDA breaks the children: start afresh then.
+    method = "spawn" if os.environ.get("SCENE_DEVICE", "").startswith("cuda") else "fork"
+    context = multiprocessing.get_context(method)
+    with ProcessPoolExecutor(workers, mp_context=context) as pool:
+        return list(pool.map(fn, items))
 
 
 def iou(a: np.ndarray, b: np.ndarray) -> float:
@@ -233,7 +253,7 @@ def train_persistence(
     return graph.persistence, trajectory
 
 
-def _occlusion_trial(seed: int, vanish: bool, persistence: float, frames: int) -> dict:
+def _occlusion_trial(seed: int, vanish: bool, persistence: float, frames: int, front=None) -> dict:
     """Watch one trial; per frame: the image, the graph's expectation of it, the true
     position (None once the object is gone), and the nodes' positions."""
 
@@ -247,9 +267,9 @@ def _occlusion_trial(seed: int, vanish: bool, persistence: float, frames: int) -
             record["hidden"] = t
             if vanish:
                 world.objects.clear()
-        record["expected"].append(graph.expect())
+        record["expected"].append(graph.expect(shade=True))
         image = world.render()
-        graph.observe(image)
+        graph.observe(front.code(image) if front else image, shade=image)
         record["images"].append(image)
         thing = world.objects[0] if world.objects else None
         record["truth"].append(None if thing is None else (thing.x, thing.y))
@@ -260,37 +280,42 @@ def _occlusion_trial(seed: int, vanish: bool, persistence: float, frames: int) -
     return record
 
 
-def object_permanence(persistence: float, seeds=range(3000, 3020), frames: int = 120) -> dict:
-    """Protocol 9, for one persistence."""
-
-    kept, errors, surprise = [], [], {"vanish": [], "reappear": []}
-    for seed in seeds:
-        reappear = _occlusion_trial(seed, False, persistence, frames)
-        vanish = _occlusion_trial(seed, True, persistence, frames)
-        hidden = reappear["hidden"]
-        back = next(t for t in range(hidden, frames) if reappear["visible"][t])
-        x, y = reappear["truth"][back - 1]
-        near = min(
-            (math.hypot(nx - x, ny - y) for nx, ny in reappear["nodes"][back - 1]),
-            default=math.inf,
-        )
-        kept.append(near <= 8)
-        if near <= 8:
-            errors.append(near)
-        region = (slice(72, 120), slice(reappear["right"], reappear["right"] + 36))
-        for name, record in (("reappear", reappear), ("vanish", vanish)):
-            surprise[name].append(
-                float(
-                    np.mean(
-                        [
-                            np.mean(
-                                (record["expected"][t][region] - record["images"][t][region]) ** 2
-                            )
-                            for t in range(back, min(back + 15, frames))
-                        ]
-                    )
-                )
+def _permanence_seed(seed: int, persistence: float, frames: int, front=None) -> dict:
+    reappear = _occlusion_trial(seed, False, persistence, frames, front)
+    vanish = _occlusion_trial(seed, True, persistence, frames, front)
+    hidden = reappear["hidden"]
+    back = next(t for t in range(hidden, frames) if reappear["visible"][t])
+    x, y = reappear["truth"][back - 1]
+    near = min(
+        (math.hypot(nx - x, ny - y) for nx, ny in reappear["nodes"][back - 1]),
+        default=math.inf,
+    )
+    region = (slice(72, 120), slice(reappear["right"], reappear["right"] + 36))
+    out = {"kept": near <= 8, "error": near}
+    for name, record in (("reappear", reappear), ("vanish", vanish)):
+        out[name] = float(
+            np.mean(
+                [
+                    np.mean((record["expected"][t][region] - record["images"][t][region]) ** 2)
+                    for t in range(back, min(back + 15, frames))
+                ]
             )
+        )
+    return out
+
+
+def object_permanence(
+    persistence: float, seeds=range(3000, 3020), frames: int = 120, front=None
+) -> dict:
+    """Protocol 9, for one persistence (and the code the graph matches in)."""
+
+    trials = seed_map(
+        functools.partial(_permanence_seed, persistence=persistence, frames=frames, front=front),
+        seeds,
+    )
+    kept = [t["kept"] for t in trials]
+    errors = [t["error"] for t in trials if t["kept"]]
+    surprise = {name: [t[name] for t in trials] for name in ("vanish", "reappear")}
     vanish_mean = float(np.mean(surprise["vanish"]))
     reappear_mean = float(np.mean(surprise["reappear"]))
     return {
@@ -456,27 +481,39 @@ def _attention_run(seed: int, attention, frames: int, novel_at: int):
     return graph, trial, fixations, found
 
 
+def _attention_seed(seed: int, policy: str, weights, frames: int, novel_at: int) -> dict:
+    from .attention import Attention
+
+    attention = Attention(weights=weights, policy=policy, seed=seed)
+    graph, trial, fixations, found = _attention_run(seed, attention, frames, novel_at)
+    # The graph's canvas, laid over the world (its gaze began at the world's centre).
+    ox = graph.start[0] - EYE_WORLD[0] // 2
+    oy = graph.start[1] - EYE_WORLD[1] // 2
+    known = graph.background_shade[oy : oy + EYE_WORLD[1], ox : ox + EYE_WORLD[0]]
+    outside = np.ones(known.shape, bool)
+    x, y = trial.noise
+    outside[y - FOVEA // 2 : y + FOVEA // 2, x - FOVEA // 2 : x + FOVEA // 2] = False
+    return {
+        "captured": [_fovea_overlap(g, trial.noise) >= 0.5 for g in fixations],
+        "error": float(np.mean((known - trial.world.background)[outside] ** 2)),
+        "novelty": frames - novel_at if found is None else found,
+    }
+
+
 def attention_trials(
     policy: str, weights=None, seeds=range(5000, 5020), frames: int = 600, novel_at: int = 300
 ) -> dict:
     """Protocol 11, for one way of choosing where to look."""
 
-    from .attention import Attention
-
-    captured, errors, novelty = [], [], []
-    for seed in seeds:
-        attention = Attention(weights=weights, policy=policy, seed=seed)
-        graph, trial, fixations, found = _attention_run(seed, attention, frames, novel_at)
-        captured.extend(_fovea_overlap(g, trial.noise) >= 0.5 for g in fixations)
-        # The graph's canvas, laid over the world (its gaze began at the world's centre).
-        ox = graph.start[0] - EYE_WORLD[0] // 2
-        oy = graph.start[1] - EYE_WORLD[1] // 2
-        known = graph.background[oy : oy + EYE_WORLD[1], ox : ox + EYE_WORLD[0]]
-        outside = np.ones(known.shape, bool)
-        x, y = trial.noise
-        outside[y - FOVEA // 2 : y + FOVEA // 2, x - FOVEA // 2 : x + FOVEA // 2] = False
-        errors.append(float(np.mean((known - trial.world.background)[outside] ** 2)))
-        novelty.append(frames - novel_at if found is None else found)
+    trials = seed_map(
+        functools.partial(
+            _attention_seed, policy=policy, weights=weights, frames=frames, novel_at=novel_at
+        ),
+        seeds,
+    )
+    captured = [c for t in trials for c in t["captured"]]
+    errors = [t["error"] for t in trials]
+    novelty = [t["novelty"] for t in trials]
     return {
         "policy": policy,
         "noise_capture": float(np.mean(captured)) if captured else 0.0,
@@ -496,3 +533,172 @@ def train_attention(seeds=range(500, 540), frames: int = 600, explore: float = 0
         attention.rng.seed(seed)
         _attention_run(seed, attention, frames, novel_at=frames // 2)
     return attention.weights.copy()
+
+
+def _parts_seed(seed: int, frames: int, sample_from: int, every: int, front=None) -> dict:
+    from .world import CreatureWorld
+
+    pairs = {"binding": {"same": [], "different": []}, "proximity": {"same": [], "different": []}}
+    graph_mse, bitmap_mse, creatures_deleted = [], [], 0
+    world = CreatureWorld(seed=seed, creatures=2 + seed % 2)
+    graph = SceneGraph(world.width, world.height)
+    for t in range(frames):
+        world.step()
+        image = world.render()
+        graph.observe(front.code(image) if front else image, shade=image)
+        if t < sample_from or (t - sample_from) % every:
+            continue
+        truth = world.truth()
+        masks = node_masks(graph)
+        matched = [
+            (i, j) for i, j, score in match([o["visible"] for o in truth], masks) if score >= 0.3
+        ]
+        owner = {}
+        for group in graph.groups():
+            for member in group["members"]:
+                owner[member] = group["id"]
+        for a, (ta, na) in enumerate(matched):
+            for tb, nb in matched[a + 1 :]:
+                same = truth[ta]["creature"] == truth[tb]["creature"]
+                node_a, node_b = graph.nodes[na], graph.nodes[nb]
+                grouped = owner.get(node_a.id, node_a.id) == owner.get(node_b.id, node_b.id)
+                close = math.hypot(node_a.x - node_b.x, node_a.y - node_b.y) < 40
+                key = "same" if same else "different"
+                pairs["binding"][key].append(grouped)
+                pairs["proximity"][key].append(close)
+    # Delete each creature whose parts are all matched.
+    frame = world.render()
+    truth = world.truth()
+    masks = node_masks(graph)
+    matched = {i: j for i, j, score in match([o["visible"] for o in truth], masks) if score >= 0.3}
+    groups = {m: g["members"] for g in graph.groups() for m in g["members"]}
+    for index, creature in enumerate(world.creatures):
+        parts = [i for i, o in enumerate(truth) if o["creature"] == index]
+        if not all(i in matched for i in parts):
+            continue
+        creatures_deleted += 1
+        nodes = {graph.nodes[matched[i]].id for i in parts}
+        delete = set().union(*(set(groups.get(n, [n])) for n in nodes))
+        union = np.zeros(frame.shape, bool)
+        for i in parts:
+            union |= masks[matched[i]]
+        true_image = world.render(deleted={p.id for p in creature["parts"]})
+        region = np.zeros(frame.shape, bool)
+        for i in parts:
+            region |= truth[i]["full"]
+        region = cv2.dilate(region.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+        graph_image = graph.edit(delete=delete, shade=True)
+        bitmap_image = bitmap_edit(frame, union, delete=True)
+        graph_mse.append(float(np.mean((graph_image - true_image)[region] ** 2)))
+        bitmap_mse.append(float(np.mean((bitmap_image - true_image)[region] ** 2)))
+
+    return {
+        "pairs": pairs,
+        "graph_mse": graph_mse,
+        "bitmap_mse": bitmap_mse,
+        "creatures_deleted": creatures_deleted,
+    }
+
+
+def parts_and_wholes(
+    seeds=range(6000, 6020),
+    frames: int = 300,
+    sample_from: int = 200,
+    every: int = 10,
+    front=None,
+) -> dict:
+    """Protocol 13."""
+
+    trials = seed_map(
+        functools.partial(
+            _parts_seed, frames=frames, sample_from=sample_from, every=every, front=front
+        ),
+        seeds,
+    )
+    pairs = {
+        condition: {
+            key: [v for t in trials for v in t["pairs"][condition][key]]
+            for key in ("same", "different")
+        }
+        for condition in ("binding", "proximity")
+    }
+    graph_mse = [v for t in trials for v in t["graph_mse"]]
+    bitmap_mse = [v for t in trials for v in t["bitmap_mse"]]
+    creatures_deleted = sum(t["creatures_deleted"] for t in trials)
+
+    def rate(values):
+        return float(np.mean(values)) if values else float("nan")
+
+    report = {
+        condition: {
+            "recall": rate(values["same"]),
+            "specificity": 1.0 - rate(values["different"]) if values["different"] else float("nan"),
+            "pairs_same": len(values["same"]),
+            "pairs_different": len(values["different"]),
+        }
+        for condition, values in pairs.items()
+    }
+    report["creatures_deleted"] = creatures_deleted
+    report["delete_graph_mse"] = rate(graph_mse)
+    report["delete_bitmap_mse"] = rate(bitmap_mse)
+    report["delete_ratio"] = rate(graph_mse) / rate(bitmap_mse) if bitmap_mse else float("nan")
+    report["scenes"] = len(list(seeds))
+    return report
+
+
+def lit(image: np.ndarray, t: int) -> np.ndarray:
+    """Protocol 14's slow change of light: gain and offset."""
+
+    gain = 1 + 0.4 * math.sin(2 * math.pi * t / 100)
+    offset = 0.1 * math.sin(2 * math.pi * t / 70)
+    return np.clip(gain * image + offset, 0.0, 1.0).astype(np.float32)
+
+
+def _lighting_seed(
+    seed: int, front, changing: bool, frames: int, sample_from: int, every: int
+) -> dict:
+    world = SpriteWorld(seed=seed, objects=3)
+    graph = SceneGraph(world.width, world.height)
+    ious, counts = [], []
+    for t in range(frames):
+        world.step()
+        image = lit(world.render(), t) if changing else world.render()
+        graph.observe(front.code(image), shade=image)
+        if t < sample_from or (t - sample_from) % every:
+            continue
+        truth = [o["visible"] for o in world.truth()]
+        masks = node_masks(graph)
+        ious.append(mean_iou(truth, masks))
+        counts.append(float(len(masks) == len(truth)))
+    return {"ious": ious, "counts": counts}
+
+
+def lighting(
+    fronts: dict,
+    seeds=range(7000, 7020),
+    frames: int = 300,
+    sample_from: int = 200,
+    every: int = 10,
+) -> dict:
+    """Protocol 14: discovery under changing and constant light, for each code."""
+
+    report = {}
+    for name, front in fronts.items():
+        for changing in (True, False):
+            trials = seed_map(
+                functools.partial(
+                    _lighting_seed,
+                    front=front,
+                    changing=changing,
+                    frames=frames,
+                    sample_from=sample_from,
+                    every=every,
+                ),
+                seeds,
+            )
+            report.setdefault(name, {})["changing" if changing else "constant"] = {
+                "mean_iou": float(np.mean([v for t in trials for v in t["ious"]])),
+                "count_accuracy": float(np.mean([v for t in trials for v in t["counts"]])),
+            }
+    report["scenes"] = len(list(seeds))
+    return report

@@ -1,0 +1,60 @@
+{
+  "split": "test",
+  "videos": [
+    "v_ThrowDiscus_g01_c04.avi",
+    "v_HorseRiding_g04_c07.avi",
+    "v_SkyDiving_g05_c01.avi",
+    "v_WalkingWithDog_g04_c01.avi",
+    "v_JugglingBalls_g03_c03.avi",
+    "v_BalanceBeam_g04_c02.avi",
+    "v_Fencing_g04_c04.avi",
+    "v_Nunchucks_g03_c02.avi",
+    "v_MilitaryParade_g05_c01.avi",
+    "v_IceDancing_g04_c06.avi",
+    "v_YoYo_g03_c03.avi",
+    "v_StillRings_g03_c04.avi",
+    "v_TaiChi_g06_c02.avi",
+    "v_GolfSwing_g04_c01.avi",
+    "v_Lunges_g04_c04.avi",
+    "v_HeadMassage_g06_c01.avi",
+    "v_PlayingGuitar_g04_c03.avi",
+    "v_WalkingWithDog_g05_c02.avi",
+    "v_WritingOnBoard_g03_c04.avi",
+    "v_CricketShot_g04_c05.avi",
+    "v_MoppingFloor_g04_c05.avi",
+    "v_Bowling_g01_c03.avi",
+    "v_FrisbeeCatch_g01_c04.avi",
+    "v_Bowling_g01_c05.avi",
+    "v_SkyDiving_g03_c01.avi",
+    "v_BenchPress_g07_c07.avi",
+    "v_PlayingViolin_g05_c01.avi",
+    "v_Surfing_g02_c04.avi",
+    "v_Drumming_g05_c05.avi",
+    "v_WritingOnBoard_g04_c04.avi",
+    "v_PizzaTossing_g06_c03.avi",
+    "v_SalsaSpin_g06_c02.avi",
+    "v_Swing_g05_c01.avi",
+    "v_PlayingSitar_g05_c01.avi",
+    "v_WallPushups_g06_c07.avi",
+    "v_Bowling_g06_c05.avi",
+    "v_Haircut_g02_c03.avi",
+    "v_Biking_g04_c01.avi",
+    "v_SkateBoarding_g01_c03.avi",
+    "v_Basketball_g07_c03.avi"
+  ],
+  "v0.4": {
+    "ratio": 4.587031424453091,
+    "clips_better_than_repeating": 0.0,
+    "seconds": 254.5
+  },
+  "registration_luminance": {
+    "ratio": 1.0357056886559872,
+    "clips_better_than_repeating": 0.35,
+    "seconds": 326.3
+  },
+  "registration_normalised": {
+    "ratio": 1.036421699741485,
+    "clips_better_than_repeating": 0.4,
+    "seconds": 328.5
+  }
+}

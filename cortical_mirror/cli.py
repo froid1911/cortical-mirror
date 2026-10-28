@@ -334,6 +334,11 @@ def main() -> None:
     scene.add_argument("--adult", type=Path, help="scene adult (default: download it)")
     scene.add_argument("--newborn", action="store_true", help="forget what it cannot see")
     scene.add_argument("--assets", type=Path, default=Path.home() / ".cache" / "cortical-mirror")
+    scene.add_argument(
+        "--device",
+        default="auto",
+        help="where the graph searches: cpu, cuda (auto: cuda if present)",
+    )
     scene.add_argument("--host", default="127.0.0.1")
     scene.add_argument("--port", type=int, default=8080)
 
@@ -352,8 +357,26 @@ def main() -> None:
         from .scene.live import serve as serve_scene
 
         scene_arguments(args)
-        source = SpriteSource() if args.source == "world" else VideoSource(args.source)
-        serve_scene(SceneLive(source, scene_graph(args)), args.host, args.port)
+        import os
+
+        import torch
+
+        device = args.device
+        if device == "auto":
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        # The array search is the faster one on a CPU.
+        os.environ["SCENE_DEVICE"] = "" if device == "cpu" else device
+        from .scene.front import NormalisedFront
+        from .scene.video import VideoGraph
+
+        if args.source == "world":
+            state = SceneLive(SpriteSource(), scene_graph(args))
+        else:
+            # A camera or a video: register the camera's own motion, and match in the
+            # normalised code, which ignores changes of exposure.
+            video = VideoGraph(front=NormalisedFront(), persistence=scene_graph(args).persistence)
+            state = SceneLive(VideoSource(args.source), video=video)
+        serve_scene(state, args.host, args.port)
         return
     if args.command == "twins":
         twins_arguments(args)
