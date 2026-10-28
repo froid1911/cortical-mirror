@@ -35,6 +35,8 @@ ERROR_SCALE = 0.02
 # Frames in the fovea a node takes to lose most of its novelty, and a place to
 # count as fully familiar.
 FAMILIAR = 30.0
+# Frames a node must have lasted to count as a thing that is new.
+LASTING = 10
 
 
 class Attention:
@@ -72,14 +74,15 @@ class Attention:
         out = np.zeros((len(COMMANDS), len(FEATURES)))
         half = graph.fovea_size // 2
         positions = graph.world_positions()
-        looked = {node.id: node.looked for node in graph.inner.nodes}
+        # Only things that last count as new: noise throws up nodes that live a frame.
+        looked = {node.id: node.looked for node in graph.inner.nodes if node.age >= LASTING}
         for command in range(len(COMMANDS)):
             x, y = (int(round(v)) for v in self._target(graph, command))
             area = (slice(y - half, y + half), slice(x - half, x + half))
             novelty = sum(
                 np.exp(-looked.get(node, 0) / FAMILIAR)
                 for node, nx, ny in positions
-                if abs(nx - x) < half and abs(ny - y) < half
+                if node in looked and abs(nx - x) < half and abs(ny - y) < half
             )
             out[command] = (
                 float(np.mean(1.0 - graph.confidence[area])),
