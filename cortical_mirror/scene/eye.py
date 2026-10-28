@@ -204,8 +204,10 @@ class EyeGraph:
             # What the graph expected here, scored before it sees the frame.
             miss = (self.inner.expect() - image) ** 2
             before = self._window(self.error, origin)
-            # Where the error suddenly jumps, something new appeared: worth a look again.
-            jump = cv2.GaussianBlur(miss, (0, 0), 4.0) > 2.0 * before + 0.005
+            # Where the error jumps at a place that used to be predicted well, something
+            # new appeared: worth a look again. Noise was never predicted well, so it
+            # never earns this.
+            jump = (cv2.GaussianBlur(miss, (0, 0), 4.0) > 2.0 * before + 0.005) & (before < 0.003)
             progress = self._window(self.progress, origin)
             progress[jump] = np.maximum(progress[jump], 0.8)
             self._window(self.error, origin)[:] = 0.7 * before + 0.3 * miss
