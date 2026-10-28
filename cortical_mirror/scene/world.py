@@ -191,8 +191,20 @@ class CreatureWorld(SpriteWorld):
         creatures: int = 2,
         limbs: int | None = None,
         speed: tuple[float, float] = (0.5, 1.5),
+        occluders: int = 0,
+        occluder_width: int = 14,
     ):
-        super().__init__(seed=seed, width=width, height=height, objects=0)
+        super().__init__(
+            seed=seed,
+            width=width,
+            height=height,
+            objects=0,
+            occluders=occluders,
+            occluder_width=occluder_width,
+        )
+        # Screens are numbered apart from the creatures' parts.
+        for index, screen in enumerate(self.occluders):
+            screen.id = 1000 + index
         rng = np.random.default_rng(seed + 10_000)
         self.creatures: list[dict] = []
         self.time = 0

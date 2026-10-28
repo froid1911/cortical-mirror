@@ -45,6 +45,9 @@ figcaption strong { color: var(--silver); font-weight: 600; font-size: 14px; }
 .node.selected circle { stroke-width: 3; }
 .node text { fill: var(--silver); font: 600 9px var(--font); paint-order: stroke; stroke: #000; stroke-width: 3px; }
 .node:active { cursor: grabbing; }
+.group rect { fill: rgba(143, 184, 255, 0.04); stroke: var(--expect); stroke-width: 1; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; cursor: pointer; pointer-events: all; }
+.group.deleted rect { stroke: var(--surprise); }
+.group text { fill: var(--pewter); font: 600 8px var(--font); paint-order: stroke; stroke: #000; stroke-width: 3px; }
 
 .graph { border-radius: 6px; background: var(--glass); box-shadow: 0 0 0 1px var(--rule); padding: 14px 16px; font-size: 13px; }
 .graph h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
@@ -88,7 +91,8 @@ figcaption strong { color: var(--silver); font-weight: 600; font-size: 14px; }
     <h2>Relations</h2>
     <p class="relations" id="edges"></p>
     <dl class="keys">
-      <dt>Click</dt><dd>delete, or bring back</dd>
+      <dt>Click</dt><dd>delete a part, or bring it back</dd>
+      <dt>Click a frame</dt><dd>delete the whole it belongs to</dd>
       <dt>Drag</dt><dd>move</dd>
       <dt>D</dt><dd>duplicate the selected object</dd>
       <dt>R</dt><dd>undo every edit</dd>
@@ -125,6 +129,24 @@ function draw() {
   const deleted = new Set(scene.edits.deleted);
   overlay.replaceChildren();
   list.replaceChildren();
+  // Wholes first, beneath their parts: a frame around the parts of each group.
+  for (const group of scene.groups || []) {
+    const parts = scene.nodes.filter((n) => group.members.includes(n.id));
+    if (!parts.length) continue;
+    const boxes = parts.map((n) => {
+      const { x, y } = shown(n);
+      const r = Math.max(6, Math.sqrt(n.size / Math.PI));
+      return [x - r, y - r, x + r, y + r];
+    });
+    const [x0, y0] = [Math.min(...boxes.map((b) => b[0])) - 3, Math.min(...boxes.map((b) => b[1])) - 3];
+    const [x1, y1] = [Math.max(...boxes.map((b) => b[2])) + 3, Math.max(...boxes.map((b) => b[3])) + 3];
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    const gone = group.members.every((m) => deleted.has(m));
+    g.setAttribute("class", `group${gone ? " deleted" : ""}`);
+    g.dataset.members = group.members.join(",");
+    g.innerHTML = `<rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" rx="4"></rect><text x="${x0 + 2}" y="${y1 + 9}">${group.id}</text>`;
+    overlay.append(g);
+  }
   for (const node of scene.nodes) {
     const { x, y } = shown(node);
     const r = Math.max(6, Math.sqrt(node.size / Math.PI));
@@ -146,7 +168,7 @@ function draw() {
     item.textContent = "Nothing moving yet: objects form from what moves together.";
     list.append(item);
   }
-  const words = { occludes: "in front of", moves_with: "moves with", near: "near" };
+  const words = { occludes: "in front of", moves_with: "moves with", near: "near", part_of: "part of" };
   edgesText.innerHTML = scene.edges.length
     ? scene.edges.map((e) => `<span>${e.from}</span> ${words[e.relation]} <span>${e.to}</span>`).join(" · ")
     : "None yet.";
@@ -157,6 +179,16 @@ function toScene(event) {
   return { x: (event.clientX - box.left) * 256 / box.width, y: (event.clientY - box.top) * 192 / box.height };
 }
 
+overlay.addEventListener("click", (event) => {
+  const whole = event.target.closest(".group");
+  if (!whole || event.target.closest(".node")) return;
+  const members = whole.dataset.members.split(",").map(Number);
+  if (members.every((m) => scene.edits.deleted.includes(m))) {
+    members.reduce((done, m) => done.then(() => edit({ restore: m })), Promise.resolve());
+  } else {
+    edit({ delete_all: members });
+  }
+});
 overlay.addEventListener("pointerdown", (event) => {
   const g = event.target.closest(".node");
   if (!g || event.button !== 0) return;

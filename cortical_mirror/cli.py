@@ -352,8 +352,17 @@ def main() -> None:
         from .scene.live import serve as serve_scene
 
         scene_arguments(args)
-        source = SpriteSource() if args.source == "world" else VideoSource(args.source)
-        serve_scene(SceneLive(source, scene_graph(args)), args.host, args.port)
+        from .scene.front import NormalisedFront
+        from .scene.video import VideoGraph
+
+        if args.source == "world":
+            state = SceneLive(SpriteSource(), scene_graph(args))
+        else:
+            # A camera or a video: register the camera's own motion, and match in the
+            # normalised code, which ignores changes of exposure.
+            video = VideoGraph(front=NormalisedFront(), persistence=scene_graph(args).persistence)
+            state = SceneLive(VideoSource(args.source), video=video)
+        serve_scene(state, args.host, args.port)
         return
     if args.command == "twins":
         twins_arguments(args)

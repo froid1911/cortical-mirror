@@ -86,6 +86,9 @@ class EyeGraph:
         self.error = np.zeros(CANVAS[::-1], np.float32)
         # Frames the fovea has spent on each place.
         self.visits = np.zeros(CANVAS[::-1], np.float32)
+        # The learning progress each place has brought when looked at. Optimistic at
+        # first: an unexplored place is presumed to teach.
+        self.progress = np.ones(CANVAS[::-1], np.float32)
         self.fovea_errors: list[float] = []
 
     # Where the view lies on the canvas.
@@ -200,9 +203,12 @@ class EyeGraph:
         if self.inner.background is not None:
             # What the graph expected here, scored before it sees the frame.
             miss = (self.inner.expect() - image) ** 2
-            self._window(self.error, origin)[:] = (
-                0.7 * self._window(self.error, origin) + 0.3 * miss
-            )
+            before = self._window(self.error, origin)
+            # Where the error suddenly jumps, something new appeared: worth a look again.
+            jump = cv2.GaussianBlur(miss, (0, 0), 4.0) > 2.0 * before + 0.005
+            progress = self._window(self.progress, origin)
+            progress[jump] = np.maximum(progress[jump], 0.8)
+            self._window(self.error, origin)[:] = 0.7 * before + 0.3 * miss
             w, h = self.view
             half = self.fovea_size // 2
             centre = (slice(h // 2 - half, h // 2 + half), slice(w // 2 - half, w // 2 + half))
@@ -239,6 +245,14 @@ class EyeGraph:
         if self.inner.previous is not None:
             seen = _shift(np.ones_like(self.inner.previous), dx, dy) > 0
             self.inner.previous = np.where(seen, _shift(self.inner.previous, dx, dy), image)
+
+    def remember_progress(self, gaze, progress: float) -> None:
+        """Write what a fixation at ``gaze`` taught into the progress map."""
+
+        half = self.fovea_size // 2
+        x, y = int(round(gaze[0])), int(round(gaze[1]))
+        area = self.progress[y - half : y + half, x - half : x + half]
+        area += 0.5 * (min(max(progress, 0.0), 1.0) - area)
 
     def predict_view(self, command: int) -> tuple[np.ndarray, np.ndarray]:
         """What the graph expects to see after ``command``, from its canvas alone, and
@@ -286,7 +300,15 @@ def recentre(graph: EyeGraph) -> tuple[int, int]:
     if margin_x <= x <= CANVAS[0] - margin_x and margin_y <= y <= CANVAS[1] - margin_y:
         return 0, 0
     dx, dy = int(round(cx - x)), int(round(cy - y))
-    for name in ("background", "background_shade", "confidence", "front", "error", "visits"):
+    for name in (
+        "background",
+        "background_shade",
+        "confidence",
+        "front",
+        "error",
+        "visits",
+        "progress",
+    ):
         setattr(graph, name, _shift(getattr(graph, name), dx, dy))
     graph.gaze = (x + dx, y + dy)
     return dx, dy

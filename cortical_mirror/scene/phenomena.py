@@ -233,7 +233,7 @@ def train_persistence(
     return graph.persistence, trajectory
 
 
-def _occlusion_trial(seed: int, vanish: bool, persistence: float, frames: int) -> dict:
+def _occlusion_trial(seed: int, vanish: bool, persistence: float, frames: int, front=None) -> dict:
     """Watch one trial; per frame: the image, the graph's expectation of it, the true
     position (None once the object is gone), and the nodes' positions."""
 
@@ -247,9 +247,9 @@ def _occlusion_trial(seed: int, vanish: bool, persistence: float, frames: int) -
             record["hidden"] = t
             if vanish:
                 world.objects.clear()
-        record["expected"].append(graph.expect())
+        record["expected"].append(graph.expect(shade=True))
         image = world.render()
-        graph.observe(image)
+        graph.observe(front.code(image) if front else image, shade=image)
         record["images"].append(image)
         thing = world.objects[0] if world.objects else None
         record["truth"].append(None if thing is None else (thing.x, thing.y))
@@ -260,13 +260,15 @@ def _occlusion_trial(seed: int, vanish: bool, persistence: float, frames: int) -
     return record
 
 
-def object_permanence(persistence: float, seeds=range(3000, 3020), frames: int = 120) -> dict:
-    """Protocol 9, for one persistence."""
+def object_permanence(
+    persistence: float, seeds=range(3000, 3020), frames: int = 120, front=None
+) -> dict:
+    """Protocol 9, for one persistence (and the code the graph matches in)."""
 
     kept, errors, surprise = [], [], {"vanish": [], "reappear": []}
     for seed in seeds:
-        reappear = _occlusion_trial(seed, False, persistence, frames)
-        vanish = _occlusion_trial(seed, True, persistence, frames)
+        reappear = _occlusion_trial(seed, False, persistence, frames, front)
+        vanish = _occlusion_trial(seed, True, persistence, frames, front)
         hidden = reappear["hidden"]
         back = next(t for t in range(hidden, frames) if reappear["visible"][t])
         x, y = reappear["truth"][back - 1]
