@@ -137,3 +137,22 @@ Newborn: kept 0.0, violation ratio 0.0, pass. τ: 118 frames in the normal world
 | 12 Self vs world | commanded 0.0, uncommanded 1.0, prediction 0.02; newborn 1.0 | pass |
 
 Run on flank's GPU 3 with `SCENE_DEVICE=cuda`.
+
+### Protocol 11 re-run (`v0.5-attention_v05.json`, seeds 5020–5039)
+
+| Condition | Noise capture | World error | Time to novelty |
+|---|---|---|---|
+| Newborn (random) | 0.175 | 0.0217 | 152 frames |
+| Surprise reflex | 0.633 | 0.0636 | 258.5 frames |
+| Adult (learned, with place values) | 0.109 | 0.0202 | 134 frames |
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| Setup: surprise reflex ≥ 1.5 × newborn | 3.6 × | pass |
+| Adult noise capture ≤ 0.5 × newborn | 0.62 × | **fail** |
+| Adult world error ≤ 0.9 × newborn | 0.93 × | **fail** |
+| Adult time to novelty ≤ 0.5 × newborn | 0.88 × | **fail** |
+
+All three fail. Unlike v0.4, the adult is now better than random gaze on every measure. The learned feature weights are still negative for "unknown" (−0.21), "error" (−0.09) and "novelty" (−0.06). What pulls the gaze is mostly each place's learned value.
+
+**Fixed after this run:** the eye graph's error, visit and progress maps were not shifted when registration found the world itself moving. With the true motor map used here, that shift is essentially zero, so the numbers above stand.

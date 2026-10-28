@@ -4,7 +4,7 @@ A live mirror that shows what the camera will see next — and keeps learning to
 
 A small predictive-coding hierarchy predicts the next webcam frame from the frames it has already seen. Every prediction is scored only against the frame it was issued for, and that error is the only teaching signal: offline on natural video, and online, continuously, on the camera stream in front of it. Started from random weights, it begins as an exact copy of the last frame. On a person moving in front of a still camera it learns, within about a minute, to predict better than that copy; on short, generic action clips it ends about even with it.
 
-**New in v0.5:** [parts and wholes, light, real video and a GPU](#v05-parts-and-wholes-light-real-video-gpu). Pieces that move together become one creature you can delete in one click. Objects survive changes of light, the camera's own motion is registered away, and the graph's search runs on a GPU. Of five protocols, one passes and four fail; see the table.
+**New in v0.5:** [parts and wholes, light, real video and a GPU](#v05-parts-and-wholes-light-real-video-gpu). Pieces that move together become one creature you can delete in one click. Objects survive changes of light, the camera's own motion is registered away, and the graph's search runs on a GPU. Of the five v0.5 protocol runs, one passes and four fail; see the table.
 
 **New in v0.4:** [the world as a scene graph](#the-world-as-a-scene-graph-v04). It explains what it sees as things: a remembered background, and objects with a shape, a place, a motion and a depth. The eye is one of its nodes. Edit the graph, by deleting an object or moving it, and it renders what the world would look like then. `cortical-mirror scene` runs it in your browser.
 
@@ -341,7 +341,7 @@ v0.4 found a person on the webcam as five unrelated pieces, compared raw brightn
 | [14](docs/protocols/14-lighting.md) Changing light | **Passes.** Under changing light, objects keep IoU 0.87 with the normalised code, while brightness collapses to 0.24. Under constant light the code is as good as brightness. Its object counts are less reliable (0.54 under changing light, 0.69 under constant). |
 | [15](docs/protocols/15-real-video.md) Real video | **Fails.** On 40 UCF101 test clips the expectation went from 4.6 × worse than repeating the last frame (v0.4) to 1.04 ×, and is better on 40% of clips. It needed below 0.95. |
 | [9](docs/protocols/09-object-permanence.md) Permanence, re-run | **Fails for the adult**, as before: it keeps 55% of hidden objects, against 80% needed. The developmental contrast and the learned τ still pass. |
-| [11](docs/protocols/11-learned-attention.md) Curiosity, re-run | P11_V05 |
+| [11](docs/protocols/11-learned-attention.md) Curiosity, re-run | **Fails, but now better than random gaze on every measure.** Captured by the noise in 11% of fixations against random's 17%; it knows the world a little better (0.93 × random's error) and finds a newcomer sooner (134 vs 152 frames). The criteria needed 0.5 ×, 0.9 × and 0.5 ×. In v0.4 the adult was worse than random on two of the three. |
 
 v0.4's protocols re-run on v0.5's code (`reports/scene/v0.5-carryover.json`) still pass:
 - discovery: IoU 0.81, counts right 91% of the time;
