@@ -131,3 +131,95 @@ class MotionLevel:
         level = cls(**state["settings"], device=device)
         level.kernels = state["kernels"].to(level.device)
         return level
+
+
+class MotionCortex:
+    """V1 (frozen, phase 1's adult or a newborn) and MT at two scales.
+
+    The fine level works on V1's grid; the coarse one on V1 pooled to half
+    resolution, so that fast motion and camera pans are within reach. Where the
+    coarse level sees motion beyond the fine level's reach, its velocity is used.
+    """
+
+    def __init__(
+        self,
+        v1: str | None = None,
+        types: int = 16,
+        reach: int = 3,
+        seed: int = 0,
+        device="cpu",
+        settle: int = 20,
+    ):
+        from .engine import RETINA_SIZE, CortexEngine
+        from .retina import Retina
+
+        self.device = torch.device(device)
+        engine = (
+            CortexEngine.load(v1, device=device, learn=False)
+            if v1
+            else CortexEngine(device=device, learn=False)
+        )
+        self.v1_path = str(v1) if v1 else None
+        self.hierarchy = engine.hierarchy
+        self.retina = Retina(*RETINA_SIZE, device=self.device)
+        self.settle = settle
+        self.fine = MotionLevel(types=types, reach=reach, seed=seed, device=device)
+        self.coarse = MotionLevel(types=types, reach=reach, seed=seed + 1, device=device)
+        self.silenced = False
+        self.previous: torch.Tensor | None = None
+        self.stride = engine.hierarchy.configs[0].stride
+
+    def v1(self, gray: torch.Tensor) -> torch.Tensor:
+        """V1's activity for frames ``[B, 1, 96, 128]`` (settled from rest, frozen)."""
+
+        return self.hierarchy.settle(self.retina.encode(gray.to(self.device)), self.settle)[0]
+
+    def reset(self) -> None:
+        self.previous = None
+
+    @torch.no_grad()
+    def step(self, gray: torch.Tensor, learn: bool = False) -> torch.Tensor | None:
+        """One frame in; the velocity of what moved since the last one out, in retinal
+        pixels per frame, ``[B, 2, H, W]`` at the retina's size (None on the first)."""
+
+        now = self.v1(gray)
+        before, self.previous = self.previous, now
+        if before is None or before.shape != now.shape:
+            return None
+        height, width = gray.shape[-2:]
+        if self.silenced:
+            return torch.zeros(now.shape[0], 2, height, width, device=self.device)
+        fine = self.fine.velocity(self.fine.step(before, now, learn)) * self.stride
+        pooled_before, pooled_now = F.avg_pool2d(before, 2), F.avg_pool2d(now, 2)
+        coarse = self.coarse.velocity(self.coarse.step(pooled_before, pooled_now, learn))
+        coarse = F.interpolate(coarse * 2 * self.stride, size=fine.shape[-2:], mode="bilinear")
+        reach = self.fine.reach * self.stride
+        velocity = torch.where(coarse.norm(dim=1, keepdim=True) > reach, coarse, fine)
+        return F.interpolate(velocity, size=(height, width), mode="bilinear")
+
+    def save(self, path) -> None:
+        torch.save(
+            {
+                "v1": self.v1_path,
+                "v1_state": self.hierarchy.state_dict(),
+                "fine": self.fine.state_dict(),
+                "coarse": self.coarse.state_dict(),
+                "settle": self.settle,
+            },
+            path,
+        )
+
+    @classmethod
+    def load(cls, path, device="cpu") -> MotionCortex:
+        state = torch.load(path, map_location="cpu", weights_only=True)
+        cortex = cls(
+            types=state["fine"]["settings"]["types"],
+            reach=state["fine"]["settings"]["reach"],
+            device=device,
+            settle=state["settle"],
+        )
+        cortex.v1_path = state["v1"]
+        cortex.hierarchy.load_state_dict(state["v1_state"])
+        cortex.fine = MotionLevel.from_state(state["fine"], device)
+        cortex.coarse = MotionLevel.from_state(state["coarse"], device)
+        return cortex

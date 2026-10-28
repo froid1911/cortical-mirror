@@ -63,3 +63,20 @@ def test_experience_of_motion_teaches_a_type_to_predict_it():
     opposite = moving(4, -2, 0, seed=9)
     back = level.velocity(level.responsibilities(opposite[1], opposite[2]))[0, :, 8:-8, 8:-8]
     assert back.mean((1, 2))[0] < -1.0
+
+
+def test_the_motion_cortex_turns_frames_into_a_velocity_field(tmp_path):
+    from cortical_mirror.cortex.mt import MotionCortex
+
+    cortex = MotionCortex(types=4, seed=0)
+    frames = [texture(96, 160, 1)[..., :, 2 * t : 2 * t + 128] for t in range(6)]
+    fields = [cortex.step(f, learn=True) for f in frames]
+    assert fields[0] is None
+    assert fields[-1].shape == (1, 2, 96, 128)
+    cortex.silenced = True
+    assert cortex.step(frames[0], learn=False).abs().max() == 0
+    cortex.silenced = False
+    cortex.save(tmp_path / "mt.pt")
+    loaded = MotionCortex.load(tmp_path / "mt.pt")
+    assert torch.equal(loaded.fine.kernels, cortex.fine.kernels)
+    assert torch.equal(loaded.coarse.kernels, cortex.coarse.kernels)
