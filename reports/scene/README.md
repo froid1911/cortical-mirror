@@ -53,3 +53,22 @@ Protocol 9 still fails for the adult. Half the hidden objects are kept, and in t
 ## Real video (`v0.4-sample-video.json`)
 
 The release's sample clip, 750 frames, with the scene adult (`tools/scene_video.py`). There is no ground truth here, so this is a description, not a protocol. The graph explains each frame with a mean squared error of 0.0054. Its expectation of the next frame is **1.9 × worse than repeating the last frame**, and it holds 1.3 objects in view on average (8 at most). The scene level works on the sprite world. It does not yet work on real video, where the camera moves, people deform and the light changes.
+
+## Protocol 11: learned attention (`v0.4-attention.json`)
+
+The adult's gaze value was trained on seeds 500–539 and tested on 5000–5019, as pre-registered.
+
+| Condition | Noise capture | World error | Time to novelty |
+|---|---|---|---|
+| Newborn (random) | 0.146 | 0.0220 | 72 frames |
+| Surprise reflex (v0.3's rule) | 0.627 | 0.0643 | 272 frames |
+| Adult (learned) | 0.009 | 0.0264 | 145 frames |
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| Setup: surprise reflex captured ≥ 1.5 × newborn | 4.3 × | pass |
+| Adult noise capture ≤ 0.5 × newborn | 0.06 × | pass |
+| Adult world error ≤ 0.9 × newborn | 1.2 × | **fail** |
+| Adult time to novelty ≤ 0.5 × newborn | 2.0 × | **fail** |
+
+The noise is a real trap: the surprise reflex spends 63% of its fixations on it, and so ends up knowing the world worst. The learned eye escapes the trap, but in the crude way. Its weights are negative for "unknown" (−0.30) and for "familiar" (−0.11), positive only for the bias (+0.16), and near zero for error (+0.05) and novelty (+0.02). It has learned to avoid unknown places rather than to seek the ones that teach, so it explores less evenly than random gaze and finds a newcomer more slowly. A linear value over these features cannot tell an unexplored place from noise until the place has been looked at. The design's hope, curiosity directed at learning progress, did not emerge.
