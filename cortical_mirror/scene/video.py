@@ -13,7 +13,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
-from .eye import EyeGraph, _shift, recentre
+from .eye import EyeGraph, recentre
 from .front import LuminanceFront
 from .graph import _as_gray
 
@@ -23,9 +23,10 @@ class VideoGraph:
         self.size = size
         self.front = front or LuminanceFront()
         self.eye = EyeGraph(size, persistence=persistence, learn_motor=False)
-        # The camera's motion, as the shift of the view's content per frame, and how
-        # far the camera has moved in all.
+        # The camera's motion, as the shift of the view's content per frame (to the
+        # sub-pixel, from the frames themselves), and how far it has moved in all.
         self.velocity = np.zeros(2)
+        self.flow = np.zeros(2)
         self.travelled = np.zeros(2)
         self.previous: np.ndarray | None = None
         self._previous_code: np.ndarray | None = None
@@ -47,6 +48,7 @@ class VideoGraph:
             )
             if response > 0.05 and abs(dx) < 48 and abs(dy) < 48:
                 shift = np.array([dx, dy])
+        self.flow += 0.5 * (shift - self.flow)
         self.eye.motor[0] = -np.round(shift)
         gaze, before = self.eye.gaze, self.eye.world_shift.copy()
         self.eye.observe(code, 0, shade=gray)
@@ -71,11 +73,14 @@ class VideoGraph:
         # graph claim to know what comes next.
         explained &= (graph.render(shade=True) - self.previous) ** 2 < 0.002
         picture = np.where(explained, graph.expect(shade=True), self.previous)
-        dx, dy = (int(round(v)) for v in self.velocity)
-        moved = _shift(picture, dx, dy)
-        # Where the camera brings in what was not seen, the last frame stands in.
-        seen = _shift(np.ones_like(picture), dx, dy) > 0
-        return np.where(seen, moved, self.previous).astype(np.float32)
+        # The camera keeps moving as it just did, to the sub-pixel; at the border it
+        # brings in what was not seen, and the nearest seen pixels stand in.
+        dx, dy = self.flow
+        warp = np.float32([[1, 0, dx], [0, 1, dy]])
+        moved = cv2.warpAffine(
+            picture, warp, self.size, flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE
+        )
+        return moved.astype(np.float32)
 
     def to_json(self) -> dict:
         data = self.graph.to_json()
