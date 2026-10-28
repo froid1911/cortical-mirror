@@ -45,6 +45,11 @@ _Q = ACCELERATION * np.array(
     [[0.25, 0, 0.5, 0], [0, 0.25, 0, 0.5], [0.5, 0, 1, 0], [0, 0.5, 0, 1]], float
 )
 _H = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], float)
+# Particle tracking: hypotheses per node, how much each hypothesis's position and
+# velocity wander per frame, and how sharply evidence separates them.
+PARTICLES = 32
+WANDER = (0.3, 0.1)
+SHARPNESS = 20.0
 # Padding of the frame kept on a device: room for the widest search (recognition).
 FRAME_PAD = SPRITE // 2 + 24
 # What an unknown background costs to explain a pixel (a squared luminance error):
@@ -107,6 +112,8 @@ class Node:
     shade: np.ndarray | None = None
     # With Kalman tracking: the uncertainty of [x, y, vx, vy].
     cov: np.ndarray | None = None
+    # With particle tracking: hypotheses of [x, y, vx, vy], one per row.
+    particles: np.ndarray | None = None
 
     def displacement(self, frames: int = 5) -> tuple[float, float] | None:
         if not self.trail or len(self.trail) <= frames:
@@ -152,6 +159,7 @@ class SceneGraph:
         # visibility) or "kalman" (a filter over position and velocity that weighs each
         # search result by how much of the node was seen, and coasts when it was not).
         self.tracking = tracking
+        self._rng = np.random.default_rng(0)
         # Frames an unseen node stays believed (the time constant of its belief).
         # Unlike everything else in the graph, it carries over from scene to scene:
         # it is what development changes.
@@ -329,6 +337,7 @@ class SceneGraph:
                 return seen[index], weight[index]
 
         mass = max(node.mass, 1e-6)
+        self._last_landscape = (gain / mass, (int(round(node.x)), int(round(node.y))), radius)
         # Continuity: things keep moving as they did; each pixel off the prediction
         # costs a little, so a partial view does not drag a node off its path.
         offsets = np.arange(-radius, radius + 1)
@@ -453,6 +462,8 @@ class SceneGraph:
                 if node.cov is None:
                     node.cov = np.diag(NEWBORN_COV)
                 node.cov = _F @ node.cov @ _F.T + _Q
+            if self.tracking == "particles":
+                self._propagate(node)
         # Nearest first: a node's visibility depends only on what is in front of it.
         ordered = sorted(self.nodes, key=lambda n: -n.depth)
         for index, node in enumerate(ordered):
@@ -463,9 +474,19 @@ class SceneGraph:
                 # Search as far as the node's own uncertainty reaches.
                 spread = math.sqrt(max(node.cov[0, 0], node.cov[1, 1]))
                 radius = int(min(max(math.ceil(2.5 * spread), SEARCH), 24))
+            if self.tracking == "particles":
+                # Search as far as the hypotheses reach.
+                reach = np.abs(node.particles[:, :2] - (node.x, node.y)).max()
+                radius = int(min(max(math.ceil(reach) + 2, SEARCH), 24))
             x, y, gain, visibility = self._search(node, image, cover, radius=radius)
             node.visibility = visibility
-            if self.tracking == "kalman" and visibility > 0.25 and gain > 0.002:
+            if self.tracking == "particles":
+                self._weigh(node)
+                if visibility > 0.25 and gain > 0.002:
+                    node.state, node.unseen, node.belief = "seen", 0, 1.0
+                else:
+                    self._unseen(node, visibility)
+            elif self.tracking == "kalman" and visibility > 0.25 and gain > 0.002:
                 self._kalman_update(node, x, y, visibility)
                 node.state, node.unseen, node.belief = "seen", 0, 1.0
             elif self.tracking == "kalman":
@@ -494,6 +515,8 @@ class SceneGraph:
         for node in self.nodes:
             # Recentring moves the frame, not the object: the trail follows the object.
             shift = self._recentre(node) if node.visibility >= COMPLETE else (0, 0)
+            if node.particles is not None and shift != (0, 0):
+                node.particles[:, :2] += shift
             node.trail = [(x + shift[0], y + shift[1]) for x, y in node.trail or []]
             node.trail = [*node.trail, (node.x, node.y)][-30:]
             if (
@@ -565,6 +588,47 @@ class SceneGraph:
             for ids in members.values()
             if len(ids) > 1
         ]
+
+    def _propagate(self, node: Node) -> None:
+        """Every hypothesis moves on by its own velocity, and wanders a little."""
+
+        rng = self._rng
+        if node.particles is None:
+            node.particles = np.column_stack(
+                [
+                    node.x + rng.normal(0, 1.0, PARTICLES),
+                    node.y + rng.normal(0, 1.0, PARTICLES),
+                    node.vx + rng.normal(0, 1.5, PARTICLES),
+                    node.vy + rng.normal(0, 1.5, PARTICLES),
+                ]
+            )
+            return
+        p = node.particles
+        p[:, :2] += p[:, 2:]
+        p[:, :2] += rng.normal(0, WANDER[0], (len(p), 2))
+        p[:, 2:] += rng.normal(0, WANDER[1], (len(p), 2))
+        node.x, node.y = (float(v) for v in p[:, :2].mean(0))
+        node.vx, node.vy = (float(v) for v in p[:, 2:].mean(0))
+
+    def _weigh(self, node: Node) -> None:
+        """Weigh the hypotheses by the search's evidence where each one stands, take
+        the node's state as their weighted mean, and resample. Where nothing can be
+        seen the evidence is flat, and every hypothesis survives."""
+
+        landscape, (cx, cy), radius = self._last_landscape
+        p = node.particles
+        ox = np.clip(np.rint(p[:, 0] - cx).astype(int), -radius, radius) + radius
+        oy = np.clip(np.rint(p[:, 1] - cy).astype(int), -radius, radius) + radius
+        # Evidence relative to this search (0 at its median, 1 at its peak), counted
+        # as much as the node was seen: a hidden node's hypotheses stay level.
+        low, high = float(np.median(landscape)), float(landscape.max())
+        evidence = (landscape[oy, ox] - low) / max(high - low, 1e-9)
+        weights = np.exp(SHARPNESS * node.visibility * (evidence - evidence.max()))
+        weights /= weights.sum()
+        node.x, node.y, node.vx, node.vy = (float(v) for v in weights @ p)
+        # Systematic resampling.
+        positions = (self._rng.random() + np.arange(len(p))) / len(p)
+        node.particles = p[np.minimum(np.searchsorted(np.cumsum(weights), positions), len(p) - 1)]
 
     def _kalman_update(self, node: Node, x: float, y: float, visibility: float) -> None:
         """Fuse a found position with the prediction: the less of the node was seen,
@@ -748,6 +812,7 @@ class SceneGraph:
                 error = math.hypot(found_x - node.x, found_y - node.y)
                 self.events.append({"returned": node.id, "after": node.unseen, "error": error})
                 node.x, node.y, node.trail, node.cov = found_x, found_y, None, None
+                node.particles = None
                 node.state, node.unseen, node.belief = "seen", 0, 1.0
                 return True
         cover = self._cover(self.nodes)
@@ -758,6 +823,7 @@ class SceneGraph:
             if visibility > 0.25 and gain > 0.004:
                 node.x, node.y, node.vx, node.vy = found_x, found_y, 0.0, 0.0
                 node.state, node.belief, node.trail, node.cov = "seen", 1.0, None, None
+                node.particles = None
                 self.nodes.append(node)
                 del self.memory[index]
                 self._recognised(node, forgotten)

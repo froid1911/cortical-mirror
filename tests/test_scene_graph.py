@@ -213,3 +213,18 @@ def test_kalman_tracking_follows_an_object_and_coasts_behind_a_screen():
     hidden = [n for n in graph.nodes if n.state == "occluded"]
     assert hidden and abs(hidden[0].vx - thing.vx) < 0.3
     assert hidden[0].cov[0, 0] > 0.5
+
+
+def test_particle_tracking_keeps_a_hidden_object_and_finds_it_again():
+    graph = SceneGraph(tracking="particles", persistence=60.0)
+    world = occlusion_world()
+    for t in range(110):
+        world.step()
+        graph.observe(world.render())
+        if t == 58:
+            hidden = [n for n in graph.nodes if n.state == "occluded"]
+            assert hidden and hidden[0].particles is not None
+            assert hidden[0].particles[:, 0].std() > 0.5  # the hypotheses spread while hidden
+    thing = world.objects[0]
+    near = [n for n in graph.nodes if abs(n.x - thing.x) < 4 and abs(n.y - thing.y) < 4]
+    assert len(near) == 1 and near[0].state == "seen"
