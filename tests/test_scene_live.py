@@ -1,3 +1,4 @@
+import copy
 import json
 import threading
 import urllib.request
@@ -74,3 +75,18 @@ def test_the_page_and_the_graph_are_served_over_http():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_a_fragment_on_a_deleted_object_is_deleted_with_it():
+    state = SceneLive(SpriteSource(seed=1))
+    run(state, 60)
+    node = state.graph.nodes[0]
+    twin = copy.deepcopy(node)
+    twin.id = 999
+    state.graph.nodes.append(twin)
+    state.control({"delete": node.id})
+    state.graph.observe = lambda image: None  # hold the graph still for this check
+    state.step()
+    hidden = {n.id for n in state.graph.nodes if n.state != "seen"}
+    alone = state.graph.edit(delete={node.id, 999} | hidden)
+    assert np.allclose(state.explained, alone)

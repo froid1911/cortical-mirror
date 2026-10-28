@@ -125,9 +125,18 @@ class SceneLive:
             # The picture shows what is explained in view; what is believed but
             # hidden is drawn on the page as a ring, not painted over what hides it.
             hidden = {n.id for n in self.graph.nodes if n.state != "seen"}
+            # An edit is to the object: a fragment node on a deleted one goes with it.
+            deleted = self.deleted & ids
+            gone = [self.graph._alpha(n) > 0.5 for n in self.graph.nodes if n.id in deleted]
+            for node in self.graph.nodes:
+                if node.id in deleted or not gone:
+                    continue
+                alpha = self.graph._alpha(node) > 0.5
+                if any((alpha & g).sum() > 0.3 * max(alpha.sum(), 1) for g in gone):
+                    deleted = deleted | {node.id}
             self.explained = self.graph.edit(
                 move={k: tuple(v) for k, v in self.moved.items() if k in ids},
-                delete=(self.deleted & ids) | hidden,
+                delete=deleted | hidden,
                 duplicate={k: DUPLICATE_OFFSET for k in self.duplicated if k in ids},
             )
             scene = self.graph.to_json()
