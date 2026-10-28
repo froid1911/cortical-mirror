@@ -50,6 +50,20 @@ CONTINUITY = 0.0001
 MEMORY = 150
 # A newborn forgets what it cannot see within a few frames.
 NEWBORN_PERSISTENCE = 1.0
+# Frames over which two nodes' common fate is judged, the binding's learning rate
+# (a time constant of about ten frames), and the reach of binding.
+BIND_WINDOW = 10
+BIND_RATE = 0.15
+# Nodes that touch and keep within this many pixels of each other's displacement for
+# this many frames in a row move rigidly: they are one object, merged. Parts that
+# move together without moving rigidly (a limb) are bound instead.
+RIGID = 1.5
+RIGID_FRAMES = 8
+DUPLICATE = 2.5
+DUPLICATE_FRAMES = 5
+# Frames a node counts as a possible fragment of its neighbour after its birth.
+FRAGMENT_AGE = 15
+BIND_REACH = 50
 
 
 @dataclass
@@ -172,6 +186,8 @@ class SceneGraph:
         self.memory: list[tuple[Node, int]] = []
         # Frames each pair of nodes has touched while moving together.
         self._together: dict[tuple[int, int], int] = {}
+        # How strongly each pair of nodes is bound into one whole (parts of a body).
+        self.binding: dict[tuple[int, int], float] = {}
 
     # Rendering -----------------------------------------------------------------
 
@@ -352,7 +368,7 @@ class SceneGraph:
             # Recentring moves the frame, not the object: the trail follows the object.
             shift = self._recentre(node) if node.visibility >= COMPLETE else (0, 0)
             node.trail = [(x + shift[0], y + shift[1]) for x, y in node.trail or []]
-            node.trail = [*node.trail, (node.x, node.y)][-12:]
+            node.trail = [*node.trail, (node.x, node.y)][-30:]
             if node.state == "seen" and node.visibility >= COMPLETE and len(node.trail) >= 6:
                 # Velocity as the slope of the recent path: single-frame steps are whole
                 # pixels, and averaging them is slow and biased.
@@ -363,9 +379,60 @@ class SceneGraph:
             moved = node.displacement()
             moving = moved is None or math.hypot(*moved) > 1.5
             node.still = 0 if moving or node.state != "seen" else node.still + 1
+        self._bind()
         self.previous = image
         self._recent = (self._recent + [image])[-STILL_LAG:]
         return {"nodes": len(self.nodes)}
+
+    # Parts and wholes ------------------------------------------------------------
+
+    def _bind(self) -> None:
+        """Hebbian binding by common fate: two nodes that keep their distance while
+        both travel, and are close, become parts of one whole. Their directions may
+        differ, as a limb's does from its torso's."""
+
+        ids = {n.id for n in self.nodes}
+        self.binding = {k: v for k, v in self.binding.items() if k[0] in ids and k[1] in ids}
+        moving = [
+            n for n in self.nodes if n.state == "seen" and n.trail and len(n.trail) > BIND_WINDOW
+        ]
+        for i, a in enumerate(moving):
+            for b in moving[i + 1 :]:
+                (ax0, ay0), (ax1, ay1) = a.trail[-BIND_WINDOW - 1], a.trail[-1]
+                (bx0, by0), (bx1, by1) = b.trail[-BIND_WINDOW - 1], b.trail[-1]
+                travel = (math.hypot(ax1 - ax0, ay1 - ay0) + math.hypot(bx1 - bx0, by1 - by0)) / 2
+                if travel < 5:
+                    continue  # standing still says nothing about belonging together
+                before = math.hypot(ax0 - bx0, ay0 - by0)
+                now = math.hypot(ax1 - bx1, ay1 - by1)
+                fate = max(0.0, 1.0 - abs(now - before) / (0.5 * travel + 2.0))
+                fate *= float(now < BIND_REACH)
+                key = (min(a.id, b.id), max(a.id, b.id))
+                old = self.binding.get(key, 0.0)
+                self.binding[key] = old + BIND_RATE * (fate - old)
+
+    def groups(self) -> list[dict]:
+        """Wholes: nodes bound above one half, taken transitively, two or more each."""
+
+        parent = {n.id: n.id for n in self.nodes}
+
+        def root(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+
+        for (a, b), strength in self.binding.items():
+            if strength > 0.5 and a in parent and b in parent:
+                parent[root(a)] = root(b)
+        members: dict[int, list[int]] = {}
+        for node in self.nodes:
+            members.setdefault(root(node.id), []).append(node.id)
+        return [
+            {"id": f"g{min(ids)}", "members": sorted(ids)}
+            for ids in members.values()
+            if len(ids) > 1
+        ]
 
     def _unseen(self, node: Node, visibility: float) -> None:
         inside = 0 <= node.x < self.width and 0 <= node.y < self.height
@@ -592,19 +659,25 @@ class SceneGraph:
         survivors: list[Node] = []
         together = {}
         for node in keep:
-            touching = cv2.dilate((self._alpha(node) > 0.3).astype(np.uint8), np.ones((5, 5)))
+            mine = self._alpha(node) > 0.3
+            touching = cv2.dilate(mine.astype(np.uint8), np.ones((5, 5)))
             partner = None
             for other in survivors:
                 pair = (other.id, node.id)
                 a, b = node.displacement(), other.displacement()
-                if (
-                    a is not None
-                    and b is not None
-                    and (touching & (self._alpha(other) > 0.3)).any()
-                    and math.hypot(a[0] - b[0], a[1] - b[1]) < 2.5
-                ):
+                theirs = self._alpha(other) > 0.3
+                if a is None or b is None or not (touching & theirs).any():
+                    continue
+                # Two views of one thing (overlapping a lot, or a fragment just born at
+                # its edge) merge readily; established parts that merely touch merge
+                # only if they move rigidly.
+                overlap = (mine & theirs).sum() > 0.4 * max(min(mine.sum(), theirs.sum()), 1)
+                fragment = min(node.age, other.age) < FRAGMENT_AGE
+                lenient = overlap or fragment
+                limit, frames = (DUPLICATE, DUPLICATE_FRAMES) if lenient else (RIGID, RIGID_FRAMES)
+                if math.hypot(a[0] - b[0], a[1] - b[1]) < limit:
                     together[pair] = self._together.get(pair, 0) + 1
-                    if together[pair] >= 5:
+                    if together[pair] >= frames:
                         partner = other
                         break
             if partner is None:
@@ -691,10 +764,15 @@ class SceneGraph:
                 speed = math.hypot(a.vx, a.vy) + math.hypot(b.vx, b.vy)
                 if speed > 0.5 and math.hypot(a.vx - b.vx, a.vy - b.vy) < 0.2 * speed:
                     edges.append({"relation": "moves_with", "from": a.id, "to": b.id})
+        groups = self.groups()
+        for group in groups:
+            for member in group["members"]:
+                edges.append({"relation": "part_of", "from": member, "to": group["id"]})
         return {
             "frame": self.frame_count,
             "nodes": nodes,
             "edges": edges,
+            "groups": groups,
             "self": {"kind": "eye", "gaze": None},
         }
 

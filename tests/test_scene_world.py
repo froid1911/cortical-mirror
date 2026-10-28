@@ -1,3 +1,5 @@
+import math
+
 import numpy as np
 
 from cortical_mirror.scene.world import SpriteWorld
@@ -65,3 +67,20 @@ def test_a_wide_screen_hides_a_small_object_completely():
     thing.x, thing.y = screen.x, screen.y
     assert world.truth()[0]["full"].sum() > 0
     assert world.truth()[0]["visible"].sum() == 0
+
+
+def test_a_creatures_limbs_swing_at_a_fixed_distance_from_its_torso():
+    from cortical_mirror.scene.world import CreatureWorld
+
+    world = CreatureWorld(seed=0, creatures=2)
+    torso, *limbs = world.creatures[0]["parts"]
+    distances, angles = [], []
+    for _ in range(60):
+        world.step()
+        dx, dy = limbs[0].x - torso.x, limbs[0].y - torso.y
+        distances.append(math.hypot(dx, dy))
+        angles.append(math.atan2(dy, dx))
+    assert max(distances) - min(distances) < 1e-6
+    assert max(angles) - min(angles) > 0.3
+    creatures = {t["id"]: t["creature"] for t in world.truth()}
+    assert creatures[torso.id] == creatures[limbs[0].id] == 0

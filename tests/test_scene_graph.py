@@ -84,7 +84,8 @@ def test_the_graph_is_served_as_json_with_nodes_and_edges():
     assert {"nodes", "edges", "self"} <= data.keys()
     node = data["nodes"][0]
     assert {"id", "kind", "x", "y", "vx", "vy", "depth", "state", "belief"} <= node.keys()
-    assert {edge["relation"] for edge in data["edges"]} <= {"occludes", "moves_with", "near"}
+    relations = {"occludes", "moves_with", "near", "part_of"}
+    assert {edge["relation"] for edge in data["edges"]} <= relations
 
 
 def occlusion_world(seed: int = 0) -> SpriteWorld:
@@ -179,3 +180,24 @@ def test_a_graph_matching_on_one_code_still_renders_brightness():
     gone = graph.edit(delete={node}, shade=True)
     region = world.truth()[0]["full"]
     assert float(np.mean((gone[region] - world.background_view()[region]) ** 2)) < 0.003
+
+
+def test_a_creatures_parts_are_bound_into_one_group_and_two_creatures_stay_apart():
+    from cortical_mirror.scene.world import CreatureWorld
+
+    world = CreatureWorld(seed=3, creatures=2, limbs=1)
+    graph = SceneGraph()
+    for _ in range(250):
+        world.step()
+        graph.observe(world.render())
+    groups = graph.groups()
+    owner = {}
+    for thing in world.objects:
+        node = matched(graph, thing)
+        owner[thing.id] = next((g["id"] for g in groups if node.id in g["members"]), node.id)
+    (torso_a, limb_a), (torso_b, limb_b) = [[p.id for p in c["parts"]] for c in world.creatures]
+    assert owner[torso_a] == owner[limb_a]
+    assert owner[torso_b] == owner[limb_b]
+    assert owner[torso_a] != owner[torso_b]
+    data = graph.to_json()
+    assert any(edge["relation"] == "part_of" for edge in data["edges"])

@@ -496,3 +496,93 @@ def train_attention(seeds=range(500, 540), frames: int = 600, explore: float = 0
         attention.rng.seed(seed)
         _attention_run(seed, attention, frames, novel_at=frames // 2)
     return attention.weights.copy()
+
+
+def parts_and_wholes(
+    seeds=range(6000, 6020),
+    frames: int = 300,
+    sample_from: int = 200,
+    every: int = 10,
+    front=None,
+) -> dict:
+    """Protocol 13."""
+
+    from .world import CreatureWorld
+
+    pairs = {"binding": {"same": [], "different": []}, "proximity": {"same": [], "different": []}}
+    graph_mse, bitmap_mse, creatures_deleted = [], [], 0
+    for seed in seeds:
+        world = CreatureWorld(seed=seed, creatures=2 + seed % 2)
+        graph = SceneGraph(world.width, world.height)
+        for t in range(frames):
+            world.step()
+            image = world.render()
+            graph.observe(front.code(image) if front else image, shade=image)
+            if t < sample_from or (t - sample_from) % every:
+                continue
+            truth = world.truth()
+            masks = node_masks(graph)
+            matched = [
+                (i, j)
+                for i, j, score in match([o["visible"] for o in truth], masks)
+                if score >= 0.3
+            ]
+            owner = {}
+            for group in graph.groups():
+                for member in group["members"]:
+                    owner[member] = group["id"]
+            for a, (ta, na) in enumerate(matched):
+                for tb, nb in matched[a + 1 :]:
+                    same = truth[ta]["creature"] == truth[tb]["creature"]
+                    node_a, node_b = graph.nodes[na], graph.nodes[nb]
+                    grouped = owner.get(node_a.id, node_a.id) == owner.get(node_b.id, node_b.id)
+                    close = math.hypot(node_a.x - node_b.x, node_a.y - node_b.y) < 40
+                    key = "same" if same else "different"
+                    pairs["binding"][key].append(grouped)
+                    pairs["proximity"][key].append(close)
+        # Delete each creature whose parts are all matched.
+        frame = world.render()
+        truth = world.truth()
+        masks = node_masks(graph)
+        matched = {
+            i: j for i, j, score in match([o["visible"] for o in truth], masks) if score >= 0.3
+        }
+        groups = {m: g["members"] for g in graph.groups() for m in g["members"]}
+        for index, creature in enumerate(world.creatures):
+            parts = [i for i, o in enumerate(truth) if o["creature"] == index]
+            if not all(i in matched for i in parts):
+                continue
+            creatures_deleted += 1
+            nodes = {graph.nodes[matched[i]].id for i in parts}
+            delete = set().union(*(set(groups.get(n, [n])) for n in nodes))
+            union = np.zeros(frame.shape, bool)
+            for i in parts:
+                union |= masks[matched[i]]
+            true_image = world.render(deleted={p.id for p in creature["parts"]})
+            region = np.zeros(frame.shape, bool)
+            for i in parts:
+                region |= truth[i]["full"]
+            region = cv2.dilate(region.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+            graph_image = graph.edit(delete=delete, shade=True)
+            bitmap_image = bitmap_edit(frame, union, delete=True)
+            graph_mse.append(float(np.mean((graph_image - true_image)[region] ** 2)))
+            bitmap_mse.append(float(np.mean((bitmap_image - true_image)[region] ** 2)))
+
+    def rate(values):
+        return float(np.mean(values)) if values else float("nan")
+
+    report = {
+        condition: {
+            "recall": rate(values["same"]),
+            "specificity": 1.0 - rate(values["different"]) if values["different"] else float("nan"),
+            "pairs_same": len(values["same"]),
+            "pairs_different": len(values["different"]),
+        }
+        for condition, values in pairs.items()
+    }
+    report["creatures_deleted"] = creatures_deleted
+    report["delete_graph_mse"] = rate(graph_mse)
+    report["delete_bitmap_mse"] = rate(bitmap_mse)
+    report["delete_ratio"] = rate(graph_mse) / rate(bitmap_mse) if bitmap_mse else float("nan")
+    report["scenes"] = len(list(seeds))
+    return report
