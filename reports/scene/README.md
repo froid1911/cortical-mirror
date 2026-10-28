@@ -49,3 +49,7 @@ These changes were tuned on development seeds 3100–3119 and the discovery seed
 Protocol 8 passes in the second run partly because the frozen control got worse: tracking now relies on learning, since templates are refined and shape comes only from complete views, so nodes that cannot learn fall apart. Its margin over the motion baseline (+0.27) does not depend on that.
 
 Protocol 9 still fails for the adult. Half the hidden objects are kept, and in those trials the vanish trials are 3–5 × as surprising as the reappear trials. Overall, though, the ratio stays below 1. The other half are lost on the way behind the screen, mostly low-contrast objects that the tracker already follows poorly in plain view. A graph with permanence built in (τ = 60) scores the same, so the open problem is tracking, not belief.
+
+## Real video (`v0.4-sample-video.json`)
+
+The release's sample clip, 750 frames, with the scene adult (`tools/scene_video.py`). There is no ground truth here, so this is a description, not a protocol. The graph explains each frame with a mean squared error of 0.0054. Its expectation of the next frame is **1.9 × worse than repeating the last frame**, and it holds 1.3 objects in view on average (8 at most). The scene level works on the sprite world. It does not yet work on real video, where the camera moves, people deform and the light changes.

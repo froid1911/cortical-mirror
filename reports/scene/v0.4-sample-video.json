@@ -1,0 +1,10 @@
+{
+  "source": "sample.mp4",
+  "frames": 750,
+  "explained_mse": 0.005396780785208998,
+  "expectation_mse": 0.005676500778178898,
+  "repeat_last_frame_mse": 0.002940177074228933,
+  "objects_in_view_mean": 1.256923076923077,
+  "objects_in_view_max": 8,
+  "expectation_over_repeat": 1.9306662948753084
+}
