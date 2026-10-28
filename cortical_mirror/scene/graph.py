@@ -33,6 +33,8 @@ from numpy.lib.stride_tricks import sliding_window_view
 SPRITE = 48
 SEARCH = 8
 SLOTS = 8
+# Padding of the frame kept on a device: room for the widest search (recognition).
+FRAME_PAD = SPRITE // 2 + 24
 # What an unknown background costs to explain a pixel (a squared luminance error):
 # where the background has not been seen still, it explains nothing well.
 UNEXPLAINED = 0.004
@@ -125,8 +127,11 @@ class SceneGraph:
         persistence: float = 30.0,
         learn: bool = True,
         learn_persistence: bool = False,
+        device: str | None = None,
     ):
         self.width, self.height, self.slots = width, height, slots
+        # Where the search runs: on the CPU in arrays (None), or on a torch device.
+        self.device = device
         # Frames an unseen node stays believed (the time constant of its belief).
         # Unlike everything else in the graph, it carries over from scene to scene:
         # it is what development changes.
@@ -171,6 +176,10 @@ class SceneGraph:
 
     def reset(self) -> None:
         self.nodes: list[Node] = []
+        self._cost_cache = None
+        self._frame_on_device = None
+        # Bumped whenever the background changes within a frame.
+        self._cost_version = 0
         self.background: np.ndarray | None = None
         self.background_shade: np.ndarray | None = None
         # How sure the graph is of each background pixel: it grows where the input stays still.
@@ -275,20 +284,30 @@ class SceneGraph:
                 return None
             return sliding_window_view(out, (SPRITE, SPRITE))
 
-        views = [window(image, 0.0), window(self._background_cost(image), 0.0), window(cover, 1.0)]
-        if any(v is None for v in views):
-            return node.x, node.y, 0.0, 0.0
-        seen, behind, covered = views
-        weight = node.mask * (1 - covered)
-        # Evidence against a placement is capped: a pixel the node cannot explain may
-        # be something known standing in front of it.
-        evidence = behind - (seen - node.template) ** 2
-        # Where the known background explains the pixel, it may stand in front of the
-        # node: no evidence against it there at all.
-        evidence = np.where(
-            behind < 0.002, np.maximum(evidence, 0.0), np.maximum(evidence, -AGAINST)
-        )
-        gain = (weight * evidence).sum((-1, -2))
+        if self.device is not None:
+            found = self._gain_on_device(node, image, cover, radius)
+            if found is None:
+                return node.x, node.y, 0.0, 0.0
+            gain, seen_at = found
+        else:
+            views = [window(image, 0.0), window(self._cost(image), 0.0), window(cover, 1.0)]
+            if any(v is None for v in views):
+                return node.x, node.y, 0.0, 0.0
+            seen, behind, covered = views
+            weight = node.mask * (1 - covered)
+            # Evidence against a placement is capped: a pixel the node cannot explain may
+            # be something known standing in front of it.
+            evidence = behind - (seen - node.template) ** 2
+            # Where the known background explains the pixel, it may stand in front of the
+            # node: no evidence against it there at all.
+            evidence = np.where(
+                behind < 0.002, np.maximum(evidence, 0.0), np.maximum(evidence, -AGAINST)
+            )
+            gain = (weight * evidence).sum((-1, -2))
+
+            def seen_at(index):
+                return seen[index], weight[index]
+
         mass = max(node.mass, 1e-6)
         # Continuity: things keep moving as they did; each pixel off the prediction
         # costs a little, so a partial view does not drag a node off its path.
@@ -301,14 +320,88 @@ class SceneGraph:
         best = np.unravel_index(int(np.argmax(gain)), gain.shape)
         # How much of the node is seen: not hidden by anything known, and explained by
         # its template where it is placed (an unknown occluder hides the rest).
-        explained = (seen[best] - node.template) ** 2 < 0.003
-        visibility = float((weight[best] * explained).sum() / mass)
+        seen_best, weight_best = seen_at(best)
+        explained = (seen_best - node.template) ** 2 < 0.003
+        visibility = float((weight_best * explained).sum() / mass)
         return (
             node.x + best[1] - radius,
             node.y + best[0] - radius,
             float(gain[best] / mass),
             visibility,
         )
+
+    def _gain_on_device(self, node: Node, image: np.ndarray, cover: np.ndarray, radius: int):
+        """The search's evidence for every placement, computed on the device at once:
+        the same numbers as the array version, as a ``[2r+1, 2r+1]`` gain and a
+        function giving the window and weight at one placement."""
+
+        import torch
+        from torch.nn import functional as F
+
+        pad = SPRITE // 2 + radius
+        size = SPRITE + 2 * radius
+        cx, cy = int(round(node.x)), int(round(node.y))
+        y0, x0 = cy + pad - SPRITE // 2 - radius, cx + pad - SPRITE // 2 - radius
+        if not (
+            0 <= y0
+            and 0 <= x0
+            and y0 + size <= self.height + 2 * pad
+            and x0 + size <= self.width + 2 * pad
+        ):
+            return None
+        frame, cost = self._device_frame(image)
+        offset = FRAME_PAD - pad
+        rows = slice(offset + y0, offset + y0 + size)
+        columns = slice(offset + x0, offset + x0 + size)
+        covered_full = torch.from_numpy(np.pad(cover, pad, constant_values=1.0))
+        covered = covered_full[y0 : y0 + size, x0 : x0 + size].to(self.device)
+        windows = torch.stack([frame[rows, columns], cost[rows, columns], covered])
+        patches = F.unfold(windows[:, None], SPRITE)  # [3, S*S, placements]
+        seen, behind, hidden = patches[0], patches[1], patches[2]
+        template = torch.from_numpy(node.template).to(self.device).reshape(-1, 1)
+        mask = torch.from_numpy(node.mask).to(self.device).reshape(-1, 1)
+        weight = mask * (1 - hidden)
+        evidence = behind - (seen - template) ** 2
+        evidence = torch.where(
+            behind < 0.002, evidence.clamp(min=0.0), evidence.clamp(min=-AGAINST)
+        )
+        side = 2 * radius + 1
+        gain = (weight * evidence).sum(0).reshape(side, side).double().cpu().numpy()
+
+        def seen_at(index):
+            column = index[0] * side + index[1]
+            shape = (SPRITE, SPRITE)
+            return (
+                seen[:, column].reshape(shape).cpu().numpy(),
+                weight[:, column].reshape(shape).cpu().numpy(),
+            )
+
+        return gain, seen_at
+
+    def _device_frame(self, image: np.ndarray):
+        """The frame and the background's cost on the device, padded once per frame."""
+
+        import torch
+
+        key = (self.frame_count, self._cost_version)
+        if self._frame_on_device is None or self._frame_on_device[0] != key:
+            frame = np.pad(image, FRAME_PAD, constant_values=0.0)
+            cost = np.pad(self._cost(image), FRAME_PAD, constant_values=0.0)
+            self._frame_on_device = (
+                key,
+                torch.from_numpy(frame).to(self.device),
+                torch.from_numpy(cost).to(self.device),
+            )
+        return self._frame_on_device[1], self._frame_on_device[2]
+
+    def _cost(self, image: np.ndarray) -> np.ndarray:
+        """The background's cost for this frame, computed once until the background
+        is learned again."""
+
+        key = (self.frame_count, self._cost_version)
+        if self._cost_cache is None or self._cost_cache[0] != key:
+            self._cost_cache = (key, self._background_cost(image))
+        return self._cost_cache[1]
 
     def _background_cost(self, image: np.ndarray) -> np.ndarray:
         """How badly the background explains each pixel of the input."""
@@ -454,7 +547,7 @@ class SceneGraph:
             seen, behind = image[world], self.background[world]
             template, mask = node.template[sprite], node.mask[sprite]
             by_node = (seen - template) ** 2
-            by_background = self._background_cost(image)[world]
+            by_background = self._cost(image)[world]
             remembered = self.confidence[world] > 0.5
             if node.state == "seen":
                 free = 1 - nearer
@@ -507,6 +600,7 @@ class SceneGraph:
             0.1 * free * (still * (1 - self.confidence) - (1 - still) * self.confidence)
         )
         rate = free * (0.01 + 0.25 * still)
+        self._cost_version += 1
         self.background += rate * (image - self.background)
         self.background_shade += rate * (self.shade - self.background_shade)
 
@@ -698,6 +792,7 @@ class SceneGraph:
         if placed:
             world, sprite = placed
             alpha = node.mask[sprite]
+            self._cost_version += 1
             self.background[world] = (
                 alpha * node.template[sprite] + (1 - alpha) * self.background[world]
             )
