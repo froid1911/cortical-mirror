@@ -5,7 +5,11 @@ squared error of the predicted t+1 over that of repeating frame t:
 
 * oracle: the model fitted to frame t+1 itself (an upper bound on what it can do);
 * extrapolated: the model fitted to t-1 -> t and applied again to t (what a
-  predictor that assumes motion continues can actually do).
+  predictor that assumes motion continues can actually do);
+* damped: the same, carrying only a fraction (0.25, 0.5, 0.75) of that motion
+  forward;
+* smoothed: the motion averaged over the last three frame pairs, carried forward
+  at half strength.
 
 Models, from rigid to deformable: one global shift; a translation per 32 px
 block; an affine warp per block; a dense smooth flow field (Farneback). This is
@@ -82,6 +86,12 @@ MODELS = {
 }
 
 
+def score(now: np.ndarray, after: np.ndarray, flow: np.ndarray) -> float:
+    """Mean squared error of the frame moved along a flow, against the next frame."""
+
+    return float(np.mean((warp(now, flow) - after) ** 2))
+
+
 def clip_errors(path: Path, frames: int, scored_from: int) -> dict:
     capture = cv2.VideoCapture(str(path))
     images = []
@@ -91,16 +101,25 @@ def clip_errors(path: Path, frames: int, scored_from: int) -> dict:
             break
         images.append(_as_gray(frame, *SIZE))
     capture.release()
-    totals = {"repeat": 0.0} | {f"{m}_{k}": 0.0 for m in MODELS for k in ("oracle", "extrapolated")}
-    for t in range(max(scored_from, 1), len(images) - 1):
+    kinds = ("oracle", "extrapolated", "damped_0.25", "damped_0.5", "damped_0.75", "smoothed")
+    totals = {"repeat": 0.0} | {f"{m}_{k}": 0.0 for m in MODELS for k in kinds}
+    for t in range(max(scored_from, 3), len(images) - 1):
         before, now, after = images[t - 1], images[t], images[t + 1]
         totals["repeat"] += float(np.mean((now - after) ** 2))
         ahead, behind = dense_flow(now, after), dense_flow(before, now)
+        history = [
+            behind,
+            dense_flow(images[t - 2], before),
+            dense_flow(images[t - 3], images[t - 2]),
+        ]
         for name, model in MODELS.items():
-            totals[f"{name}_oracle"] += float(np.mean((warp(now, model(ahead)) - after) ** 2))
-            totals[f"{name}_extrapolated"] += float(
-                np.mean((warp(now, model(behind)) - after) ** 2)
-            )
+            fitted = model(behind)
+            totals[f"{name}_oracle"] += score(now, after, model(ahead))
+            totals[f"{name}_extrapolated"] += score(now, after, fitted)
+            for fraction in (0.25, 0.5, 0.75):
+                totals[f"{name}_damped_{fraction}"] += score(now, after, fraction * fitted)
+            smoothed = 0.5 * model(np.mean(history, axis=0))
+            totals[f"{name}_smoothed"] += score(now, after, smoothed)
     return totals
 
 
