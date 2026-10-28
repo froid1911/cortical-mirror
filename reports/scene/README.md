@@ -169,3 +169,31 @@ All three fail. Unlike v0.4, the adult is now better than random gaze on every m
 | Kalman, 0.02, power 6 | 0.65, 0.72 | 0.56, 0.97 | 0.78, 0.82 |
 
 A single filtered estimate gains a little permanence and loses discovery, so it is not the fix, and it stays an option, not the default. No pre-registered protocol was run. Getting past a screen likely needs several hypotheses per hidden object (multi-hypothesis or particle tracking), not one estimate weighted more or less.
+
+## After v0.5: headroom of motion models on real video (`dev-headroom.json`)
+
+`tools/video_headroom.py` on 20 UCF101 validation clips (development, not a protocol). Each model of how frame t becomes t+1 is fitted to dense optical flow. The numbers are the mean squared error of the predicted next frame divided by that of repeating frame t.
+
+| Model | Oracle (fitted to t+1) | Last motion carried forward | × 0.25 | × 0.5 | × 0.75 | Last 3 averaged, × 0.5 |
+|---|---|---|---|---|---|---|
+| Global shift | 0.65 | 1.09 | 0.97 | 0.99 | 1.03 | 0.92 |
+| Translation per 32 px block | 0.36 | 1.06 | 0.93 | 0.94 | 0.98 | 0.86 |
+| Affine per block | 0.29 | 1.07 | 0.92 | 0.92 | 0.98 | 0.85 |
+| Dense flow | 0.23 | 1.06 | 0.91 | 0.92 | 0.97 | 0.84 |
+
+- **Large headroom:** knowing the motion into the next frame would cut the error by up to 77%.
+- **Raw motion does not continue:** carrying the last frame's motion forward is worse than repeating the frame, for every model.
+- **Smoothed motion does:** averaged over three frames and carried forward at half strength, it beats repeating by about 15%.
+- **Affine per block is enough:** it gets 0.85, dense flow 0.84. For predicting real video, parts with affine motion and smoothed, damped prediction should suffice; fully deformable objects are not needed. That is the path for v0.6's real-video work.
+
+## After v0.5: particle tracking (development seeds only, not merged)
+
+32 hypotheses per node, weighed by the search's normalised evidence, surviving while hidden. On the development seeds it was far worse than direct tracking:
+
+| Measure | Direct | Particles |
+|---|---|---|
+| Permanence kept | 0.65 | 0.25 |
+| Grouping recall | 0.72 | 0.39 |
+| Discovery IoU / counts right | 0.81 / 0.91 | 0.56 / 0.28 |
+
+The node's position, the mean of its hypotheses, jitters from frame to frame. Shape learning then fails and nodes fragment. The code stays on branch `feat/v0.6-particles` and is not merged.
