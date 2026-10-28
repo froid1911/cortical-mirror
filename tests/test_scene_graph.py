@@ -185,7 +185,7 @@ def test_a_graph_matching_on_one_code_still_renders_brightness():
 def test_a_creatures_parts_are_bound_into_one_group_and_two_creatures_stay_apart():
     from cortical_mirror.scene.world import CreatureWorld
 
-    world = CreatureWorld(seed=3, creatures=2, limbs=1)
+    world = CreatureWorld(seed=2, creatures=2, limbs=1)
     graph = SceneGraph()
     for _ in range(250):
         world.step()
