@@ -1,0 +1,66 @@
+{
+  "split": "test",
+  "seed": 1,
+  "videos": [
+    "v_BodyWeightSquats_g04_c04.avi",
+    "v_PlayingFlute_g05_c04.avi",
+    "v_TrampolineJumping_g03_c03.avi",
+    "v_Swing_g04_c07.avi",
+    "v_SoccerPenalty_g01_c01.avi",
+    "v_BaseballPitch_g06_c05.avi",
+    "v_Fencing_g03_c02.avi",
+    "v_BlowDryHair_g05_c01.avi",
+    "v_Mixing_g07_c05.avi",
+    "v_SoccerJuggling_g06_c01.avi",
+    "v_Kayaking_g07_c02.avi",
+    "v_Lunges_g04_c03.avi",
+    "v_PushUps_g02_c03.avi",
+    "v_HorseRiding_g03_c05.avi",
+    "v_SumoWrestling_g07_c04.avi",
+    "v_CricketBowling_g07_c02.avi",
+    "v_BenchPress_g07_c05.avi",
+    "v_Mixing_g03_c01.avi",
+    "v_Archery_g07_c06.avi",
+    "v_WallPushups_g07_c01.avi",
+    "v_ThrowDiscus_g01_c02.avi",
+    "v_HulaHoop_g03_c02.avi",
+    "v_JumpingJack_g01_c02.avi",
+    "v_PlayingTabla_g07_c01.avi",
+    "v_SoccerJuggling_g07_c02.avi",
+    "v_SoccerPenalty_g03_c04.avi",
+    "v_ApplyEyeMakeup_g02_c03.avi",
+    "v_SalsaSpin_g04_c01.avi",
+    "v_Kayaking_g04_c03.avi",
+    "v_FieldHockeyPenalty_g05_c04.avi",
+    "v_Shotput_g07_c02.avi",
+    "v_Swing_g04_c05.avi",
+    "v_CuttingInKitchen_g06_c04.avi",
+    "v_PlayingSitar_g01_c04.avi",
+    "v_Biking_g07_c02.avi",
+    "v_WritingOnBoard_g05_c05.avi",
+    "v_HammerThrow_g03_c04.avi",
+    "v_BabyCrawling_g02_c05.avi",
+    "v_Archery_g03_c02.avi",
+    "v_Archery_g05_c05.avi"
+  ],
+  "v0.4": {
+    "ratio": 5.183131218229203,
+    "clips_better_than_repeating": 0.0,
+    "seconds": 129.4
+  },
+  "registration_luminance": {
+    "ratio": 0.9128301577198429,
+    "clips_better_than_repeating": 0.45,
+    "seconds": 122.1
+  },
+  "registration_normalised": {
+    "ratio": 0.9050803580806787,
+    "clips_better_than_repeating": 0.45,
+    "seconds": 118.0
+  },
+  "part_motion": {
+    "ratio": 0.7647360726831639,
+    "clips_better_than_repeating": 0.95,
+    "seconds": 110.6
+  }
+}

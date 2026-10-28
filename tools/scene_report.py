@@ -49,6 +49,7 @@ def self_world() -> dict:
     import torch
 
     motor = train_motor()
+    ADULT.parent.mkdir(parents=True, exist_ok=True)
     torch.save({"motor": torch.tensor(motor)}, ADULT.with_name("scene-adult-eye.pt"))
     return {
         "adult_motor": motor.round(2).tolist(),
@@ -63,6 +64,7 @@ def attention() -> dict:
     import torch
 
     weights = train_attention()
+    ADULT.parent.mkdir(parents=True, exist_ok=True)
     torch.save({"weights": torch.tensor(weights)}, ADULT.with_name("scene-adult-gaze.pt"))
     return {
         "adult_weights": weights.round(4).tolist(),
@@ -122,6 +124,28 @@ def attention_v05() -> dict:
     }
 
 
+def permanence_v06() -> dict:
+    """Protocol 9 for v0.6 on fresh seeds, with a freshly raised adult."""
+
+    adult, course = train_persistence()
+    magic, _ = train_persistence(magic=True)
+    seeds = range(3040, 3060)
+    return {
+        "adult_persistence": adult,
+        "magic_persistence": magic,
+        "adult_course": course,
+        "newborn": object_permanence(NEWBORN_PERSISTENCE, seeds=seeds),
+        "adult": object_permanence(adult, seeds=seeds),
+        "built_in": object_permanence(60.0, seeds=seeds),
+    }
+
+
+def parts_v06() -> dict:
+    """Protocol 13 for v0.6 on fresh seeds."""
+
+    return parts_and_wholes(seeds=range(6020, 6040))
+
+
 PROTOCOLS = {
     "discovery": object_discovery,
     "manipulation": manipulation,
@@ -132,6 +156,8 @@ PROTOCOLS = {
     "lighting": light,
     "permanence_v05": permanence_v05,
     "attention_v05": attention_v05,
+    "permanence_v06": permanence_v06,
+    "parts_v06": parts_v06,
 }
 
 
