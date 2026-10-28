@@ -6,6 +6,7 @@ split while developing; the test split is the protocol.
 """
 
 import argparse
+import functools
 import json
 import random
 import time
@@ -17,6 +18,7 @@ import numpy as np
 from cortical_mirror.data import split_videos
 from cortical_mirror.scene.front import NormalisedFront
 from cortical_mirror.scene.graph import SceneGraph, _as_gray
+from cortical_mirror.scene.phenomena import seed_map
 from cortical_mirror.scene.video import VideoGraph
 
 
@@ -33,14 +35,19 @@ class Plain:
         return self.graph.expect(shade=True)
 
 
+def registration_normalised():
+    return VideoGraph(front=NormalisedFront())
+
+
 CONDITIONS = {
     "v0.4": Plain,
     "registration_luminance": VideoGraph,
-    "registration_normalised": lambda: VideoGraph(front=NormalisedFront()),
+    "registration_normalised": registration_normalised,
 }
 
 
-def clip_errors(model, path: Path, frames: int, scored_from: int):
+def clip_errors(path: Path, condition: str, frames: int, scored_from: int):
+    model = CONDITIONS[condition]()
     capture = cv2.VideoCapture(str(path))
     expected, repeated, previous = [], [], None
     for t in range(frames):
@@ -70,14 +77,16 @@ def main() -> None:
     videos = sorted(getattr(split_videos(args.data), args.split))
     chosen = random.Random(0).sample(videos, min(args.videos, len(videos)))
     report = {"split": args.split, "videos": [v.name for v in chosen]}
-    for name, make in CONDITIONS.items():
+    for name in CONDITIONS:
         started = time.time()
-        totals, wins = [0.0, 0.0], 0
-        for path in chosen:
-            expected, repeated = clip_errors(make(), path, args.frames, args.scored_from)
-            totals[0] += expected
-            totals[1] += repeated
-            wins += expected < repeated
+        clips = seed_map(
+            functools.partial(
+                clip_errors, condition=name, frames=args.frames, scored_from=args.scored_from
+            ),
+            chosen,
+        )
+        totals = [sum(e for e, _ in clips), sum(r for _, r in clips)]
+        wins = sum(e < r for e, r in clips)
         report[name] = {
             "ratio": totals[0] / totals[1] if totals[1] else float("nan"),
             "clips_better_than_repeating": wins / len(chosen),

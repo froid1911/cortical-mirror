@@ -137,3 +137,10 @@ def test_training_attention_returns_one_weight_per_feature():
 
     weights = phenomena.train_attention(seeds=[500], frames=60)
     assert weights.shape == (len(FEATURES),)
+
+
+def test_running_seeds_in_parallel_gives_the_same_numbers(monkeypatch):
+    sequential = phenomena.object_permanence(60.0, seeds=[3000, 3001], frames=90)
+    monkeypatch.setenv("SCENE_WORKERS", "2")
+    parallel = phenomena.object_permanence(60.0, seeds=[3000, 3001], frames=90)
+    assert parallel == sequential
