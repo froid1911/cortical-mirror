@@ -10,6 +10,7 @@ is the world as it would look if it were changed.
 from __future__ import annotations
 
 import json
+import math
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -31,6 +32,8 @@ class SpriteSource:
 
     def __init__(self, seed: int = 0, scene_frames: int = 600):
         self.seed, self.scene_frames, self.frame = seed, scene_frames, 0
+        # Set on the frame a new scene begins, so the graph can start afresh.
+        self.new_scene = False
         self._world()
 
     def _world(self) -> None:
@@ -39,7 +42,8 @@ class SpriteSource:
         )
 
     def read(self) -> np.ndarray:
-        if self.frame and self.frame % self.scene_frames == 0:
+        self.new_scene = bool(self.frame) and self.frame % self.scene_frames == 0
+        if self.new_scene:
             self.seed += 1
             self._world()
         self.frame += 1
@@ -91,21 +95,32 @@ class SceneLive:
     # Edits ------------------------------------------------------------------
 
     def control(self, command: dict) -> dict:
+        """Apply an edit; anything malformed raises ValueError and changes nothing."""
+
+        ids = {
+            key: _node_id(command[key])
+            for key in ("delete", "restore", "move", "duplicate")
+            if key in command
+        }
+        by = _offset(command.get("by", (0, 0))) if "move" in command else (0.0, 0.0)
         with self._lock:
             if command.get("reset"):
                 self.deleted.clear()
                 self.moved.clear()
                 self.duplicated.clear()
-            if "delete" in command:
-                self.deleted.add(int(command["delete"]))
-            if "restore" in command:
-                self.deleted.discard(int(command["restore"]))
-            if "move" in command:
-                dx, dy = (float(v) for v in command.get("by", (0, 0)))
-                old = self.moved.get(int(command["move"]), [0.0, 0.0])
-                self.moved[int(command["move"])] = [old[0] + dx, old[1] + dy]
-            if "duplicate" in command:
-                self.duplicated.add(int(command["duplicate"]))
+            if "delete" in ids:
+                self.deleted.add(ids["delete"])
+            if "restore" in ids:
+                self.deleted.discard(ids["restore"])
+            if "move" in ids:
+                old = self.moved.get(ids["move"], [0.0, 0.0])
+                # Within reach: no further than twice the view in any direction.
+                self.moved[ids["move"]] = [
+                    max(-2.0 * SIZE[0], min(2.0 * SIZE[0], old[0] + by[0])),
+                    max(-2.0 * SIZE[1], min(2.0 * SIZE[1], old[1] + by[1])),
+                ]
+            if "duplicate" in ids:
+                self.duplicated.add(ids["duplicate"])
         return {"ok": True, "edits": self._edits()}
 
     def _edits(self) -> dict:
@@ -119,6 +134,10 @@ class SceneLive:
 
     def step(self) -> None:
         image = self.source.read()
+        if getattr(self.source, "new_scene", False):
+            # A different world: nothing known about it, and the old edits mean nothing.
+            self.graph.reset()
+            self.control({"reset": True})
         self.graph.observe(image)
         with self._lock:
             ids = {n.id for n in self.graph.nodes}
@@ -134,11 +153,18 @@ class SceneLive:
                 alpha = self.graph._alpha(node) > 0.5
                 if any((alpha & g).sum() > 0.3 * max(alpha.sum(), 1) for g in gone):
                     deleted = deleted | {node.id}
-            self.explained = self.graph.edit(
-                move={k: tuple(v) for k, v in self.moved.items() if k in ids},
-                delete=deleted | hidden,
-                duplicate={k: DUPLICATE_OFFSET for k in self.duplicated if k in ids},
-            )
+            try:
+                self.explained = self.graph.edit(
+                    move={k: tuple(v) for k, v in self.moved.items() if k in ids},
+                    delete=deleted | hidden,
+                    duplicate={k: DUPLICATE_OFFSET for k in self.duplicated if k in ids},
+                )
+            except (ValueError, OverflowError, IndexError):
+                # An edit the graph cannot render is dropped, not allowed to stop the source.
+                self.deleted.clear()
+                self.moved.clear()
+                self.duplicated.clear()
+                self.explained = self.graph.render()
             scene = self.graph.to_json()
             scene["edits"] = self._edits()
             scene["size"] = list(SIZE)
@@ -179,6 +205,24 @@ class SceneLive:
             self.running = False
             with self._condition:
                 self._condition.notify_all()
+
+
+def _node_id(value) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"a node id is a whole number, not {value!r}")
+    if not math.isfinite(value) or value != int(value) or abs(value) > 1e9:
+        raise ValueError(f"a node id is a whole number, not {value!r}")
+    return int(value)
+
+
+def _offset(value) -> tuple[float, float]:
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        raise ValueError("'by' is [dx, dy]")
+    if any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in value):
+        raise ValueError("'by' is [dx, dy]")
+    if not all(math.isfinite(v) for v in value):
+        raise ValueError("'by' must be finite")
+    return float(value[0]), float(value[1])
 
 
 PAGE = resources.files("cortical_mirror").joinpath("static/scene.html")
@@ -229,13 +273,15 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.split("?")[0] != "/edit":
             self._bytes(404, "text/plain; charset=utf-8", b"not found")
             return
-        length = min(int(self.headers.get("Content-Length") or 0), 4096)
         try:
+            length = int(self.headers.get("Content-Length") or 0)
+            if not 0 <= length <= 4096:
+                raise ValueError("an edit is at most 4096 bytes")
             command = json.loads(self.rfile.read(length) or b"{}")
             if not isinstance(command, dict):
                 raise ValueError("expected a JSON object")
             self._json(self.server.state.control(command))
-        except (ValueError, TypeError) as error:
+        except (ValueError, TypeError, OverflowError) as error:
             self._bytes(400, "text/plain; charset=utf-8", str(error).encode())
 
     def log_message(self, *_):

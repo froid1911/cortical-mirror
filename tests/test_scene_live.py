@@ -1,6 +1,7 @@
 import copy
 import json
 import threading
+import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
 
@@ -90,3 +91,69 @@ def test_a_fragment_on_a_deleted_object_is_deleted_with_it():
     hidden = {n.id for n in state.graph.nodes if n.state != "seen"}
     alone = state.graph.edit(delete={node.id, 999} | hidden)
     assert np.allclose(state.explained, alone)
+
+
+def test_impossible_edits_are_refused_and_change_nothing():
+    import pytest
+
+    state = SceneLive(SpriteSource(seed=1))
+    run(state, 30)
+    for bad in (
+        {"move": 0, "by": [float("inf"), 0]},
+        {"move": 0, "by": [1e999, 0]},
+        {"delete": 1e999},
+        {"delete": 1, "move": 2, "by": "x"},
+        {"move": 0, "by": [1, 2, 3]},
+    ):
+        with pytest.raises(ValueError):
+            state.control(bad)
+    assert state.scene()["edits"] == {"deleted": [], "moved": {}, "duplicated": []}
+
+
+def test_a_move_is_kept_within_reach():
+    state = SceneLive(SpriteSource(seed=1))
+    for _ in range(10):
+        state.control({"move": 0, "by": [1e300, -1e300]})
+    dx, dy = state.scene()["edits"]["moved"]["0"]
+    assert abs(dx) <= 512 and abs(dy) <= 384
+
+
+def test_a_duplicate_follows_its_original_and_goes_when_it_is_deleted():
+    state = SceneLive(SpriteSource(seed=1))
+    run(state, 60)
+    node = next(n for n in state.graph.nodes if n.state == "seen")
+    state.control({"duplicate": node.id})
+    state.control({"delete": node.id})
+    state.graph.observe = lambda image: None
+    state.step()
+    hidden = {n.id for n in state.graph.nodes if n.state != "seen"}
+    assert np.allclose(state.explained, state.graph.edit(delete={node.id} | hidden))
+
+
+def test_a_new_sprite_scene_starts_a_new_graph_and_clears_the_edits():
+    state = SceneLive(SpriteSource(seed=1, scene_frames=40))
+    run(state, 39)
+    state.control({"delete": 0})
+    run(state, 2)
+    assert state.graph.frame_count <= 2
+    assert state.scene()["edits"]["deleted"] == []
+
+
+def test_the_server_answers_bad_requests_with_400():
+    state = SceneLive(SpriteSource(seed=1))
+    run(state, 5)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.state = state
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        for body in (b'{"delete": 1e999}', b"[1]", b"not json"):
+            request = urllib.request.Request(base + "/edit", data=body, method="POST")
+            try:
+                urllib.request.urlopen(request)
+                raise AssertionError("expected 400")
+            except urllib.error.HTTPError as error:
+                assert error.code == 400
+    finally:
+        server.shutdown()
+        server.server_close()

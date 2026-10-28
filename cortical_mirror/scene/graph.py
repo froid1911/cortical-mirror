@@ -211,9 +211,14 @@ class SceneGraph:
             if depth and node.id in depth:
                 node.depth = depth[node.id]
         for source, (dx, dy) in (duplicate or {}).items():
+            if source in (delete or set()):
+                continue
             original = next(n for n in self.nodes if n.id == source)
             twin = copy.deepcopy(original)
-            twin.x, twin.y, twin.depth = twin.x + dx, twin.y + dy, original.depth + 0.5
+            # A duplicate goes where its original was moved to, plus its own offset.
+            mx, my = (move or {}).get(source, (0, 0))
+            twin.x, twin.y = twin.x + mx + dx, twin.y + my + dy
+            twin.depth = original.depth + 0.5
             nodes.append(twin)
         return self.render(nodes)
 

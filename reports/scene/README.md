@@ -72,3 +72,10 @@ The adult's gaze value was trained on seeds 500–539 and tested on 5000–5019,
 | Adult time to novelty ≤ 0.5 × newborn | 2.0 × | **fail** |
 
 The noise is a real trap: the surprise reflex spends 63% of its fixations on it, and so ends up knowing the world worst. The learned eye escapes the trap, but in the crude way. Its weights are negative for "unknown" (−0.30) and for "familiar" (−0.11), positive only for the bias (+0.16), and near zero for error (+0.05) and novelty (+0.02). It has learned to avoid unknown places rather than to seek the ones that teach, so it explores less evenly than random gaze and finds a newcomer more slowly. A linear value over these features cannot tell an unexplored place from noise until the place has been looked at. The design's hope, curiosity directed at learning progress, did not emerge.
+
+## Known deviations and limits (found in review, after measuring)
+
+- **Protocol 11, time to novelty:** the code counts the newcomer as found on any frame its centre is inside the fovea. The protocol says at a fixation. So a newcomer drifting into a still fovea counts too. This favours every condition alike, and the measured numbers are left as they are.
+- **Protocol 10, bitmap baseline:** the code inpaints the mask dilated by one pixel, where the protocol says the mask itself. That gives the baseline a slightly larger hole. It probably costs the baseline a little, and it does not change which wins.
+- **Speed on real video:** recognising forgotten objects searches widely and can slow the live page well below 25 fps on busy footage.
+- **The eye graph** keeps its gaze inside its canvas only because the protocol drivers keep it there; it is not part of the live page.

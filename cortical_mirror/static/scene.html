@@ -38,7 +38,7 @@ figure { margin: 0; }
 figcaption { margin: 8px 2px 0; font-size: 13px; color: var(--pewter); }
 figcaption strong { color: var(--silver); font-weight: 600; font-size: 14px; }
 
-.node { cursor: grab; }
+.node { cursor: grab; pointer-events: all; }
 .node circle { fill: rgba(143, 184, 255, 0.06); stroke: var(--expect); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .node.hidden circle { stroke-dasharray: 4 4; fill: none; }
 .node.deleted circle { stroke: var(--surprise); fill: rgba(255, 179, 71, 0.08); }
@@ -159,17 +159,28 @@ function toScene(event) {
 
 overlay.addEventListener("pointerdown", (event) => {
   const g = event.target.closest(".node");
-  if (!g) return;
+  if (!g || event.button !== 0) return;
   selected = Number(g.dataset.id);
   drag = { id: selected, start: toScene(event), moved: false, element: g };
   overlay.setPointerCapture(event.pointerId);
-  draw();
+  // Mark the selection in place: redrawing now would detach the element being dragged.
+  for (const other of overlay.querySelectorAll(".node.selected")) other.classList.remove("selected");
+  g.classList.add("selected");
 });
 overlay.addEventListener("pointermove", (event) => {
   if (!drag) return;
   const p = toScene(event);
   if (Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > 2) drag.moved = true;
+  // Follow the pointer while dragging; the poll redraws everything once it ends.
+  const node = scene.nodes.find((n) => n.id === drag.id);
+  if (node) {
+    const { x, y } = shown(node);
+    drag.element.setAttribute("transform", `translate(${x + p.x - drag.start.x} ${y + p.y - drag.start.y})`);
+  }
 });
+function cancelDrag() { drag = null; draw(); }
+overlay.addEventListener("pointercancel", cancelDrag);
+overlay.addEventListener("lostpointercapture", () => { if (drag) cancelDrag(); });
 overlay.addEventListener("pointerup", (event) => {
   if (!drag) return;
   const p = toScene(event);
