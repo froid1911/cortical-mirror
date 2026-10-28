@@ -32,6 +32,30 @@ def panel(image: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(cv2.resize(gray, size, interpolation=cv2.INTER_NEAREST), cv2.COLOR_GRAY2BGR)
 
 
+def frames_of_groups(canvas: np.ndarray, scene: dict) -> None:
+    """A dashed frame around the parts of each whole."""
+
+    deleted = set(scene["edits"]["deleted"])
+    nodes = {n["id"]: n for n in scene["nodes"]}
+    for group in scene.get("groups", []):
+        parts = [nodes[m] for m in group["members"] if m in nodes and nodes[m]["state"] == "seen"]
+        if not parts:
+            continue
+        boxes = []
+        for node in parts:
+            r = max(6, math.sqrt(node["size"] / math.pi))
+            boxes.append((node["x"] - r, node["y"] - r, node["x"] + r, node["y"] + r))
+        x0, y0 = (int((min(b[i] for b in boxes) - 3) * SCALE) for i in (0, 1))
+        x1, y1 = (int((max(b[i] for b in boxes) + 3) * SCALE) for i in (2, 3))
+        colour = SURPRISE if all(m in deleted for m in group["members"]) else MUTED
+        for x in range(x0, x1, 6):
+            cv2.line(canvas, (x, y0), (min(x + 3, x1), y0), colour, 1)
+            cv2.line(canvas, (x, y1), (min(x + 3, x1), y1), colour, 1)
+        for y in range(y0, y1, 6):
+            cv2.line(canvas, (x0, y), (x0, min(y + 3, y1)), colour, 1)
+            cv2.line(canvas, (x1, y), (x1, min(y + 3, y1)), colour, 1)
+
+
 def rings(canvas: np.ndarray, scene: dict) -> None:
     deleted = set(scene["edits"]["deleted"])
     for node in scene["nodes"]:
@@ -72,25 +96,22 @@ def main() -> None:
     parser.add_argument("--every", type=int, default=2)
     args = parser.parse_args()
 
-    state = SceneLive(SpriteSource(seed=5), SceneGraph.load(args.adult))
+    state = SceneLive(SpriteSource(seed=2), SceneGraph.load(args.adult))
     args.frames_dir.mkdir(parents=True, exist_ok=True)
     written, caption = 0, ""
     for t in range(args.frames):
         state.step()
-        seen_nodes = [n for n in state.scene()["nodes"] if n["state"] == "seen"]
-        if t == 160 and seen_nodes:
-            target = seen_nodes[0]["id"]
-            state.control({"delete": target})
-            caption = f"{target} deleted: the background behind it, from memory"
-        if t == 300 and len(seen_nodes) > 1:
-            target = next(n["id"] for n in seen_nodes if n["id"] not in state.deleted)
-            state.control({"move": target, "by": [0, 40]})
-            caption = f"{target} moved: its whole shape, somewhere else"
+        groups = state.scene().get("groups", [])
+        if t >= 160 and not caption and groups:
+            whole = groups[0]
+            state.control({"delete_all": whole["members"]})
+            caption = f"{whole['id']} deleted, all its parts"
         if t % args.every:
             continue
         scene = state.scene()
         seen = panel(state.source.world.render())
         explained = panel(state.explained)
+        frames_of_groups(explained, scene)
         rings(explained, scene)
         gap = 12
         width = seen.shape[1] * 2 + gap
@@ -101,7 +122,7 @@ def main() -> None:
         put(canvas, "What it explains", seen.shape[1] + gap, seen.shape[0] + 20, 0.55, TEXT)
         put(
             canvas,
-            caption or "dashed: believed, not seen",
+            caption or "frames: wholes; dashed: believed, unseen",
             seen.shape[1] + gap,
             seen.shape[0] + 40,
             0.42,

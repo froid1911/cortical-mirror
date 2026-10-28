@@ -131,7 +131,8 @@ function draw() {
   list.replaceChildren();
   // Wholes first, beneath their parts: a frame around the parts of each group.
   for (const group of scene.groups || []) {
-    const parts = scene.nodes.filter((n) => group.members.includes(n.id));
+    // The frame goes around the parts in view; hidden ones may have drifted.
+    const parts = scene.nodes.filter((n) => group.members.includes(n.id) && n.state === "seen");
     if (!parts.length) continue;
     const boxes = parts.map((n) => {
       const { x, y } = shown(n);
