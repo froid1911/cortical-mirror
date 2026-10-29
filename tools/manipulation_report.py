@@ -39,12 +39,13 @@ def matches(truth: list[dict], masks: dict[int, np.ndarray]) -> list[tuple[dict,
     return pairs
 
 
-def learned(cortex, field, seeds, frames) -> dict:
+def learned(cortex, field, seeds, frames, files: bool = False) -> dict:
     scores = {e: {"scene": [], "bitmap": [], "unchanged": []} for e in ("delete", "move")}
     objects = matched = 0
     for seed in seeds:
         world = SpriteWorld(seed=seed, objects=2 + seed % 2)
-        scene = LearnedScene(cortex, MotionSlots(field=field, device=cortex.device))
+        slots = MotionSlots(field=field, device=cortex.device)
+        scene = LearnedScene(cortex, slots, files=files)
         for _ in range(frames):
             world.step()
             labels = scene.observe(world.render())

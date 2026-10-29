@@ -59,6 +59,7 @@ class LearnedScene:
         rate: float = 0.1,
         gap: int = 4,
         files: bool = False,
+        silenced: bool = False,
     ):
         self.cortex, self.slots = cortex, slots
         self.width, self.height, self.rate = width, height, rate
@@ -67,7 +68,7 @@ class LearnedScene:
         self.past = deque(maxlen=gap + 1)
         self.frame: np.ndarray | None = None
         self.labels: np.ndarray | None = None
-        self.use_files = files
+        self.use_files, self.silenced = files, silenced
         self.files: dict[int, ObjectFile] = {}
 
     # Seeing ------------------------------------------------------------------
@@ -82,6 +83,8 @@ class LearnedScene:
             self.labels = np.zeros(self.past[-1].shape[-2:], np.int64)
         else:
             velocity = self.cortex.between(self.past[0], self.past[-1])[0] / (len(self.past) - 1)
+            if self.silenced:
+                velocity = torch.zeros_like(velocity)
             self.labels = self.slots.step(velocity, self.past[-1][0]).numpy()
         if self.use_files and self.slots is not None:
             self._follow(image, self.labels)
