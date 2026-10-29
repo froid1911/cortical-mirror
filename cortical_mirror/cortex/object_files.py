@@ -13,7 +13,8 @@ its learned appearance explains the image best (analysis by synthesis). That sea
 is engineered inference; the appearance and the shape are learned.
 
 A file knows how sure it is: its fit is the error of its prediction, relative to the
-variance it has learned to expect. A mature file that cannot explain what it sees
+error an unrelated template would make (near 0 when it explains what it sees, near
+1 when it explains it no better than chance). A mature file that cannot explain what it sees
 does not learn from it, and is not trusted until it finds its object again.
 """
 
@@ -33,7 +34,7 @@ class ObjectFile:
         mature: int = 30,
         align_after: int = 10,
         rate: float = 0.05,
-        trust: float = 5.0,
+        trust: float = 0.5,
     ):
         self.x, self.y, self.radius, self.search = float(x), float(y), radius, search
         self.ratio, self.mature, self.align_after = ratio, mature, align_after
@@ -88,19 +89,22 @@ class ObjectFile:
         if weights.sum() < 4:
             return
         cx, cy = int(round(x)), int(round(y))
-        best, best_offset = np.inf, (0, 0)
+        best, best_offset, best_chance = np.inf, (0, 0), 1.0
         for dy in range(-search, search + 1):
             for dx in range(-search, search + 1):
                 window = self._window(image, cx + dx, cy + dy)
                 use = weights & ~np.isnan(window)
                 if use.sum() < weights.sum() / 2:
                     continue
-                cost = float(np.mean((window[use] - self.mean[use]) ** 2))
+                seen, expected = window[use], self.mean[use]
+                cost = float(np.mean((seen - expected) ** 2))
                 if cost < best:
-                    best, best_offset = cost, (dx, dy)
+                    # The error an unrelated template would make here.
+                    chance = seen.var() + expected.var() + (seen.mean() - expected.mean()) ** 2
+                    best, best_offset, best_chance = cost, (dx, dy), float(chance)
         if np.isfinite(best):
             self.x, self.y = cx + best_offset[0], cy + best_offset[1]
-            self.fit = best / (float(np.mean(self.var[weights])) + 1e-4)
+            self.fit = best / (best_chance + 1e-6)
 
     def _align(self, image: np.ndarray) -> None:
         self._search(image, self.x, self.y, self.search)
