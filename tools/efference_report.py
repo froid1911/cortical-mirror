@@ -6,6 +6,7 @@ from pathlib import Path
 
 import torch
 
+import cortical_mirror.scene.phenomena as phenomena
 from cortical_mirror.cortex.efference import Efference
 from cortical_mirror.cortex.mt import MotionCortex
 from cortical_mirror.scene.phenomena import self_world_learned, train_efference
@@ -18,12 +19,14 @@ def main() -> None:
     parser.add_argument("--test-seeds", default="8000:8020")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--save-map", type=Path)
+    parser.add_argument("--saccade", type=int, default=4, help="view pixels per small saccade")
     args = parser.parse_args()
 
     def seeds(text):
         start, stop = (int(v) for v in text.split(":"))
         return range(start, stop)
 
+    phenomena.SMALL_SACCADE = args.saccade
     mt = MotionCortex.load(args.mt)
     adult = train_efference(mt, seeds=seeds(args.train_seeds))
     if args.save_map:
