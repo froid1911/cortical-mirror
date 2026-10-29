@@ -64,6 +64,7 @@ class MotionSlots:
         confirm: int = 3,
         edge: int = 1,
         merge: bool = True,
+        tolerance: float | None = None,
         field: AssociationField | None = None,
         device="cpu",
     ):
@@ -71,6 +72,8 @@ class MotionSlots:
         self.blur, self.rounds, self.moving = blur, rounds, moving
         self.birth, self.death, self.patience = birth, death, patience
         self.confirm, self.edge, self.merging = confirm, edge, merge
+        # How alike two touching slots' velocities must be for them to merge.
+        self.tolerance = sigma if tolerance is None else tolerance
         self.field, self.device = field, torch.device(device)
         self.reset()
 
@@ -158,7 +161,7 @@ class MotionSlots:
             for j in held:
                 if j <= i or not (self.alive[i] and self.alive[j]):
                     continue
-                if float((self.u[i] - self.u[j]).norm()) > self.sigma:
+                if float((self.u[i] - self.u[j]).norm()) > self.tolerance:
                     continue
                 grown = F.max_pool2d((labels == i).float()[None, None], 3, 1, 1)[0, 0] > 0
                 if bool((grown & (labels == j)).any()):
