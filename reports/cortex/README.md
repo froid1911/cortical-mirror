@@ -237,3 +237,19 @@ Development showed that measuring the fit against the file's own variance was un
 - **Why delete fails.** Files make deleting better on 61% of objects, but not on average. When a sure file's shape misses part of its object, that part stays behind after the delete, and a few such remnants outweigh the many small gains. For deleting, a coarse mask that covers too much is the safer answer; for moving, the sharp one is.
 - Development seeds (2200–2209) had shown delete 0.12 ×; the test shows 0.52 ×. Ten development scenes were again too few.
 - **Next:** let the edit ask what it needs. Delete everything that could belong to the object (the sharp shape and the slot's region), and move only what surely does (the sharp shape).
+
+## v0.13: remove what could belong, paste what surely does (`v0.13-cautious-edits/`, protocol 25)
+
+An edit now removes all that could belong to an object, a sure file's shape *and* the slot's coarse region. When moving, it pastes only what surely belongs, the sure shape. Nothing else changed from protocol 24. Test: fresh seeds 2500–2539, each scene with and without object files, compared on the 70 objects both matched.
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| 1. Objects matched with files ≥ 80% | **77%** (without files 87%; protocol 24: 84%) | **fail**, narrowly |
+| 2. Delete: ≤ 0.75 × the bitmap, and below the scene without files | **0.15 ×**; MSE 0.00046 against 0.00127; files better on 73% of objects | **pass** |
+| 3. Move: below the scene without files | MSE 0.00097 against 0.00302; files better on 77% | **pass** |
+
+- **Deleting is fixed.** Removing all that could belong to an object leaves no remnants. With object files, deleting errs about a third as much as with coarse masks alone, and moving about a third.
+- **Close to the engineered graph.** Its errors in protocol 22 (other seeds) were 0.0004 for delete and 0.0009 for move. The learned scene now reaches 0.00046 and 0.00097. These are different seeds, so this is a comparison, not a criterion.
+- **Matching is not yet stable.** Unchanged code matched 84% of objects in protocol 24 and 77% here. A sharp mask must cover half of its object to count, and some sure files cover less. Matching sits around the 80% bar, not safely above it.
+
+The live page can now show these learned objects: `cortical-mirror scene --objects learned` (for a still camera, since the background is remembered pixel by pixel).

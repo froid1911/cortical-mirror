@@ -4,6 +4,8 @@ A live mirror that shows what the camera will see next — and keeps learning to
 
 A small predictive-coding hierarchy predicts the next webcam frame from the frames it has already seen. Every prediction is scored only against the frame it was issued for, and that error is the only teaching signal: offline on natural video, and online, continuously, on the camera stream in front of it. Started from random weights, it begins as an exact copy of the last frame. On a person moving in front of a still camera it learns, within about a minute, to predict better than that copy; on short, generic action clips it ends about even with it.
 
+**New in v0.13:** learned objects on the live page, and edits that leave no remnants. `cortical-mirror scene --objects learned` replaces the template search with objects found by learned motion. An edit removes all that could belong to an object and pastes only what surely does: deleting and moving now err about as little as with the engineered graph (0.00046 and 0.00097). Matching objects stays narrowly below its bar (77% against 80%, protocol 25).
+
 **New in v0.12:** object files that know how sure they are. A file compares its prediction with the rival explanation, the remembered background, so a file that drifted onto background no longer trusts itself. Learned objects reach 0.56 pixel IoU with 84% of objects matched, and moving one errs half as much as with coarse masks. Deleting with sharp masks still leaves remnants on a few objects, and that criterion fails (protocol 24).
 
 **New in v0.11:** object files. Each learned object keeps a running mean and variance in its own frame; its shape is where the variance stays low, since its texture moves with it while the background slides past. Learned objects reach 0.505 pixel IoU (from 0.38), the bar earlier protocols failed. But the sharp masks match fewer objects (67% against 85%) and make deleting worse, which the [report](reports/cortex/README.md) states plainly (protocol 23).
@@ -461,6 +463,11 @@ Why the masks stay coarse: given each object's true velocity, assigning places t
 
 | [23](docs/protocols/23-object-files.md) Object files | **Passes as written.** Pixel object IoU 0.505 with object files (0.379 without); silenced MT finds nothing; moving errs less (0.0020 against 0.0036). But fewer objects are matched with files (67% against 85%), so the move comparison is over different objects, and deleting gets worse (0.56 × against 0.26 × the bitmap). |
 | [24](docs/protocols/24-confident-object-files.md) Object files that know how sure they are | **Four of five pass.** Pixel IoU 0.564 (0.383 without files), 84% matched, silenced MT finds nothing, and moving errs less than without files on the same objects (0.0015 against 0.0029). Deleting fails: better on 61% of objects, but remnants of partly missed objects make the mean worse (0.0017 against 0.0011). |
+| [25](docs/protocols/25-cautious-edits.md) Cautious edits | **Two of three pass.** Deleting (0.15 × the bitmap; 0.00046 against 0.00127 without files) and moving (0.00097 against 0.00302) both improve on the same objects. Matching fails narrowly: 77% (criterion 80%; 84% in protocol 24 with the same code). |
+
+```bash
+cortical-mirror scene --objects learned          # objects found by learned motion, live
+```
 
 ### References for the scene graph
 
@@ -711,6 +718,10 @@ Tests cover causal counterfactuals, forward-warp direction, the group-disjoint s
 - Live learning needs an NVIDIA GPU. On a CPU the learner manages under one step per second.
 - The mirror has no object permanence, explicit egomotion, or multimodal future; pixel warping and blending can soften detail. The v0.4 scene level has objects and a self, but only in synthetic worlds: on real video it is worse than repeating the last frame, and its adult fails the permanence protocol.
 - The pretrained DMVFN expert is not part of the self-organizing story; ablations without it are reported.
+
+## Changes in v0.13
+
+Edits remove all that could belong to an object and paste only what surely does. `LearnedGraph` (`cortex/learned_graph.py`) offers the learned scene behind the scene graph's interface; `cortical-mirror scene --objects learned` uses it, downloading `links-adult.pt` from v0.10.0. `tools/files_report.py --part combine` joins paired runs over parts of the seeds.
 
 ## Changes in v0.12
 
