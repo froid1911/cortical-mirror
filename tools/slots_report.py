@@ -74,8 +74,8 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--seeds", type=int, nargs=2, help="first and last+1 (development)")
-    parser.add_argument("--gap", type=int, default=1, help="frames MT integrates over")
-    parser.add_argument("--smoothing", type=int, help="MT's pooling of its evidence")
+    parser.add_argument("--gap", type=int, default=4, help="frames MT integrates over")
+    parser.add_argument("--smoothing", type=int, default=3, help="MT's pooling")
     parser.add_argument("--set", nargs="*", default=[], help="slot settings, name=value")
     args = parser.parse_args()
 

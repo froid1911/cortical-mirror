@@ -38,3 +38,13 @@ Reported without a criterion:
 - for reference, the engineered scene graph's object IoU on comparable scenes, about 0.8 (protocol 8).
 
 Failures are reported as failures.
+
+## Amendment (2026-10-29, before any test measurement)
+
+Development on training seeds 900–905 only:
+- **MT integrates over time.** MT's velocity on the sprites, frame to frame, has a median error of 0.58 retinal px per frame, about as large as the sprites' speeds. It sees motion on only 44% of object places. Comparing V1 now with V1 four frames ago, divided by four, halves the error (0.35) and sees 81% of object places as moving, with MT's evidence pooled over 3 instead of 5 positions. These are settings of the frozen MT adult's read-out, not new learning.
+- **Slot settings:** σ = 0.25 retinal px per frame, β = 2, blur 0.2, 3 EM rounds, merge tolerance = σ.
+- **What development showed, so that the test is read in its light:**
+  - On training seeds 900–903 the slots reach a moving IoU of 0.27 (ARI 0.48) and keep 37% of their IoU through the still moment.
+  - Even given each object's true velocity, choosing places by MT's velocity reaches IoU 0.26 at best: MT's motion spills onto 1.5 background places per object place.
+  - Criteria 1 and 3 are therefore expected to fail. The criteria are not changed.
