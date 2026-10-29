@@ -128,3 +128,25 @@ Objects have a median radius of only 3.1 positions on V1's grid, so a ring of 1�
 - **Novelty does not single out occlusion.** The untrained MT predicts the sprites' own motion about as badly as uncovered background: at κ = 1 novelty takes 49% of swept background places and 43% of object places.
 - **Looking closer shrinks the ring.** Spill falls from 1.78 to 1.08 background places per object place. But MT's place-by-place velocity does not get more precise (median error 0.7–0.9 world px per frame).
 - **What this means for protocol 20.** A perfect "is it moving" map, with MT's coverage and spill, bounds the object IoU near 0.8 / 2.8 ≈ 0.29 at 128 × 96, which is what the slots reached (0.30). At full resolution the bound is near 0.37. Neither reaches 0.5.
+
+## v0.10 step 3: links relearned from integrated motion (`v0.10-links.json`, protocol 21)
+
+The learned links were retrained by protocol 19's rule from the motion the slots use (MT comparing V1 four frames apart), on training seeds 900–949. Everything else is protocol 20's. Test: fresh seeds 9100–9119.
+
+| Condition | Moving IoU | Moving ARI | Still moment: IoU before → after |
+|---|---|---|---|
+| **Slots, relearned links** | **0.295** | **0.520** | 0.267 → 0.139 |
+| Silenced MT | 0 | 0 | 0 → 0 |
+| Without links | 0.332 | 0.551 | 0.280 → 0.012 |
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| 1. Moving IoU ≥ 0.5 | 0.295 | **fail** (expected: MT's map bounds it near 0.29) |
+| 2. Silenced MT: IoU ≤ 0.1 | 0.000 | **pass** |
+| 3. Still moment keeps ≥ 80% of its IoU | 52% | **fail** |
+
+- The relearned links keep more of each object through a pause than protocol 20's links (52% against 39%; without links, 4%).
+- Development on 4 held-out training seeds had shown 88%. Four seeds were too few, and the estimate was optimistic.
+- While objects move, the links still cost a little IoU (0.295 against 0.332 without them).
+
+**Where v0.10 stands.** Learned motion finds objects (ARI about 0.5, up from chance in protocol 19), and learned links hold them through pauses partly but not well enough. Object IoU is capped near 0.3 by how sharply MT sees motion at an object's edge, about half of what the protocol asks for.
