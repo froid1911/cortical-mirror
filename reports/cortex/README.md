@@ -253,3 +253,21 @@ An edit now removes all that could belong to an object, a sure file's shape *and
 - **Matching is not yet stable.** Unchanged code matched 84% of objects in protocol 24 and 77% here. A sharp mask must cover half of its object to count, and some sure files cover less. Matching sits around the 80% bar, not safely above it.
 
 The live page can now show these learned objects: `cortical-mirror scene --objects learned` (for a still camera, since the background is remembered pixel by pixel).
+
+### After protocol 25: matching, and the first real video (development; no protocol)
+
+**Matching.** On development seeds 2200–2214, 33 of 38 objects were matched (87%). The 5 misses had no common cause:
+- twice the coarse slot already missed the object;
+- twice the file sat partly off it;
+- once its variance was too high.
+
+With 84% (protocol 24) and 77% (protocol 25), matching lies near 82%, about ±4 points for 100 objects. Nothing was changed for it.
+
+**The first real video** (`docs/images/learned-video.gif`, `tools/record_learned_video_gif.py`): the sample clip, a person signing in front of a still camera (median global shift 0.16 px per frame). Qualitative only; there is no ground truth.
+- The learned scene finds the moving hands and arms as objects, unaided.
+- The torso hardly moves, so, as for an infant, it is not an object but background. Deleting every object leaves a ghost of the person: the background memory has averaged the body and the arms that passed.
+- Hands split into several slots, and an unsure slot's coarse region can spread over the body.
+- Two faults showed here first, and are fixed, with tests:
+  1. A file on a place never seen as background could only be compared with an unrelated template, and could win that comparison by chance. A file is now sure only against a background the scene knows.
+  2. On a plain, still region, file and background both explain the image almost perfectly, and the ratio of two tiny errors is noise. A file is now sure only where the background fails to explain what it sees (mean squared error ≥ 0.002).
+- Neither change alters the sprite results on development seeds: IoU 0.58, 88% matched, delete 0.00034 and move 0.0015 against 0.0015 and 0.0043 without files.
