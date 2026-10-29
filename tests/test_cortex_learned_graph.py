@@ -49,3 +49,30 @@ def test_a_reset_forgets_the_scene():
     _, graph = watched()
     graph.reset()
     assert graph.nodes == [] and graph.frame_count == 0
+
+
+def test_the_expectation_moves_each_object_by_its_velocity():
+    _, graph = watched()
+    frame = graph.scene.frame.copy()
+    frame[40:56, 80:96] = 0.95
+    graph.scene.frame = frame
+    graph.scene.memory[:] = 0.2
+    graph.scene.seen[:] = 1
+    graph.scene.labels = np.zeros_like(graph.scene.labels)
+    graph.scene.labels[10:14, 20:24] = 1
+    graph.slots.u[1] = 0.0
+    graph.slots.u[1, 0] = 2.0  # 2 px of the 128-wide view = 4 image px per frame
+    graph._refresh()
+    expected = graph.expect()
+    assert np.allclose(expected[40:56, 84:100], 0.95, atol=1e-4)
+    assert np.allclose(expected[40:56, 80:84], 0.2, atol=1e-4)
+    # Elsewhere the last frame stands.
+    assert np.allclose(expected[100:, :], frame[100:, :])
+
+
+def test_without_motion_the_expectation_is_the_last_frame():
+    _, graph = watched()
+    for k in range(len(graph.slots.u)):
+        graph.slots.u[k] = 0.0
+    graph._refresh()
+    assert np.allclose(graph.expect(), graph.scene.frame, atol=1e-4)

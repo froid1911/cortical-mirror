@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+import cv2
 import numpy as np
 
 from ..scene.world import SPRITE
@@ -37,15 +38,22 @@ class _Node:
 
 
 class LearnedGraph:
-    def __init__(self, cortex, field=None, width: int = 256, height: int = 192, files=True):
-        self.cortex, self.field, self.files = cortex, field, files
+    def __init__(
+        self, cortex, field=None, width: int = 256, height: int = 192, files=True, silenced=False
+    ):
+        self.cortex, self.field, self.files, self.silenced = cortex, field, files, silenced
         self.width, self.height = width, height
         self.reset()
 
     def reset(self) -> None:
         self.slots = MotionSlots(field=self.field, device=self.cortex.device)
         self.scene = LearnedScene(
-            self.cortex, self.slots, width=self.width, height=self.height, files=self.files
+            self.cortex,
+            self.slots,
+            width=self.width,
+            height=self.height,
+            files=self.files,
+            silenced=self.silenced,
         )
         self.nodes: list[_Node] = []
         self.frame_count = 0
@@ -114,6 +122,35 @@ class LearnedGraph:
                 dx, dy = int(round(offset[0])), int(round(offset[1]))
                 target = shifted(masks[k], dx, dy, False)
                 out[target] = shifted(picture, dx, dy)[target]
+        return out
+
+    def expect(self) -> np.ndarray:
+        """The next frame: the last one, with every object moved on by its velocity.
+
+        Where an object could be, the remembered background shows; what surely belongs
+        to it is moved by its velocity, to the sub-pixel. With no motion this is
+        exactly the last frame."""
+
+        frame = self.scene.frame
+        if frame is None:
+            return np.zeros((self.height, self.width), np.float32)
+        out = frame.astype(np.float32).copy()
+        coarse = self.scene._grid_masks(self.scene.labels) if self.scene.labels is not None else {}
+        moving = [n for n in self.nodes if abs(n.vx) + abs(n.vy) > 1e-6]
+        removed = np.zeros(out.shape, bool)
+        for node in moving:
+            removed |= node.mask | coarse.get(node.id, np.zeros_like(removed))
+        known = removed & (self.scene.seen > 0)
+        out[known] = self.scene.memory[known]
+        for node in moving:
+            warp = np.float32([[1, 0, node.vx], [0, 1, node.vy]])
+            size = (self.width, self.height)
+            alpha = cv2.warpAffine(node.mask.astype(np.float32), warp, size, flags=cv2.INTER_LINEAR)
+            layer = cv2.warpAffine(
+                np.where(node.mask, frame, 0).astype(np.float32), warp, size, flags=cv2.INTER_LINEAR
+            )
+            inside = alpha > 1e-3
+            out[inside] = out[inside] * (1 - alpha[inside]) + layer[inside]
         return out
 
     # The page's scene ------------------------------------------------------------
