@@ -43,6 +43,9 @@ class ObjectFile:
         self.ratio, self.mature, self.align_after = ratio, mature, align_after
         self.rate, self.trust = rate, trust
         self.fit = np.inf
+        # Whether the fit was won against a background the scene knows.
+        self.against_background = False
+        self.background_given = False
         side = 2 * radius
         self.n = np.zeros((side, side), np.float32)
         self.mean = np.zeros((side, side), np.float32)
@@ -80,7 +83,12 @@ class ObjectFile:
 
     @property
     def confident(self) -> bool:
-        return self.ready and self.fit < self.trust
+        """Sure of its object: mature, fitting, and (where the scene remembers a
+        background at all) better than a background it knows. A file that has only
+        beaten an unrelated template, on a place never seen without it, is not."""
+
+        known = self.against_background or not self.background_given
+        return self.ready and self.fit < self.trust and known
 
     # Following ------------------------------------------------------------------
 
@@ -92,7 +100,7 @@ class ObjectFile:
         if weights.sum() < 4:
             return
         cx, cy = int(round(x)), int(round(y))
-        best, best_offset, best_chance = np.inf, (0, 0), 1.0
+        best, best_offset, best_chance, best_known = np.inf, (0, 0), 1.0, False
         for dy in range(-search, search + 1):
             for dx in range(-search, search + 1):
                 window = self._window(image, cx + dx, cy + dy)
@@ -102,25 +110,26 @@ class ObjectFile:
                 seen, expected = window[use], self.mean[use]
                 cost = float(np.mean((seen - expected) ** 2))
                 if cost < best:
-                    best, best_offset, best_chance = (
-                        cost,
-                        (dx, dy),
-                        self._rival(seen, expected, background, cx + dx, cy + dy, use),
-                    )
+                    rival, known = self._rival(seen, expected, background, cx + dx, cy + dy, use)
+                    best, best_offset, best_chance, best_known = cost, (dx, dy), rival, known
         if np.isfinite(best):
             self.x, self.y = cx + best_offset[0], cy + best_offset[1]
             self.fit = best / (best_chance + 1e-6)
+            self.against_background = best_known
+            self.background_given = background is not None
 
-    def _rival(self, seen, expected, background, cx: int, cy: int, use) -> float:
-        """The error of the rival explanation of what the file sees."""
+    def _rival(self, seen, expected, background, cx: int, cy: int, use) -> tuple[float, bool]:
+        """The error of the rival explanation of what the file sees, and whether
+        that rival was a background the scene knows."""
 
         if background is not None:
             remembered = self._window(background, cx, cy)[use]
             known = ~np.isnan(remembered)
             if known.sum() >= use.sum() / 2:
-                return float(np.mean((seen[known] - remembered[known]) ** 2))
+                return float(np.mean((seen[known] - remembered[known]) ** 2)), True
         # The error an unrelated template would make here.
-        return float(seen.var() + expected.var() + (seen.mean() - expected.mean()) ** 2)
+        chance = seen.var() + expected.var() + (seen.mean() - expected.mean()) ** 2
+        return float(chance), False
 
     def relocate(self, image, x: float, y: float, search: int = 8, background=None) -> None:
         """Look for the object again, near (x, y)."""
