@@ -215,3 +215,25 @@ Reported without a criterion:
 - **Criterion 3 compares different sets.** With files, fewer objects are matched (67% against 85%), so the two move means are over different objects. The criterion passes as written, but it does not show that the files make moving better.
 - **Sharp is not yet reliable.** A file's mask sometimes misses part of its object, or slips onto a neighbour, so fewer objects are covered by half. Deleting then leaves remnants: 0.56 × the bitmap's error against 0.26 × with the coarse masks. A coarse mask that covers too much is safer to delete with than a sharp one that covers too little.
 - **Next:** files that know how sure they are. Use the sharp mask where the file is confident, the coarse one where it is not, and let a file that loses its object hand back to its slot.
+
+## v0.12: object files that know how sure they are (`v0.12-confident-files/`, protocol 24)
+
+On training seeds, 10 of protocol 23's 17 mature files had lost their objects. Now a file measures its fit: its prediction error relative to the error of the rival explanation, the remembered background (or an unrelated template where no background is known).
+- A file that drifted onto background explains it well, but no better than the background does, so it is not trusted.
+- A mature file that cannot explain what it sees does not learn from it, and looks for its object again near its slot.
+- The scene uses a file's sharp mask only while the file is sure.
+
+Development showed that measuring the fit against the file's own variance was unstable; the background as rival made it work. Test: moving scenes on seeds 9300–9339; manipulation on seeds 2400–2439, each scene run with and without files and compared on the 76 objects both matched.
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| 1. Pixel object IoU with files ≥ 0.5 | **0.564** (without files 0.383) | **pass** |
+| 2. Objects matched with files ≥ 80% | **84%** (protocol 23: 67%; without files 88%) | **pass** |
+| 3. Delete: ≤ 0.75 × the bitmap, and below the scene without files (paired) | 0.52 × the bitmap; MSE 0.0017 against 0.0011 without files | **fail** |
+| 4. Move: below the scene without files (paired) | MSE 0.0015 against 0.0029; files better on 72% of objects | **pass** |
+| 5. MT silenced: IoU ≤ 0.1 | 0.000 | **pass** |
+
+- **Sharp and mostly reliable.** Learned objects now reach 0.56 pixel IoU, and moving a learned object errs about half as much with its object file as without.
+- **Why delete fails.** Files make deleting better on 61% of objects, but not on average. When a sure file's shape misses part of its object, that part stays behind after the delete, and a few such remnants outweigh the many small gains. For deleting, a coarse mask that covers too much is the safer answer; for moving, the sharp one is.
+- Development seeds (2200–2209) had shown delete 0.12 ×; the test shows 0.52 ×. Ten development scenes were again too few.
+- **Next:** let the edit ask what it needs. Delete everything that could belong to the object (the sharp shape and the slot's region), and move only what surely does (the sharp shape).
