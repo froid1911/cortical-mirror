@@ -109,9 +109,14 @@ class MotionLevel:
         dy = (self.kernels * self._dy).flatten(1).sum(1)
         return torch.stack([dx, dy], 1)
 
-    def velocity(self, r: torch.Tensor) -> torch.Tensor:
-        """``[B, 2, H, W]``: the population vector of the responsible types."""
+    def velocity(self, r: torch.Tensor, sharpness: float = 1.0) -> torch.Tensor:
+        """``[B, 2, H, W]``: the population vector of the responsible types. With
+        ``sharpness`` > 1 the read-out leans on the types that clearly own a place
+        (responsibilities raised to that power and renormalised)."""
 
+        if sharpness != 1.0:
+            r = r.pow(sharpness)
+            r = r / r.sum(1, keepdim=True).clamp_min(1e-12)
         return torch.einsum("bmhw,mk->bkhw", r, self.displacements())
 
     def state_dict(self) -> dict:
