@@ -35,7 +35,7 @@ class AssociationField:
         radius: int = 4,
         sigma: float = 1.0,
         rate: float = 0.1,
-        moving: float = 0.5,
+        moving: float = 0.2,
         device="cpu",
     ):
         self.types, self.radius, self.sigma = types, radius, sigma
@@ -48,7 +48,8 @@ class AssociationField:
 
     def learn(self, activity: torch.Tensor, velocity: torch.Tensor) -> None:
         """One frame: ``activity`` [F, H, W] (V1), ``velocity`` [2, H, W] (MT) on
-        V1's grid. Only pairs of places that both move take part."""
+        V1's grid. Pairs where at least one place moves take part: a moving place
+        beside a still one is evidence that the two do not belong together."""
 
         moving = velocity.norm(dim=0) > self.moving
         fates, pairs = [], []
@@ -58,7 +59,7 @@ class AssociationField:
                 pairs.append(None)
                 continue
             other_velocity = _shift(velocity, dy, dx)
-            pair = moving & _shift(moving.float(), dy, dx).bool()
+            pair = moving | _shift(moving.float(), dy, dx).bool()
             fate = torch.exp(-(velocity - other_velocity).square().sum(0) / self.sigma**2)
             fates.append(fate)
             pairs.append(pair)

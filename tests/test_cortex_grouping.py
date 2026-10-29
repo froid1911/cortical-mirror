@@ -72,3 +72,16 @@ def test_mean_object_iou_matches_one_to_one():
     assert mean_object_iou(truth, found) == 0.25
     assert mean_object_iou(truth, truth) == 1.0
     assert mean_object_iou(truth, np.zeros_like(truth)) == 0.0
+
+
+def test_a_moving_place_beside_a_still_one_weakens_their_link():
+    a = torch.zeros(2, 12, 12)
+    a[0, :, :6] = 1.0  # the object, moving
+    a[1, :, 6:] = 1.0  # the background, still
+    velocity = torch.zeros(2, 12, 12)
+    velocity[0, :, :6] = 2.0
+    field = AssociationField(types=2, radius=1)
+    field.learn(a, velocity)
+    right = field.offsets.index((0, 1))
+    assert field.links[0, 1, right] < 0
+    assert field.links[0, 0, right] > 0

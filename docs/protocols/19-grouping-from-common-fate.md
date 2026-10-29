@@ -40,3 +40,7 @@ Here, an association field between V1 feature types at small offsets learns by a
 The engineered scene graph's object IoU on comparable scenes is about 0.8 (protocol 8), and is reported for reference. Grouping from still features alone, without tracking, is not expected to reach it.
 
 Failures are reported as failures.
+
+## Amendment (2026-10-29, before any test measurement)
+
+The learning rule counts a pair of places when at least one of them moves (MT speed above 0.2 retinal px per frame), not only when both do. Reason and the check behind it (training seed 900 only): see the design's amendment. Stimuli, measures, conditions and pass criteria are unchanged.
