@@ -53,7 +53,7 @@ class MotionSlots:
         self,
         slots: int = 6,
         stride: int = 2,
-        sigma: float = 0.5,
+        sigma: float = 0.25,
         beta: float = 2.0,
         blur: float = 0.2,
         rounds: int = 3,
@@ -61,12 +61,14 @@ class MotionSlots:
         birth: int = 6,
         death: float = 3.0,
         patience: int = 5,
+        confirm: int = 3,
         field: AssociationField | None = None,
         device="cpu",
     ):
         self.slots, self.stride, self.sigma, self.beta = slots, stride, sigma, beta
         self.blur, self.rounds, self.moving = blur, rounds, moving
         self.birth, self.death, self.patience = birth, death, patience
+        self.confirm = confirm
         self.field, self.device = field, torch.device(device)
         self.reset()
 
@@ -76,6 +78,8 @@ class MotionSlots:
         self.alive = torch.zeros(self.slots + 1, dtype=torch.bool, device=self.device)
         self.alive[0] = True
         self.low = [0] * (self.slots + 1)
+        # Frames a slot has moved; an object is something that has been seen moving.
+        self.moved = [0] * (self.slots + 1)
 
     # Pieces ------------------------------------------------------------------
 
@@ -118,10 +122,21 @@ class MotionSlots:
                 evidence = evidence * torch.exp(self.beta * (links - links.amax(0)))
             evidence = evidence * self.alive[:, None, None]
             self.q = evidence / evidence.sum(0, keepdim=True).clamp_min(1e-12)
-            mass = self.q.sum((1, 2))
-            u = torch.einsum("shw,khw->sk", self.q, velocity) / mass[:, None].clamp_min(1e-9)
-            self.u = torch.where(self.alive[:, None], u, torch.zeros_like(u))
+            self.u = self._velocities(self.q, velocity)
         return self.q
+
+    def _velocities(self, q: torch.Tensor, velocity: torch.Tensor) -> torch.Tensor:
+        """Each object slot's velocity from the places it holds where MT sees motion
+        (holes in MT's view would otherwise slow it down); the background's from
+        all its places. A slot with no moving place stands still."""
+
+        moving = (velocity.norm(dim=0) > self.moving).float()
+        weight = q * moving[None]
+        weight[0] = q[0]
+        mass = weight.sum((1, 2))
+        u = torch.einsum("shw,khw->sk", weight, velocity) / mass[:, None].clamp_min(1e-9)
+        keep = self.alive[:, None] & (mass[:, None] > 0.5)
+        return torch.where(keep, u, torch.zeros_like(u))
 
     def _free(self, k: int) -> None:
         self.q[0] += self.q[k]
@@ -129,6 +144,7 @@ class MotionSlots:
         self.u[k] = 0
         self.alive[k] = False
         self.low[k] = 0
+        self.moved[k] = 0
 
     def _merge(self, labels: torch.Tensor) -> None:
         held = [k for k in range(1, self.slots + 1) if self.alive[k]]
@@ -159,6 +175,7 @@ class MotionSlots:
             self.u[k] = velocity[:, region].mean(1)
             self.alive[k] = True
             self.low[k] = 0
+            self.moved[k] = 1
 
     # The step ------------------------------------------------------------------
 
@@ -179,7 +196,11 @@ class MotionSlots:
         for k in range(1, self.slots + 1):
             if not self.alive[k]:
                 continue
-            self.low[k] = self.low[k] + 1 if float(self.q[k].sum()) < self.death else 0
+            moves = float(self.u[k].norm()) > self.moving
+            self.moved[k] = self.moved[k] + 1 if moves else self.moved[k]
+            small = float(self.q[k].sum()) < self.death
+            unconfirmed_still = self.moved[k] < self.confirm and not moves
+            self.low[k] = self.low[k] + 1 if small or unconfirmed_still else 0
             if self.low[k] >= self.patience:
                 self._free(k)
         labels = self.q.argmax(0)

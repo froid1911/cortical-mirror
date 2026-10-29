@@ -88,3 +88,27 @@ def test_links_hold_an_object_through_a_still_moment():
         scores[beta] = iou(labels.numpy() > 0, mask)
     assert scores[2.0] > 0.8
     assert scores[2.0] > scores[0.0]
+
+
+def test_a_moving_blip_that_never_moves_again_is_freed():
+    slots = MotionSlots(stride=2, patience=5)
+    mask = square(8, 8)
+    slots.step(*reversed(scene([mask], [(2.0, 0.0)])))
+    for _ in range(10):
+        labels = slots.step(*reversed(scene([mask], [(0.0, 0.0)])))
+    assert labels.max() == 0
+
+
+def test_a_slot_s_velocity_comes_from_its_moving_places():
+    slots = MotionSlots(stride=2)
+    q = torch.zeros(slots.slots + 1, H, W)
+    mask = torch.from_numpy(square(8, 8))
+    q[1][mask] = 1
+    q[0][~mask] = 1
+    velocity = torch.zeros(2, H, W)
+    velocity[0][mask] = 2.0
+    velocity[0, 8:11] = 0.0  # half the object: MT sees no motion there
+    slots.alive[1] = True
+    u = slots._velocities(q, velocity)
+    assert abs(float(u[1, 0]) - 2.0) < 1e-4
+    assert float(u[0].norm()) < 1e-6
