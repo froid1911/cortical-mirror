@@ -41,6 +41,7 @@ def matches(truth: list[dict], masks: dict[int, np.ndarray]) -> list[tuple[dict,
 
 def learned(cortex, field, seeds, frames, files: bool = False) -> dict:
     scores = {e: {"scene": [], "bitmap": [], "unchanged": []} for e in ("delete", "move")}
+    records = []
     objects = matched = 0
     for seed in seeds:
         world = SpriteWorld(seed=seed, objects=2 + seed % 2)
@@ -75,14 +76,22 @@ def learned(cortex, field, seeds, frames, files: bool = False) -> dict:
             ):
                 region = before | (after if edit == "move" else before)
                 region = cv2.dilate(region.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+                errors = {}
                 for name, image in (
                     ("scene", scene_image),
                     ("bitmap", bitmap_image),
                     ("unchanged", frame),
                 ):
-                    scores[edit][name].append(float(np.mean((image - true_image)[region] ** 2)))
+                    errors[name] = float(np.mean((image - true_image)[region] ** 2))
+                    scores[edit][name].append(errors[name])
+                records.append({"seed": seed, "object": int(thing.id), "edit": edit, **errors})
         print(f"seed {seed}: {matched} of {objects} objects matched so far", flush=True)
-    report = {"objects": objects, "matched": matched, "matched_share": matched / max(objects, 1)}
+    report = {
+        "objects": objects,
+        "matched": matched,
+        "matched_share": matched / max(objects, 1),
+        "records": records,
+    }
     for edit, values in scores.items():
         scene_mse, bitmap_mse = float(np.mean(values["scene"])), float(np.mean(values["bitmap"]))
         report[edit] = {
