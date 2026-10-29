@@ -157,3 +157,39 @@ def adjusted_rand_index(truth: np.ndarray, found: np.ndarray) -> float:
     expected = rows * columns / total if total else 0.0
     maximum = (rows + columns) / 2
     return (index - expected) / (maximum - expected) if maximum != expected else 1.0
+
+
+def truth_on_grid(truth: list[dict], block: int = 4) -> np.ndarray:
+    """Object labels (id + 1; 0 = background) on a grid of ``block`` × ``block``
+    pixels: a cell belongs to an object if most of its pixels show it."""
+
+    h, w = truth[0]["visible"].shape if truth else (0, 0)
+    labels = np.zeros((h // block, w // block), np.int64)
+    for thing in truth:
+        visible = thing["visible"][: h - h % block, : w - w % block]
+        share = visible.reshape(h // block, block, w // block, block).mean((1, 3))
+        labels[share > 0.5] = thing["id"] + 1
+    return labels
+
+
+def mean_object_iou(truth: np.ndarray, found: np.ndarray) -> float:
+    """Objects (truth labels > 0) matched one-to-one to groups (found labels > 0),
+    greedily, best IoU first; an unmatched object scores 0."""
+
+    objects = [t for t in np.unique(truth) if t > 0]
+    groups = [g for g in np.unique(found) if g > 0]
+    if not objects:
+        return float("nan")
+    scores = []
+    for t in objects:
+        for g in groups:
+            a, b = truth == t, found == g
+            scores.append((float((a & b).sum() / (a | b).sum()), t, g))
+    taken_objects, taken_groups, total = set(), set(), 0.0
+    for iou, t, g in sorted(scores, reverse=True):
+        if t in taken_objects or g in taken_groups:
+            continue
+        taken_objects.add(t)
+        taken_groups.add(g)
+        total += iou
+    return total / len(objects)

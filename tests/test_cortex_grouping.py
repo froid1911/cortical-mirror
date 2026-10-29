@@ -51,3 +51,24 @@ def test_adjusted_rand_index_is_one_for_matching_labels_and_near_zero_for_random
     assert abs(adjusted_rand_index(truth, (truth + 1) % 4) - 1.0) < 1e-9
     rng = np.random.default_rng(0)
     assert abs(adjusted_rand_index(truth, rng.integers(0, 4, truth.size))) < 0.05
+
+
+def test_truth_on_grid_takes_the_majority_of_each_block():
+    from cortical_mirror.cortex.grouping import truth_on_grid
+
+    mask = np.zeros((8, 8), bool)
+    mask[0:4, 0:3] = True  # 12 of 16 pixels: belongs
+    mask[4:6, 4:8] = True  # 8 of 16: not a majority
+    labels = truth_on_grid([{"id": 0, "visible": mask}], block=4)
+    assert labels.tolist() == [[1, 0], [0, 0]]
+
+
+def test_mean_object_iou_matches_one_to_one():
+    from cortical_mirror.cortex.grouping import mean_object_iou
+
+    truth = np.array([[1, 1, 2, 2], [1, 1, 2, 2]])
+    # One group covers both objects: only one of them may claim it.
+    found = np.array([[5, 5, 5, 5], [5, 5, 5, 5]])
+    assert mean_object_iou(truth, found) == 0.25
+    assert mean_object_iou(truth, truth) == 1.0
+    assert mean_object_iou(truth, np.zeros_like(truth)) == 0.0
