@@ -4,6 +4,8 @@ A live mirror that shows what the camera will see next — and keeps learning to
 
 A small predictive-coding hierarchy predicts the next webcam frame from the frames it has already seen. Every prediction is scored only against the frame it was issued for, and that error is the only teaching signal: offline on natural video, and online, continuously, on the camera stream in front of it. Started from random weights, it begins as an exact copy of the last frame. On a person moving in front of a still camera it learns, within about a minute, to predict better than that copy; on short, generic action clips it ends about even with it.
 
+**New in v0.8:** [self and world in one learned code](#v08-self-and-world-in-learned-motion). The eye's own command is told to the learned motion cells, and a map learned by Hebbian averaging says which cells each command makes active. The cortex then explains away 98% of the motion its own saccades cause, while the same shift without a command is seen as the world moving. The newborn cannot tell the two apart.
+
 **New in v0.7:** [motion, learned](#v07-motion-learned). Motion cells learn from video, with no motion detector built in. On fresh UCF101 test clips, real video is now predicted from motion the cortex itself learned: 0.88 × the error of repeating the last frame. Silencing those cells removes all motion from the prediction.
 
 **New in v0.6:** [real video, predicted from moving parts](#v06-real-video-from-moving-parts). On fresh UCF101 test clips the scene level now predicts the next frame at 0.77 × the error of repeating the last frame, better on 95% of clips. The adult also keeps hidden objects. Much of this rests on engineered parts, labelled as such below. v0.7 turns back to learning them.
@@ -416,6 +418,21 @@ The learned path contains no engineered motion detector. Phase correlation still
   --hours 2 --output checkpoints/mt-adult.pt --log reports/cortex/train-mt.jsonl
 ```
 
+### v0.8: self and world in learned motion
+
+Joscha Bach's point about the self-model is that a mind knows which changes it causes. Protocol 12 (v0.4) separated self-motion from world motion with an engineered motor map and image registration. v0.8 does it inside the learned motion code ([design](docs/superpowers/specs/2026-10-29-v0.8-design.md)).
+
+- **The efference copy, learned.** Before each frame the eye's command is told to MT. An efference map holds, for each command, the mean responsibility of each motion type on the frames right after it, learned by a local delta rule (Hebbian averaging). A newborn's map is uniform.
+- **Self and world from one code.** The motion a command is expected to cause is read from the same learned cells: what is sensed after it, minus what is sensed after no command. Whatever the cells sense beyond that is the world moving.
+
+| Protocol | Verdict |
+|---|---|
+| [18](docs/protocols/18-self-and-world-in-learned-motion.md) Self and world in learned motion | **Passes.** With the learned map, a commanded saccade leaves 0.016 of its motion as "world"; the same shift uncommanded leaves 0.80. The newborn map leaves 0.80 either way. MT senses the shift's direction to within 0.4°. The saccade size was amended to one V1 position before any test measurement, because the v0.7 MT adult represents faster motion only along a few axes. |
+
+```bash
+.venv/bin/python tools/efference_report.py --mt checkpoints/mt-adult.pt --output reports/scene/v0.8-self-world.json
+```
+
 ### References for the scene graph
 
 - E. S. Spelke. Principles of object perception. *Cognitive Science* 14, 1990.
@@ -665,6 +682,10 @@ Tests cover causal counterfactuals, forward-warp direction, the group-disjoint s
 - Live learning needs an NVIDIA GPU. On a CPU the learner manages under one step per second.
 - The mirror has no object permanence, explicit egomotion, or multimodal future; pixel warping and blending can soften detail. The v0.4 scene level has objects and a self, but only in synthetic worlds: on real video it is worse than repeating the last frame, and its adult fails the permanence protocol.
 - The pretrained DMVFN expert is not part of the self-organizing story; ablations without it are reported.
+
+## Changes in v0.8
+
+v0.8 learns an efference map: what each eye command makes the learned motion cells do. Self-caused and world motion then separate in one learned code: a commanded saccade is explained away (0.016 left), and the same shift uncommanded is seen as the world moving (0.80). Protocol 18 passes. The map is a release asset.
 
 ## Changes in v0.7
 

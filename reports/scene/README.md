@@ -259,3 +259,18 @@ Run on flank's GPU 3. The first attempt crashed at its last step (the checkpoint
 | Optical flow (v0.6, yardstick) | 0.822 | 87.5% |
 
 **Passes both criteria:** learned motion below 1.0, silenced at or above 0.99. Real video is now predicted from motion the cortex learned. Silencing MT takes the prediction back to exactly the last frame, so nothing engineered senses motion in that path. Learned motion is 7% behind engineered flow in error, and equal in the fraction of clips it wins. Phase correlation still aligns the graph's canvas, as labelled scaffolding outside the prediction.
+
+## v0.8: self and world in learned motion (`v0.8-self-world.json`, protocol 18)
+
+The efference map was trained on seeds 800–839 (it is the only thing that learns; MT is the frozen v0.7 adult) and tested on seeds 8000–8019. Saccades move the view by one V1 position, amended before any test measurement; see the protocol.
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| Adult map: commanded world-motion fraction ≤ 0.3 | **0.016** | pass |
+| Adult map: uncommanded fraction ≥ 0.7 | 0.80 | pass |
+| Newborn map: commanded fraction ≥ 0.7 | 0.80 | pass |
+| Check: MT senses the shift's direction | 0.4° median error | — |
+
+**Passes.** The adult's own saccade is explained away almost entirely: 98% of the motion it causes is attributed to itself. The same shift without a command is seen as the world moving. The newborn sees the world move either way. Both the self part and the world part are read from the same learned motion cells. The only addition is the efference map: for each command, the mean responsibility of the motion types after it, learned by Hebbian averaging.
+
+The amendment's development check also found a limit of the v0.7 MT adult. It represents motion of one V1 position per frame in every direction, but faster motion only along a few axes, because UCF101 rarely shows it. Larger saccades are therefore sensed at about half their size.

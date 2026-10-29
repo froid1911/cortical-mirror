@@ -702,3 +702,91 @@ def lighting(
             }
     report["scenes"] = len(list(seeds))
     return report
+
+
+# View pixels per small saccade: 4 view pixels are 2 retinal pixels, one V1 position,
+# a motion the v0.7 MT adult represents in all eight directions.
+SMALL_SACCADE = 4
+
+
+def _small(gaze, command: int):
+    from ..cortex.eye import COMMANDS
+
+    dx, dy = COMMANDS[command]
+    return gaze[0] + dx * SMALL_SACCADE, gaze[1] + dy * SMALL_SACCADE
+
+
+def _retinal(view: np.ndarray):
+    import torch
+
+    from ..cortex.engine import RETINA_SIZE
+
+    small = cv2.resize(view, RETINA_SIZE, interpolation=cv2.INTER_AREA)
+    return torch.from_numpy(small)[None, None]
+
+
+def train_efference(mt, seeds=range(800, 840), frames: int = 600, every: int = 5):
+    """Protocol 18's training: small random saccades; only the efference map learns."""
+
+    import random
+
+    from ..cortex.efference import Efference
+    from .eye import look
+
+    efference = Efference(commands=9, types=mt.fine.types)
+    for seed in seeds:
+        rng = random.Random(seed)
+        world, gaze = _eye_world(seed), (EYE_WORLD[0] / 2, EYE_WORLD[1] / 2)
+        mt.reset()
+        for t in range(frames):
+            command = 0
+            if t % every == every - 1:
+                command = rng.choice([c for c in range(1, 9) if _inside(_small(gaze, c))])
+                gaze = _small(gaze, command)
+            world.step()
+            if mt.step(_retinal(look(world.render(), gaze, EYE_VIEW)), learn=False) is not None:
+                efference.learn(command, mt.last_fine)
+    return efference
+
+
+def self_world_learned(mt, efference, seeds=range(8000, 8020), settle: int = 30) -> dict:
+    """Protocol 18, for one efference map."""
+
+    import random
+
+    from ..cortex.eye import COMMANDS
+    from .eye import look
+
+    displacements = mt.fine.displacements() * mt.stride
+    fractions = {"commanded": [], "uncommanded": []}
+    direction_errors = []
+    for seed in seeds:
+        rng = random.Random(seed)
+        world, gaze = _eye_world(seed), (EYE_WORLD[0] / 2, EYE_WORLD[1] / 2)
+        mt.reset()
+        for _ in range(settle):
+            world.step()
+            mt.step(_retinal(look(world.render(), gaze, EYE_VIEW)), learn=False)
+        command = rng.choice([c for c in range(1, 9) if _inside(_small(gaze, c))])
+        gaze = _small(gaze, command)
+        world.step()
+        velocity = mt.step(_retinal(look(world.render(), gaze, EYE_VIEW)), learn=False)
+        h, w = velocity.shape[-2:]
+        centre = (slice(h // 4, 3 * h // 4), slice(w // 4, 3 * w // 4))
+        dx, dy = COMMANDS[command]
+        # Retinal pixels the view's content moved (the retina is half the view's size).
+        shift = SMALL_SACCADE / 2 * math.hypot(dx, dy)
+        for name, told in (("commanded", command), ("uncommanded", 0)):
+            world_motion = efference.world_motion(velocity, told, displacements)[0]
+            size = world_motion[:, centre[0], centre[1]].norm(dim=0).median()
+            fractions[name].append(float(size) / shift)
+        sensed = velocity[0, :, centre[0], centre[1]].median(-1).values.median(-1).values
+        true = math.atan2(-dy, -dx)  # the content moves against the eye
+        error = math.degrees(math.atan2(float(sensed[1]), float(sensed[0])) - true)
+        direction_errors.append(abs((error + 180) % 360 - 180))
+    return {
+        "commanded": float(np.mean(fractions["commanded"])),
+        "uncommanded": float(np.mean(fractions["uncommanded"])),
+        "sensed_direction_error": float(np.median(direction_errors)),
+        "trials": len(fractions["commanded"]),
+    }
