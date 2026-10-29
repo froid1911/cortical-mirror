@@ -191,7 +191,9 @@ class MotionCortex:
         height, width = gray.shape[-2:]
         if self.silenced:
             return torch.zeros(now.shape[0], 2, height, width, device=self.device)
-        fine = self.fine.velocity(self.fine.step(before, now, learn)) * self.stride
+        # The fine types' responsibilities, kept for the efference copy to learn from.
+        self.last_fine = self.fine.step(before, now, learn)
+        fine = self.fine.velocity(self.last_fine) * self.stride
         pooled_before, pooled_now = F.avg_pool2d(before, 2), F.avg_pool2d(now, 2)
         coarse = self.coarse.velocity(self.coarse.step(pooled_before, pooled_now, learn))
         coarse = F.interpolate(coarse * 2 * self.stride, size=fine.shape[-2:], mode="bilinear")
