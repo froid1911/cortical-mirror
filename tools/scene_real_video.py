@@ -69,6 +69,26 @@ def mt_silenced():
     return learned_motion(silenced=True)
 
 
+LINKS_CHECKPOINT = os.environ.get("SCENE_LINKS")
+
+
+def learned_scene(silenced: bool = False):
+    """v0.13: objects found by learned motion over a remembered background (protocol 26)."""
+
+    from argparse import Namespace
+
+    from cortical_mirror.cli import learned_graph
+
+    graph = learned_graph(Namespace(mt=MT_CHECKPOINT, links=LINKS_CHECKPOINT), "cpu")
+    graph.silenced = silenced
+    graph.reset()
+    return graph
+
+
+def learned_scene_silenced():
+    return learned_scene(silenced=True)
+
+
 CONDITIONS = {
     "v0.4": Plain,
     "registration_luminance": registration_luminance,
@@ -76,7 +96,28 @@ CONDITIONS = {
     "part_motion": part_motion,
     "learned_motion": learned_motion,
     "mt_silenced": mt_silenced,
+    "learned_scene": learned_scene,
+    "learned_scene_silenced": learned_scene_silenced,
 }
+
+
+def camera_shift(path: Path, frames: int = 150) -> float:
+    """The median global shift between frames (phase correlation), in px of 256 × 192:
+    how still the camera is. It looks only at the video, never at a model."""
+
+    capture = cv2.VideoCapture(str(path))
+    shifts, previous = [], None
+    for _ in range(frames):
+        ok, frame = capture.read()
+        if not ok:
+            break
+        gray = _as_gray(frame, 256, 192)
+        if previous is not None:
+            (dx, dy), _ = cv2.phaseCorrelate(previous, gray)
+            shifts.append(float(np.hypot(dx, dy)))
+        previous = gray
+    capture.release()
+    return float(np.median(shifts)) if shifts else float("inf")
 
 
 def clip_errors(path: Path, condition: str, frames: int, scored_from: int):
@@ -113,6 +154,10 @@ def main() -> None:
     )
     parser.add_argument("--conditions", help="comma-separated; default: all")
     parser.add_argument("--mt", type=Path, help="MT adult, for the learned-motion conditions")
+    parser.add_argument("--links", type=Path, help="grouping links, for the learned scene")
+    parser.add_argument(
+        "--still", type=float, help="only clips whose camera moves less (median px per frame)"
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -120,11 +165,24 @@ def main() -> None:
         # Read by the worker processes, which build their own conditions.
         os.environ["SCENE_MT"] = str(args.mt)
         globals()["MT_CHECKPOINT"] = str(args.mt)
+    if args.links:
+        os.environ["SCENE_LINKS"] = str(args.links)
+        globals()["LINKS_CHECKPOINT"] = str(args.links)
     videos = sorted(getattr(split_videos(args.data), args.split))
     for excluded in args.exclude_seed or []:
         used = set(random.Random(excluded).sample(videos, min(args.videos, len(videos))))
         videos = [v for v in videos if v not in used]
-    chosen = random.Random(args.seed).sample(videos, min(args.videos, len(videos)))
+    if args.still is None:
+        chosen = random.Random(args.seed).sample(videos, min(args.videos, len(videos)))
+    else:
+        # Clips in the seed's order, kept while their camera is still enough.
+        order = random.Random(args.seed).sample(videos, len(videos))
+        chosen = []
+        for video in order:
+            if len(chosen) == args.videos:
+                break
+            if camera_shift(video) < args.still:
+                chosen.append(video)
     report = {"split": args.split, "seed": args.seed, "videos": [v.name for v in chosen]}
     names = args.conditions.split(",") if args.conditions else list(CONDITIONS)
     for name in names:
