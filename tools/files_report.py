@@ -66,11 +66,31 @@ def paired(files: dict, plain: dict) -> dict:
     return out
 
 
+def combine(paths: list[Path]) -> dict:
+    """Paired runs over parts of the seeds, joined into one."""
+
+    parts = [json.loads(Path(p).read_text())["result"] for p in paths]
+    joined = {}
+    for side in ("with_files", "without_files"):
+        objects = sum(r[side]["objects"] for r in parts)
+        matched = sum(r[side]["matched"] for r in parts)
+        joined[side] = {
+            "objects": objects,
+            "matched": matched,
+            "matched_share": matched / max(objects, 1),
+            "records": [record for r in parts for record in r[side]["records"]],
+        }
+    return paired(joined["with_files"], joined["without_files"])
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mt", type=Path, required=True, help="the v0.9 MT adult")
     parser.add_argument("--field", type=Path, required=True, help="protocol 21's links")
-    parser.add_argument("--part", choices=("moving", "manipulation", "paired"), required=True)
+    parser.add_argument(
+        "--part", choices=("moving", "manipulation", "paired", "combine"), required=True
+    )
+    parser.add_argument("--parts", type=Path, nargs="*", help="paired results to combine")
     parser.add_argument("--files", action="store_true", help="with object files")
     parser.add_argument("--silenced", action="store_true", help="MT gives zero velocity")
     parser.add_argument("--seeds", type=int, nargs=2, help="first and last+1 (development)")
@@ -78,6 +98,14 @@ def main() -> None:
     parser.add_argument("--device", default="cpu")
     args = parser.parse_args()
 
+    if args.part == "combine":
+        result = combine(args.parts)
+        shown = {k: v for k, v in result.items() if k.endswith("_paired")}
+        for k in ("with_files", "without_files"):
+            shown[k] = {a: b for a, b in result[k].items() if a != "records"}
+        print(json.dumps(shown, indent=2), flush=True)
+        args.output.write_text(json.dumps({"part": "combine", "result": result}, indent=2) + "\n")
+        return
     cortex = MotionCortex.load(args.mt, device=args.device, fast=True)
     cortex.fine.smoothing = cortex.coarse.smoothing = 3
     state = torch.load(args.field, map_location="cpu", weights_only=False)

@@ -155,6 +155,8 @@ DEMO_ASSETS = {
     "scene-adult.pt": f"{RELEASES}/v0.4.0/scene-adult.pt",
     # The motion cells MT learned from video (v0.7), with the V1 they read.
     "mt-adult.pt": f"{RELEASES}/v0.9.0/mt-adult.pt",
+    # Grouping links learned from common fate, for objects found by learned motion (v0.10).
+    "links-adult.pt": f"{RELEASES}/v0.10.0/links-adult.pt",
 }
 
 
@@ -180,6 +182,8 @@ def fetch(name: str, folder: Path) -> Path:
                 alternative = "pass --newborn, or --adult with a scene checkpoint"
             elif name == "mt-adult.pt":
                 alternative = "pass --motion flow, or --mt with a motion checkpoint"
+            elif name == "links-adult.pt":
+                alternative = "pass --objects engineered, or --links with a links checkpoint"
             else:
                 alternative = "leave out --pretrained to start untrained"
             raise SystemExit(
@@ -267,11 +271,35 @@ def twins_engine(args):
 
 
 def scene_arguments(args) -> None:
+    if getattr(args, "objects", "engineered") == "learned":
+        # Objects found by learned motion need MT and the grouping links, nothing else.
+        if getattr(args, "mt", None) is None:
+            args.mt = fetch("mt-adult.pt", args.assets)
+        if getattr(args, "links", None) is None:
+            args.links = fetch("links-adult.pt", args.assets)
+        return
     if args.adult is None and not args.newborn:
         args.adult = fetch("scene-adult.pt", args.assets)
     learned = getattr(args, "motion", "flow") == "learned" and args.source != "world"
     if learned and getattr(args, "mt", None) is None:
         args.mt = fetch("mt-adult.pt", args.assets)
+
+
+def learned_graph(args, device: str):
+    """The learned scene (v0.10-v0.12) behind the scene graph's interface."""
+
+    import torch
+
+    from .cortex.grouping import AssociationField
+    from .cortex.learned_graph import LearnedGraph
+    from .cortex.mt import MotionCortex
+
+    cortex = MotionCortex.load(args.mt, device=device, fast=True)
+    cortex.fine.smoothing = cortex.coarse.smoothing = 3
+    state = torch.load(args.links, map_location="cpu", weights_only=False)
+    field = AssociationField(types=state["links"].shape[0], device=device)
+    field.links = state["links"].to(device)
+    return LearnedGraph(cortex, field=field)
 
 
 def scene_graph(args):
@@ -347,6 +375,13 @@ def main() -> None:
         help="for a camera or video: motion from learned MT cells (v0.7) or optical flow (v0.6)",
     )
     scene.add_argument("--mt", type=Path, help="MT adult (default: download it)")
+    scene.add_argument(
+        "--objects",
+        choices=("engineered", "learned"),
+        default="engineered",
+        help="objects by template search (v0.4) or found by learned motion (v0.12, still camera)",
+    )
+    scene.add_argument("--links", type=Path, help="grouping links (default: download them)")
     scene.add_argument("--assets", type=Path, default=Path.home() / ".cache" / "cortical-mirror")
     scene.add_argument(
         "--device",
@@ -383,7 +418,13 @@ def main() -> None:
         from .scene.front import NormalisedFront
         from .scene.video import VideoGraph
 
-        if args.source == "world":
+        if args.objects == "learned":
+            # Objects found by learned motion over a remembered background: the camera
+            # must stay still, since the background is remembered pixel by pixel.
+            graph = learned_graph(args, device)
+            source = SpriteSource() if args.source == "world" else VideoSource(args.source)
+            state = SceneLive(source, graph)
+        elif args.source == "world":
             state = SceneLive(SpriteSource(), scene_graph(args))
         else:
             # A camera or a video: register the camera's own motion, and match in the

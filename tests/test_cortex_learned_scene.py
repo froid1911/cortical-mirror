@@ -90,3 +90,43 @@ def test_a_file_s_sharp_mask_is_used_only_while_the_file_is_sure():
     assert scene.masks(labels)[3].sum() == 1
     scene.files[3] = _File(confident=False)
     assert scene.masks(labels)[3].sum() == BLOCK * BLOCK
+
+
+class _Sharp:
+    """A sure file whose shape misses the object's right half."""
+
+    ready = confident = True
+
+    def mask(self, height, width):
+        out = np.zeros((height, width), bool)
+        out[8:16, 8:12] = True
+        return out
+
+
+def test_deleting_removes_all_that_could_belong_to_the_object():
+    scene = scene_with(None)
+    empty = np.zeros((H // BLOCK, W // BLOCK), np.int64)
+    scene.remember(background(), empty)
+    frame = background().copy()
+    frame[8:16, 8:16] = 0.9
+    labels = empty.copy()
+    labels[2:4, 2:4] = 1
+    scene.files[1] = _Sharp()
+    edited = scene.edit(frame, labels, delete={1})
+    # The part the sharp shape missed is gone too.
+    assert np.allclose(edited[8:16, 8:16], background()[8:16, 8:16])
+
+
+def test_moving_pastes_only_what_surely_belongs_to_the_object():
+    scene = scene_with(None)
+    empty = np.zeros((H // BLOCK, W // BLOCK), np.int64)
+    scene.remember(background(), empty)
+    frame = background().copy()
+    frame[8:16, 8:16] = 0.9
+    labels = empty.copy()
+    labels[2:4, 2:4] = 1
+    scene.files[1] = _Sharp()
+    edited = scene.edit(frame, labels, move={1: (20, 0)})
+    assert np.allclose(edited[8:16, 28:32], 0.9)
+    assert np.allclose(edited[8:16, 32:36], background()[8:16, 32:36])
+    assert np.allclose(edited[8:16, 8:16], background()[8:16, 8:16])

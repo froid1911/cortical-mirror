@@ -127,3 +127,24 @@ def test_engineered_flow_needs_no_motion_cells(monkeypatch):
     )
     cli.scene_arguments(args)
     assert fetched == []
+
+
+def test_learned_objects_download_motion_cells_and_links_only(monkeypatch):
+    fetched = []
+    monkeypatch.setattr(cli, "fetch", lambda name, folder: fetched.append(name) or folder / name)
+    args = Namespace(
+        adult=None,
+        newborn=False,
+        assets=Path("/assets"),
+        source="world",
+        objects="learned",
+        mt=None,
+        links=None,
+    )
+    cli.scene_arguments(args)
+    assert fetched == ["mt-adult.pt", "links-adult.pt"]
+    assert args.links == Path("/assets/links-adult.pt") and args.adult is None
+
+
+def test_the_learned_links_have_a_download():
+    assert "links-adult.pt" in cli.DEMO_ASSETS
