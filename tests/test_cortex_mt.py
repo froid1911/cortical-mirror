@@ -90,3 +90,25 @@ def test_the_motion_cell_protocol_reports_its_three_measures():
     assert 0.0 <= report["fraction_dsi_over_half"] <= 1.0
     assert 0 <= report["sectors_covered"] <= 8
     assert 0.0 <= report["median_direction_error"] <= 180.0
+
+
+def test_the_fast_path_reads_v1_s_feedforward_drive():
+    from torch.nn import functional as F
+
+    from cortical_mirror.cortex.mt import MotionCortex
+
+    cortex = MotionCortex(types=4, seed=0, fast=True)
+    frame = texture(96, 128, 2)
+    code = cortex.retina.encode(frame)
+    expected = F.relu(cortex.hierarchy.levels[0].drive(code))
+    assert torch.allclose(cortex.v1(frame), expected)
+    slow = MotionCortex(types=4, seed=0)
+    assert not torch.allclose(slow.v1(frame), expected)
+
+
+def test_the_fast_path_is_kept_when_saved(tmp_path):
+    from cortical_mirror.cortex.mt import MotionCortex
+
+    MotionCortex(types=4, seed=0, fast=True).save(tmp_path / "mt.pt")
+    assert MotionCortex.load(tmp_path / "mt.pt").fast
+    assert MotionCortex.load(tmp_path / "mt.pt", fast=False).fast is False

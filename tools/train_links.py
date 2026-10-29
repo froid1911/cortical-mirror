@@ -22,9 +22,10 @@ def main() -> None:
     parser.add_argument("--gap", type=int, default=4)
     parser.add_argument("--smoothing", type=int, default=3)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument("--fast", action="store_true", help="MT reads V1's feedforward sweep")
     args = parser.parse_args()
 
-    cortex = MotionCortex.load(args.mt, device=args.device)
+    cortex = MotionCortex.load(args.mt, device=args.device, fast=args.fast)
     cortex.fine.smoothing = cortex.coarse.smoothing = args.smoothing
     field = AssociationField(types=cortex.hierarchy.configs[0].cells, device=args.device)
     for seed in range(*args.seeds):

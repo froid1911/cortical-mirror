@@ -150,3 +150,23 @@ The learned links were retrained by protocol 19's rule from the motion the slots
 - While objects move, the links still cost a little IoU (0.295 against 0.332 without them).
 
 **Where v0.10 stands.** Learned motion finds objects (ARI about 0.5, up from chance in protocol 19), and learned links hold them through pauses partly but not well enough. Object IoU is capped near 0.3 by how sharply MT sees motion at an object's edge, about half of what the protocol asks for.
+
+### Where spatial precision is lost (development, training seeds 900–903 and 950–953)
+
+After protocol 21, a stronger test: assign each place to the layer that predicts it best. Each object's layer moves the code from 4 frames ago by the object's **true** velocity, and the background layer keeps it still. This needs no MT at all, so it bounds what any motion read-out of a representation can reach.
+
+| Representation the layers predict | Bound on object IoU |
+|---|---|
+| Raw pixels, 256 × 192 | 0.60 |
+| Raw pixels, 128 × 96 | 0.52 |
+| Retina (centre–surround contrast), 128 × 96 | 0.42; its contrast normalisation makes no difference (0.41 without) |
+| V1's feedforward response (the learned filters, rectified) | 0.38 at stride 2 or 1 alike |
+| V1's settled sparse code (what MT reads) | 0.30 at 128 × 96 and 0.29 at 256 × 192 input; 0.27 after 60 settling steps |
+| V1's settled code pooled 3 × 3 (as complex cells would) | 0.26 |
+
+- Every stage loses edge sharpness, and 0.5 sits near the pixel level. With frame pairs, no read-out of this cortex reaches protocol 20's criterion.
+- The largest single loss is V1's settling. Competition between cells makes the code jump under small shifts, and longer settling makes it worse. Pooling into complex cells blurs edges further.
+- In cortex, MT's fast (magnocellular) input arrives with the first feedforward sweep, before recurrent processing (Lamme & Roelfsema 2000). With `MotionCortex(fast=True)`, MT reads V1's feedforward response instead, with no retraining.
+  - MT's spill falls from 1.78 to 1.36 background places per object place, and its error from 0.36 to 0.32 px per frame.
+  - On held-out training seeds 950–953 the slots reach moving IoU 0.36 (0.295 on the settled code), ARI 0.53, and keep 77% of their IoU through the still moment with protocol 21's links.
+- The engineered scene graph reaches 0.8 because it builds pixel templates from many complete views. Sharp objects need memory of shape across time, not better frame-pair evidence.
