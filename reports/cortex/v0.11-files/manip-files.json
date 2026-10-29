@@ -1,0 +1,30 @@
+{
+  "part": "manipulation",
+  "files": true,
+  "silenced": false,
+  "seeds": [
+    2300,
+    2340
+  ],
+  "result": {
+    "objects": 100,
+    "matched": 67,
+    "matched_share": 0.67,
+    "delete": {
+      "edits": 67,
+      "scene_mse": 0.0020294382584054717,
+      "bitmap_mse": 0.0036487891260576226,
+      "unchanged_mse": 0.02765357357262175,
+      "scene_over_bitmap": 0.5561949973793641,
+      "scene_wins": 0.9104477611940298
+    },
+    "move": {
+      "edits": 67,
+      "scene_mse": 0.001985688453713994,
+      "bitmap_mse": 0.0027896183994233804,
+      "unchanged_mse": 0.027837880537845194,
+      "scene_over_bitmap": 0.7118136495387468,
+      "scene_wins": 0.9104477611940298
+    }
+  }
+}

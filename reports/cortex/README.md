@@ -192,3 +192,26 @@ Yardstick, the engineered scene graph on the same scenes (protocol 10's matching
 - **What passes.** Objects found by learned motion, plus a memory of the background, explain the scene well enough to show what it would look like after a change, far better than a bitmap with the same segmentation. That was Joscha Bach's request, now met by learned objects instead of templates.
 - **What is still behind.** The engineered graph's absolute error is about a quarter (delete) and a third (move) of the learned scene's. Its masks are sharp, built from pixel templates over many complete views. The learned masks are blocky: 4 × 4 px cells, larger than the objects. A moved object therefore drags some background along, and that dominates the remaining move error.
 - **Engineered parts:** rendering by pasting, the inpainting fallback, and the slots' EM.
+
+## v0.11: object files (`v0.11-files/`, protocol 23)
+
+Each slot keeps an object file. In the object's own frame, every place keeps a running mean and variance (a local rule that forgets slowly). The object's shape is where the variance stays low, because the object's texture moves with it while the background slides past. The file follows its slot's velocity and corrects its position within ±3 px by its own learned appearance. Settings were chosen on training seeds 940–943 and 950–953 (see the protocol). Test: moving scenes on seeds 9200–9239 (400 scored frames), manipulation on seeds 2300–2339.
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| 1. Pixel object IoU with files ≥ 0.5 | **0.505** (without files 0.379) | **pass**, narrowly |
+| 2. MT silenced: IoU ≤ 0.1 | 0.000 | **pass** |
+| 3. Move: MSE with files < without | 0.0020 against 0.0036 | **pass as written; see below** |
+
+Reported without a criterion:
+
+| Manipulation (seeds 2300–2339) | With files | Without files |
+|---|---|---|
+| Objects matched (a mask covers ≥ half the object) | **67%** | 85% |
+| Delete, × the bitmap with the same mask | **0.56 ×** | 0.26 × |
+| Move, × the bitmap with the same mask | 0.71 × | 0.64 × |
+
+- **What the files do.** Masks become sharp: for the first time, learned objects reach protocol 20's bar of 0.5 IoU, from 0.30 on V1's grid. Motion still finds them: silenced, nothing is found.
+- **Criterion 3 compares different sets.** With files, fewer objects are matched (67% against 85%), so the two move means are over different objects. The criterion passes as written, but it does not show that the files make moving better.
+- **Sharp is not yet reliable.** A file's mask sometimes misses part of its object, or slips onto a neighbour, so fewer objects are covered by half. Deleting then leaves remnants: 0.56 × the bitmap's error against 0.26 × with the coarse masks. A coarse mask that covers too much is safer to delete with than a sharp one that covers too little.
+- **Next:** files that know how sure they are. Use the sharp mask where the file is confident, the coarse one where it is not, and let a file that loses its object hand back to its slot.

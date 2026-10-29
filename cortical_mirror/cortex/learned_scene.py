@@ -6,6 +6,10 @@ average of what was seen there. That memory is what lets the scene say what lies
 behind an object once it is deleted or moved (amodal completion). Where the
 background was never seen, it can only guess, by inpainting, as a bitmap would.
 
+With ``files``, each slot also keeps an object file (`object_files.py`) that learns
+the object's shape from what moves with it; once the file is mature, its sharp mask
+replaces the slot's coarse one.
+
 Rendering by pasting and the inpainting fallback are engineered; the objects and
 the memory come from what the cortex has seen.
 """
@@ -18,6 +22,8 @@ import cv2
 import numpy as np
 import torch
 from torch.nn import functional as F
+
+from .object_files import ObjectFile
 
 
 def inpaint(image: np.ndarray, hole: np.ndarray) -> np.ndarray:
@@ -45,7 +51,15 @@ def shifted(a: np.ndarray, dx: int, dy: int, fill=0) -> np.ndarray:
 
 class LearnedScene:
     def __init__(
-        self, cortex, slots, width: int = 256, height: int = 192, rate: float = 0.1, gap: int = 4
+        self,
+        cortex,
+        slots,
+        width: int = 256,
+        height: int = 192,
+        rate: float = 0.1,
+        gap: int = 4,
+        files: bool = False,
+        silenced: bool = False,
     ):
         self.cortex, self.slots = cortex, slots
         self.width, self.height, self.rate = width, height, rate
@@ -54,6 +68,8 @@ class LearnedScene:
         self.past = deque(maxlen=gap + 1)
         self.frame: np.ndarray | None = None
         self.labels: np.ndarray | None = None
+        self.use_files, self.silenced = files, silenced
+        self.files: dict[int, ObjectFile] = {}
 
     # Seeing ------------------------------------------------------------------
 
@@ -67,13 +83,46 @@ class LearnedScene:
             self.labels = np.zeros(self.past[-1].shape[-2:], np.int64)
         else:
             velocity = self.cortex.between(self.past[0], self.past[-1])[0] / (len(self.past) - 1)
+            if self.silenced:
+                velocity = torch.zeros_like(velocity)
             self.labels = self.slots.step(velocity, self.past[-1][0]).numpy()
+        if self.use_files and self.slots is not None:
+            self._follow(image, self.labels)
         self.remember(image, self.labels)
         return self.labels
 
-    def masks(self, labels: np.ndarray) -> dict[int, np.ndarray]:
-        """Each object slot's region on the pixels."""
+    def _follow(self, image: np.ndarray, labels: np.ndarray) -> None:
+        """Each living slot's object file follows it; files of freed slots go."""
 
+        alive = {k for k in range(1, len(self.slots.alive)) if bool(self.slots.alive[k])}
+        for k in list(self.files):
+            if k not in alive:
+                del self.files[k]
+        coarse = self._grid_masks(labels)
+        # MT's velocity is in retinal px of the 128-wide view; the image is wider.
+        scale = self.width / 128
+        for k in alive:
+            if k not in self.files:
+                if k not in coarse:
+                    continue
+                ys, xs = np.nonzero(coarse[k])
+                self.files[k] = ObjectFile(xs.mean(), ys.mean())
+            u = self.slots.u[k].tolist()
+            self.files[k].follow(image, velocity=(u[0] * scale, u[1] * scale))
+
+    def masks(self, labels: np.ndarray) -> dict[int, np.ndarray]:
+        """Each object slot's region on the pixels: its object file's shape once
+        the file is mature, else the slot's region on V1's grid."""
+
+        masks = self._grid_masks(labels)
+        for k, file in self.files.items():
+            if k in masks and file.ready:
+                sharp = file.mask(self.height, self.width)
+                if sharp.any():
+                    masks[k] = sharp
+        return masks
+
+    def _grid_masks(self, labels: np.ndarray) -> dict[int, np.ndarray]:
         block = self.width // labels.shape[1]
         pixels = np.kron(labels, np.ones((block, block), np.int64))[: self.height, : self.width]
         return {int(k): pixels == k for k in np.unique(pixels) if k > 0}
