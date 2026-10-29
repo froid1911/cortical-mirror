@@ -6,6 +6,14 @@ A small predictive-coding hierarchy predicts the next webcam frame from the fram
 
 **New in v0.13:** learned objects on the live page, and edits that leave no remnants. `cortical-mirror scene --objects learned` replaces the template search with objects found by learned motion. An edit removes all that could belong to an object and pastes only what surely does: deleting and moving now err about as little as with the engineered graph (0.00046 and 0.00097). Matching objects stays narrowly below its bar (77% against 80%, protocol 25).
 
+![Learned objects in the sprite world: what it sees, the objects it found by learned motion, and the scene with every object deleted](docs/images/learned-objects.gif)
+
+<sub>v0.13 in the sprite world. Middle: objects found by learned motion, sharpened by object files. Right: every object deleted; what was behind them comes from the remembered background. An object half behind the screen is not yet found.</sub>
+
+![Learned objects on real video: moving hands and arms become objects; deleting them leaves a ghost of the still body](docs/images/learned-video.gif)
+
+<sub>The same on real video, with a still camera. Moving hands and arms become objects. The torso hardly moves, so, as for an infant, it counts as background, and deleting every object leaves a ghost of the person. Hands still split into pieces. Sample footage: “FFSb – Corona LSFB” by the Fédération Francophone des Sourds de Belgique, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).</sub>
+
 **New in v0.12:** object files that know how sure they are. A file compares its prediction with the rival explanation, the remembered background, so a file that drifted onto background no longer trusts itself. Learned objects reach 0.56 pixel IoU with 84% of objects matched, and moving one errs half as much as with coarse masks. Deleting with sharp masks still leaves remnants on a few objects, and that criterion fails (protocol 24).
 
 **New in v0.11:** object files. Each learned object keeps a running mean and variance in its own frame; its shape is where the variance stays low, since its texture moves with it while the background slides past. Learned objects reach 0.505 pixel IoU (from 0.38), the bar earlier protocols failed. But the sharp masks match fewer objects (67% against 85%) and make deleting worse, which the [report](reports/cortex/README.md) states plainly (protocol 23).
