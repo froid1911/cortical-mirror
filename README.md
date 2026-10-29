@@ -4,6 +4,8 @@ A live mirror that shows what the camera will see next — and keeps learning to
 
 A small predictive-coding hierarchy predicts the next webcam frame from the frames it has already seen. Every prediction is scored only against the frame it was issued for, and that error is the only teaching signal: offline on natural video, and online, continuously, on the camera stream in front of it. Started from random weights, it begins as an exact copy of the last frame. On a person moving in front of a still camera it learns, within about a minute, to predict better than that copy; on short, generic action clips it ends about even with it.
 
+**New in v0.10:** [objects from learned motion](#v010-objects-from-learned-motion). Objects are found as what moves together, by the motion cells the cortex learned, and held through pauses by links learned from common fate. A scene of these learned objects, with a memory of the background, can be edited: deleting an object shows what was behind it at 0.24 × a bitmap's error, moving one at 0.59 × (protocol 22). Their masks are still coarse: object IoU stays near 0.3, and the reports show where spatial precision is lost.
+
 **New in v0.9:** faster motion cells. With more types and faster training motion, they cover 7 of 8 directions at fast speeds (v0.7: 4). The learned self/world separation now passes at the original, larger saccades: 0.145 against 0.72 ([reports](reports/scene/README.md)).
 
 **New in v0.8:** [self and world in one learned code](#v08-self-and-world-in-learned-motion). The eye's own command is told to the learned motion cells, and a map learned by Hebbian averaging says which cells each command makes active. The cortex then explains away 98% of the motion its own saccades cause, while the same shift without a command is seen as the world moving. The newborn cannot tell the two apart.
@@ -435,6 +437,24 @@ Joscha Bach's point about the self-model is that a mind knows which changes it c
 .venv/bin/python tools/efference_report.py --mt checkpoints/mt-adult.pt --output reports/scene/v0.8-self-world.json
 ```
 
+### v0.10: objects from learned motion
+
+The scene graph's objects were the last large engineered piece: pixel templates found by template search. v0.10 grows them from what the cortex has learned. Every step was pre-registered, and three of the four fail at least one criterion.
+
+| Protocol | Verdict |
+|---|---|
+| [19](docs/protocols/19-grouping-from-common-fate.md) Grouping from common fate | **Fails.** Links learned from what moves together separate same-object pairs from cross-border pairs better than feature similarity (2.3 : 1 against 1.55 : 1), but grouping still frames by them finds no objects (IoU 0.02): the textured background looks to V1 almost like the objects. |
+| [20](docs/protocols/20-objects-from-learned-motion.md) Objects from learned motion | **One of three passes.** Slots found by learned motion agree with the objects at ARI 0.5 (from chance), and silencing MT removes every object. Object IoU is 0.30 (criterion 0.5), and through a 30-frame pause the slots keep 39% of it (criterion 80%). |
+| [21](docs/protocols/21-objects-held-by-relearned-links.md) Links relearned from integrated motion | **One of three passes.** Links relearned from MT integrated over 4 frames keep 52% through the pause (without links 4%). |
+| [22](docs/protocols/22-manipulating-learned-objects.md) Manipulating learned objects | **Passes.** With a memory of the background, deleting a learned object shows what was behind it at 0.24 × the error of a bitmap with the same mask, and moving one at 0.59 ×, better on 98% of edits; 88% of objects matched. The engineered graph: 0.16 × and 0.44 ×. |
+
+Why the masks stay coarse: given each object's true velocity, assigning places to the layer that predicts them best reaches IoU 0.52 on pixels, 0.42 on the retina's code, 0.38 on V1's feedforward response and 0.30 on V1's settled code. The competition of settling costs the most. MT can now read V1's feedforward sweep instead (`MotionCortex(fast=True)`), as its fast input in cortex does. Details: [reports/cortex/README.md](reports/cortex/README.md).
+
+```bash
+.venv/bin/python tools/train_links.py --mt checkpoints/mt-adult.pt --output checkpoints/links.pt
+.venv/bin/python tools/manipulation_report.py --mt checkpoints/mt-adult.pt --field checkpoints/links.pt --output reports/cortex/v0.10-manipulation.json
+```
+
 ### References for the scene graph
 
 - E. S. Spelke. Principles of object perception. *Cognitive Science* 14, 1990.
@@ -684,6 +704,10 @@ Tests cover causal counterfactuals, forward-warp direction, the group-disjoint s
 - Live learning needs an NVIDIA GPU. On a CPU the learner manages under one step per second.
 - The mirror has no object permanence, explicit egomotion, or multimodal future; pixel warping and blending can soften detail. The v0.4 scene level has objects and a self, but only in synthetic worlds: on real video it is worse than repeating the last frame, and its adult fails the permanence protocol.
 - The pretrained DMVFN expert is not part of the self-organizing story; ablations without it are reported.
+
+## Changes in v0.10
+
+v0.10 grows objects from learned motion: grouping links learned from common fate (`cortex/grouping.py`), slots found by MT's velocity and held by those links (`cortex/slots.py`), and an editable scene of learned objects with a background memory (`cortex/learned_scene.py`). MT can read V1's feedforward sweep (`fast=True`) and compare frames several apart (`MotionCortex.between`). Protocols 19–22; protocol 22 passes.
 
 ## Changes in v0.9
 

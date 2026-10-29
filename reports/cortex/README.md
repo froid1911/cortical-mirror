@@ -170,3 +170,25 @@ After protocol 21, a stronger test: assign each place to the layer that predicts
   - MT's spill falls from 1.78 to 1.36 background places per object place, and its error from 0.36 to 0.32 px per frame.
   - On held-out training seeds 950–953 the slots reach moving IoU 0.36 (0.295 on the settled code), ARI 0.53, and keep 77% of their IoU through the still moment with protocol 21's links.
 - The engineered scene graph reaches 0.8 because it builds pixel templates from many complete views. Sharp objects need memory of shape across time, not better frame-pair evidence.
+
+## v0.10 step 4: manipulating a scene of learned objects (`v0.10-manipulation.json`, protocol 22)
+
+A scene of learned objects: the motion slots (MT's fast path, protocol 21's links) and a background memory, a running average at every pixel the background slot owns. Protocol 10's edits on fresh seeds 2100–2139 (100 objects): delete each matched object, and move it 30 px. Nothing was tuned; three development seeds (2200–2202) only checked that the code runs.
+
+| Criterion | Learned scene | Verdict |
+|---|---|---|
+| 1. Delete: MSE ≤ 0.75 × the bitmap baseline's | **0.24 ×**, better than the bitmap in 98% of edits | **pass** |
+| 2. Move: MSE < the bitmap baseline's | **0.59 ×**, better in 98% | **pass** |
+| 3. Objects matched (a slot covers ≥ half the object) ≥ 80% | **88%** | **pass** |
+
+Yardstick, the engineered scene graph on the same scenes (protocol 10's matching):
+
+| | Delete MSE (× its bitmap) | Move MSE (× its bitmap) | Matched |
+|---|---|---|---|
+| Learned scene | 0.0015 (0.24 ×) | 0.0032 (0.59 ×) | 88% |
+| Engineered graph | 0.0004 (0.16 ×) | 0.0009 (0.44 ×) | 98% |
+| Leaving the frame unchanged | 0.020 | 0.021 | |
+
+- **What passes.** Objects found by learned motion, plus a memory of the background, explain the scene well enough to show what it would look like after a change, far better than a bitmap with the same segmentation. That was Joscha Bach's request, now met by learned objects instead of templates.
+- **What is still behind.** The engineered graph's absolute error is about a quarter (delete) and a third (move) of the learned scene's. Its masks are sharp, built from pixel templates over many complete views. The learned masks are blocky: 4 × 4 px cells, larger than the objects. A moved object therefore drags some background along, and that dominates the remaining move error.
+- **Engineered parts:** rendering by pasting, the inpainting fallback, and the slots' EM.
