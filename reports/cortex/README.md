@@ -48,3 +48,27 @@ MT with 32 types per scale was raised for 4 hours on flank's GPU 1 (about 9.9 mi
 | Tuning agreement ≥ 0.5 | none judged | 0.05 | **fail** (the aperture problem, as in v0.7) |
 
 The untrained comparison used 16 types (the default), not 32. It covers no sectors at any size, so this does not change a verdict.
+
+## v1.0 step 1: grouping learned from common fate (`v1.0-grouping.json`, protocol 19)
+
+An association field between V1's 32 types at offsets up to 4 positions learned for 60 training seeds × 300 frames of the sprite world (about 12 minutes on flank's GPU 1), gated by the v0.9 MT adult's velocities. The rule was amended before any test measurement (see the protocol). The test grouped 200 still frames (seeds 9000–9019) from features alone.
+
+| Condition | Mean object IoU | ARI | Groups per frame |
+|---|---|---|---|
+| **Learned field** | **0.021** | **−0.017** | 9.4 |
+| Newborn (zero) | 0 | 0 | 0 |
+| Similarity baseline (identity) | 0.007 | −0.012 | 2.5 |
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| Learned ARI ≥ similarity ARI + 0.05 | −0.005 | **fail** |
+| Learned mean object IoU ≥ 0.5 | 0.021 | **fail** |
+
+The engineered scene graph reaches about 0.8 object IoU on comparable scenes (protocol 8).
+
+**Why it fails (diagnosis on training seeds 900–909 only, after the test).** The links did learn something; the read-out cannot use it.
+- Mean affinity between places in the same object is 2.3 times that across an object's border with the learned field, against 1.55 times with the similarity baseline. Common fate taught the field which neighbours belong together better than feature similarity does.
+- But objects cover only 3.3% of V1's grid, and the background is a texture with nearly the same V1 statistics (the cosine between the mean V1 profiles of objects and background is 0.885). Of the frame's strongest 20% of affinities, 92% lie inside the background (91% for the baseline), about its share of all pairs. The global threshold and connected components therefore carve the background into texture patches, and the objects are rarely found.
+- So a still frame in this world does not show its objects in local features. Objects there are defined by their borders and by moving, and a read-out by threshold has no notion of a figure against a ground.
+
+**What this suggests for the next step** (not tested here): a read-out that lets groups compete for places (EM over slots) instead of a global threshold; border ownership, so that a border belongs to the figure inside it; and grouping during motion, where common fate is directly available, with the learned links carrying groups through still moments.
