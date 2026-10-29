@@ -1,0 +1,53 @@
+{
+  "seeds": [
+    2100,
+    2140
+  ],
+  "learned": {
+    "objects": 100,
+    "matched": 88,
+    "matched_share": 0.88,
+    "delete": {
+      "edits": 88,
+      "scene_mse": 0.0014740232195151748,
+      "bitmap_mse": 0.006211158328700218,
+      "unchanged_mse": 0.020373365831222724,
+      "scene_over_bitmap": 0.23731857111162022,
+      "scene_wins": 0.9772727272727273
+    },
+    "move": {
+      "edits": 88,
+      "scene_mse": 0.0032126043261087034,
+      "bitmap_mse": 0.005433887189031917,
+      "unchanged_mse": 0.02099619176376357,
+      "scene_over_bitmap": 0.5912166032068564,
+      "scene_wins": 0.9772727272727273
+    }
+  },
+  "engineered_graph": {
+    "objects": 100,
+    "matched": 98,
+    "scenes": 40,
+    "delete": {
+      "edits": 98,
+      "graph_mse": 0.00041878656689936625,
+      "bitmap_mse": 0.0025953012958111962,
+      "unchanged_mse": 0.019485337198806966,
+      "graph_over_bitmap": 0.16136337140326856,
+      "graph_wins": 0.9591836734693877
+    },
+    "move": {
+      "edits": 98,
+      "graph_mse": 0.0009422226641469692,
+      "bitmap_mse": 0.0021263625438928567,
+      "unchanged_mse": 0.02040059190975236,
+      "graph_over_bitmap": 0.44311477685361544,
+      "graph_wins": 0.9489795918367347
+    }
+  },
+  "verdict": {
+    "delete_criterion": true,
+    "move_criterion": true,
+    "matched_criterion": true
+  }
+}
