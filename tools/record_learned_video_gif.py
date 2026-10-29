@@ -1,5 +1,6 @@
-"""Record a GIF of the learned scene on a real video: what it sees, the objects it
-found by learned motion, and the scene with every object deleted.
+"""Record a GIF of the learned scene: what it sees, the objects it found by learned
+motion, and the scene with every object deleted. The source is a real video with a
+still camera, or the sprite world (``--source world``).
 
     python tools/record_learned_video_gif.py --mt checkpoints/mt-adult.pt \
         --links checkpoints/links-adult.pt --source checkpoints/sample.mp4 \
@@ -18,7 +19,29 @@ import numpy as np
 from record_slots_gif import COLOURS, MUTED, SIZE, label, picture  # tools/ on the path
 
 from cortical_mirror.cli import learned_graph
-from cortical_mirror.scene.live import VideoSource
+from cortical_mirror.scene.live import SpriteSource, VideoSource
+
+LABELS = {
+    "en": {
+        "sees": "What it sees",
+        "objects": "Learned objects",
+        "deleted": "Every object deleted",
+        "frame": "frame",
+        "world": "sprite world",
+        "video": "real video",
+        "memory": "background from memory",
+    },
+    # The German labels avoid umlauts, which OpenCV's fonts cannot draw.
+    "de": {
+        "sees": "Was es sieht",
+        "objects": "Gelernte Objekte",
+        "deleted": "Alle Objekte geloescht",
+        "frame": "Bild",
+        "world": "Sprite-Welt",
+        "video": "echtes Video",
+        "memory": "Hintergrund aus dem Gedaechtnis",
+    },
+}
 
 
 def objects(image: np.ndarray, graph) -> np.ndarray:
@@ -34,7 +57,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mt", type=Path, required=True)
     parser.add_argument("--links", type=Path, required=True)
-    parser.add_argument("--source", required=True, help="a video with a still camera")
+    parser.add_argument("--source", required=True, help="a still-camera video, or 'world'")
+    parser.add_argument("--language", choices=("en", "de"), default="en")
     parser.add_argument("--frames-dir", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--frames", type=int, default=360)
@@ -44,7 +68,9 @@ def main() -> None:
     args = parser.parse_args()
 
     graph = learned_graph(Namespace(mt=args.mt, links=args.links), args.device)
-    source = VideoSource(args.source)
+    world = args.source == "world"
+    source = SpriteSource(scene_frames=10**9) if world else VideoSource(args.source)
+    words = LABELS[args.language]
     args.frames_dir.mkdir(parents=True, exist_ok=True)
     gutter, width = 8, SIZE[0]
     for t in range(args.frames):
@@ -57,11 +83,12 @@ def main() -> None:
         for i, panel in enumerate((picture(image), objects(image, graph), picture(empty))):
             canvas[: SIZE[1], i * (width + gutter) : i * (width + gutter) + width] = panel
         y = SIZE[1] + 22
-        label(canvas, "Was es sieht", 0, y)
-        label(canvas, "Gelernte Objekte", width + gutter, y)
-        label(canvas, "Alle Objekte geloescht", 2 * (width + gutter), y)
-        label(canvas, f"Bild {t}, echtes Video", 0, y + 20, MUTED, 0.4)
-        label(canvas, "Hintergrund aus dem Gedaechtnis", 2 * (width + gutter), y + 20, MUTED, 0.4)
+        label(canvas, words["sees"], 0, y)
+        label(canvas, words["objects"], width + gutter, y)
+        label(canvas, words["deleted"], 2 * (width + gutter), y)
+        where = words["world"] if world else words["video"]
+        label(canvas, f"{words['frame']} {t}, {where}", 0, y + 20, MUTED, 0.4)
+        label(canvas, words["memory"], 2 * (width + gutter), y + 20, MUTED, 0.4)
         cv2.imwrite(str(args.frames_dir / f"{t:04d}.png"), canvas)
 
     palette = (
