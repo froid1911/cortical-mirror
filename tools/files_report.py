@@ -49,8 +49,11 @@ def paired(files: dict, plain: dict) -> dict:
     plain_by = {key(r): r for r in plain["records"]}
     out = {"with_files": files, "without_files": plain}
     for edit in ("delete", "move"):
-        pairs = [(r, plain_by[key(r)]) for r in files["records"] if r["edit"] == edit]
-        pairs = [(a, b) for a, b in pairs if key(a) in plain_by]
+        pairs = [
+            (r, plain_by[key(r)])
+            for r in files["records"]
+            if r["edit"] == edit and key(r) in plain_by
+        ]
         out[f"{edit}_paired"] = {
             "objects": len(pairs),
             "with_files_mse": float(np.mean([a["scene"] for a, _ in pairs])),
