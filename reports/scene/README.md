@@ -274,3 +274,26 @@ The efference map was trained on seeds 800–839 (it is the only thing that lear
 **Passes.** The adult's own saccade is explained away almost entirely: 98% of the motion it causes is attributed to itself. The same shift without a command is seen as the world moving. The newborn sees the world move either way. Both the self part and the world part are read from the same learned motion cells. The only addition is the efference map: for each command, the mean responsibility of the motion types after it, learned by Hebbian averaging.
 
 The amendment's development check also found a limit of the v0.7 MT adult. It represents motion of one V1 position per frame in every direction, but faster motion only along a few axes, because UCF101 rarely shows it. Larger saccades are therefore sensed at about half their size.
+
+## v0.9: faster motion
+
+### Protocol 17 (`v0.9-learned-motion.json`, 40 fresh clips, seed 3, excluding seeds 0–2)
+
+| Condition | Expectation ÷ last frame | Clips better |
+|---|---|---|
+| Learned motion, v0.9 MT adult | 0.855 | 77.5% |
+| Learned motion, v0.7 MT adult (same clips, `v0.9-learned-motion-v07-adult.json`) | 0.855 | 77.5% |
+| MT silenced | 1.000 | 0% |
+| Optical flow (yardstick) | 0.787 | 85% |
+
+**Passes.** The wider speed range does not change real-video prediction: the v0.7 and v0.9 adults score the same on these clips. What limits prediction is elsewhere.
+
+### Protocol 18 at the original saccade size (`v0.9-self-world.json`, 8 view pixels, seeds 8020–8039)
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| Adult map: commanded ≤ 0.3 | 0.145 | pass |
+| Adult map: uncommanded ≥ 0.7 | 0.72 | pass |
+| Newborn map: commanded ≥ 0.7 | 0.72 | pass |
+
+**Passes** at the saccade size v0.8 had to amend away from. The faster motion cells sense two-position shifts well enough for the learned efference map to separate self from world.

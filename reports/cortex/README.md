@@ -35,3 +35,16 @@ MT was raised for 2 hours on flank's GPU 1 (about 5.5 million frames of UCF101 t
 - type 5 points up and answers at 210° and 330°.
 
 This is the aperture problem. A grating shows motion only along its stripes' normal, and the test gratings move slowly (1–2 px per frame), while the types learned fast motion (about 4 px per frame). A type moving 4 px along its direction explains a 2 px-per-frame grating whose direction lies 60° away (4 × cos 60° = 2). The cells are tuned to direction and speed together, which slow gratings cannot reveal. Translating textures are not ambiguous, and their direction is decoded to within 1.4°. Tested with gratings matched to each type's speed, the agreement would likely hold, but that test was not pre-registered, so the fail stands.
+
+## v0.9: faster motion (`v0.9-motion-cells.json`, protocol 16)
+
+MT with 32 types per scale was raised for 4 hours on flank's GPU 1 (about 9.9 million stream frames). Half the streams skipped every other frame (`train-mt-v09.jsonl`).
+
+| Criterion | Untrained | Adult v0.9 | Verdict |
+|---|---|---|---|
+| Compass sectors covered ≥ 6 | 0 | 8 | pass |
+| **Fast sectors** (displacement ≥ 1.5 positions) **≥ 6** (v0.7 adult: 4) | 0 | **7** | **pass** |
+| Median decoded direction error ≤ 30° | 67° | 1.6° | pass |
+| Tuning agreement ≥ 0.5 | none judged | 0.05 | **fail** (the aperture problem, as in v0.7) |
+
+The untrained comparison used 16 types (the default), not 32. It covers no sectors at any size, so this does not change a verdict.

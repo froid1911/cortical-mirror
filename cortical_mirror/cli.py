@@ -154,7 +154,7 @@ DEMO_ASSETS = {
     # The scene graph's adult: the persistence it learned from occlusion scenes.
     "scene-adult.pt": f"{RELEASES}/v0.4.0/scene-adult.pt",
     # The motion cells MT learned from video (v0.7), with the V1 they read.
-    "mt-adult.pt": f"{RELEASES}/v0.7.0/mt-adult.pt",
+    "mt-adult.pt": f"{RELEASES}/v0.9.0/mt-adult.pt",
 }
 
 
