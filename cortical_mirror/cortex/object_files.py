@@ -11,6 +11,14 @@ To keep its frame on the object, the file moves by the velocity it is told, then
 corrects its position by its own prediction: within a few pixels, the place where
 its learned appearance explains the image best (analysis by synthesis). That search
 is engineered inference; the appearance and the shape are learned.
+
+A file knows how sure it is: its fit is the error of its prediction, relative to the
+error of the rival explanation: the remembered background where the scene knows it
+(a file that drifted onto background learns it and explains it well, but no better
+than the background does), else an unrelated template. Near 0 when the file
+explains what it sees, near 1 or above when it explains it no better. A mature
+file that cannot explain what it sees does not learn from it, and is not trusted
+until it finds its object again.
 """
 
 from __future__ import annotations
@@ -29,10 +37,12 @@ class ObjectFile:
         mature: int = 30,
         align_after: int = 10,
         rate: float = 0.05,
+        trust: float = 0.5,
     ):
         self.x, self.y, self.radius, self.search = float(x), float(y), radius, search
         self.ratio, self.mature, self.align_after = ratio, mature, align_after
-        self.rate = rate
+        self.rate, self.trust = rate, trust
+        self.fit = np.inf
         side = 2 * radius
         self.n = np.zeros((side, side), np.float32)
         self.mean = np.zeros((side, side), np.float32)
@@ -68,32 +78,65 @@ class ObjectFile:
     def ready(self) -> bool:
         return self.frames >= self.mature
 
+    @property
+    def confident(self) -> bool:
+        return self.ready and self.fit < self.trust
+
     # Following ------------------------------------------------------------------
 
-    def _align(self, image: np.ndarray) -> None:
+    def _search(self, image, x: float, y: float, search: int, background=None) -> None:
+        """Put the file where, within ``search`` px of (x, y), its appearance
+        explains the image best, and remember how well (its fit)."""
+
         weights = self.shape()
         if weights.sum() < 4:
             return
-        cx, cy = int(round(self.x)), int(round(self.y))
-        best, best_offset = np.inf, (0, 0)
-        for dy in range(-self.search, self.search + 1):
-            for dx in range(-self.search, self.search + 1):
+        cx, cy = int(round(x)), int(round(y))
+        best, best_offset, best_chance = np.inf, (0, 0), 1.0
+        for dy in range(-search, search + 1):
+            for dx in range(-search, search + 1):
                 window = self._window(image, cx + dx, cy + dy)
                 use = weights & ~np.isnan(window)
                 if use.sum() < weights.sum() / 2:
                     continue
-                cost = float(np.mean((window[use] - self.mean[use]) ** 2))
+                seen, expected = window[use], self.mean[use]
+                cost = float(np.mean((seen - expected) ** 2))
                 if cost < best:
-                    best, best_offset = cost, (dx, dy)
-        self.x, self.y = cx + best_offset[0], cy + best_offset[1]
+                    best, best_offset, best_chance = (
+                        cost,
+                        (dx, dy),
+                        self._rival(seen, expected, background, cx + dx, cy + dy, use),
+                    )
+        if np.isfinite(best):
+            self.x, self.y = cx + best_offset[0], cy + best_offset[1]
+            self.fit = best / (best_chance + 1e-6)
 
-    def follow(self, image: np.ndarray, velocity=(0.0, 0.0)) -> None:
+    def _rival(self, seen, expected, background, cx: int, cy: int, use) -> float:
+        """The error of the rival explanation of what the file sees."""
+
+        if background is not None:
+            remembered = self._window(background, cx, cy)[use]
+            known = ~np.isnan(remembered)
+            if known.sum() >= use.sum() / 2:
+                return float(np.mean((seen[known] - remembered[known]) ** 2))
+        # The error an unrelated template would make here.
+        return float(seen.var() + expected.var() + (seen.mean() - expected.mean()) ** 2)
+
+    def relocate(self, image, x: float, y: float, search: int = 8, background=None) -> None:
+        """Look for the object again, near (x, y)."""
+
+        self._search(image, x, y, search, background)
+
+    def follow(self, image: np.ndarray, velocity=(0.0, 0.0), background=None) -> None:
         """One frame: move by ``velocity`` (px per frame), correct by prediction, learn."""
 
         self.x += velocity[0]
         self.y += velocity[1]
         if self.frames >= self.align_after:
-            self._align(image)
+            self._search(image, self.x, self.y, self.search, background)
+        if self.ready and self.fit >= self.trust:
+            # What it cannot explain, it does not learn from.
+            return
         window = self._window(image, int(round(self.x)), int(round(self.y)))
         seen = ~np.isnan(window)
         self.n[seen] += 1

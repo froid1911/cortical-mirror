@@ -101,6 +101,7 @@ class LearnedScene:
         coarse = self._grid_masks(labels)
         # MT's velocity is in retinal px of the 128-wide view; the image is wider.
         scale = self.width / 128
+        background = np.where(self.seen > 0, self.memory, np.nan).astype(np.float32)
         for k in alive:
             if k not in self.files:
                 if k not in coarse:
@@ -108,15 +109,20 @@ class LearnedScene:
                 ys, xs = np.nonzero(coarse[k])
                 self.files[k] = ObjectFile(xs.mean(), ys.mean())
             u = self.slots.u[k].tolist()
-            self.files[k].follow(image, velocity=(u[0] * scale, u[1] * scale))
+            file = self.files[k]
+            file.follow(image, velocity=(u[0] * scale, u[1] * scale), background=background)
+            if file.ready and not file.confident and k in coarse:
+                # Lost: look for the object again where its slot says it is.
+                ys, xs = np.nonzero(coarse[k])
+                file.relocate(image, xs.mean(), ys.mean(), background=background)
 
     def masks(self, labels: np.ndarray) -> dict[int, np.ndarray]:
-        """Each object slot's region on the pixels: its object file's shape once
-        the file is mature, else the slot's region on V1's grid."""
+        """Each object slot's region on the pixels: its object file's shape while
+        the file is sure of its object, else the slot's region on V1's grid."""
 
         masks = self._grid_masks(labels)
         for k, file in self.files.items():
-            if k in masks and file.ready:
+            if k in masks and file.confident:
                 sharp = file.mask(self.height, self.width)
                 if sharp.any():
                     masks[k] = sharp
