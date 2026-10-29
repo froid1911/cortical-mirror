@@ -70,3 +70,23 @@ def test_pixel_masks_follow_the_grid_labels():
     masks = scene.masks(labels)
     assert set(masks) == {3}
     assert masks[3].sum() == BLOCK * BLOCK and masks[3][4:8, 8:12].all()
+
+
+class _File:
+    def __init__(self, confident: bool):
+        self.ready, self.confident = True, confident
+
+    def mask(self, height, width):
+        out = np.zeros((height, width), bool)
+        out[0, 0] = True
+        return out
+
+
+def test_a_file_s_sharp_mask_is_used_only_while_the_file_is_sure():
+    scene = scene_with(None)
+    labels = np.zeros((H // BLOCK, W // BLOCK), np.int64)
+    labels[1, 2] = 3
+    scene.files[3] = _File(confident=True)
+    assert scene.masks(labels)[3].sum() == 1
+    scene.files[3] = _File(confident=False)
+    assert scene.masks(labels)[3].sum() == BLOCK * BLOCK

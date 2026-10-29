@@ -11,6 +11,10 @@ To keep its frame on the object, the file moves by the velocity it is told, then
 corrects its position by its own prediction: within a few pixels, the place where
 its learned appearance explains the image best (analysis by synthesis). That search
 is engineered inference; the appearance and the shape are learned.
+
+A file knows how sure it is: its fit is the error of its prediction, relative to the
+variance it has learned to expect. A mature file that cannot explain what it sees
+does not learn from it, and is not trusted until it finds its object again.
 """
 
 from __future__ import annotations
@@ -29,10 +33,12 @@ class ObjectFile:
         mature: int = 30,
         align_after: int = 10,
         rate: float = 0.05,
+        trust: float = 0.2,
     ):
         self.x, self.y, self.radius, self.search = float(x), float(y), radius, search
         self.ratio, self.mature, self.align_after = ratio, mature, align_after
-        self.rate = rate
+        self.rate, self.trust = rate, trust
+        self.fit = np.inf
         side = 2 * radius
         self.n = np.zeros((side, side), np.float32)
         self.mean = np.zeros((side, side), np.float32)
@@ -68,16 +74,23 @@ class ObjectFile:
     def ready(self) -> bool:
         return self.frames >= self.mature
 
+    @property
+    def confident(self) -> bool:
+        return self.ready and self.fit < self.trust
+
     # Following ------------------------------------------------------------------
 
-    def _align(self, image: np.ndarray) -> None:
+    def _search(self, image: np.ndarray, x: float, y: float, search: int) -> None:
+        """Put the file where, within ``search`` px of (x, y), its appearance
+        explains the image best, and remember how well (its fit)."""
+
         weights = self.shape()
         if weights.sum() < 4:
             return
-        cx, cy = int(round(self.x)), int(round(self.y))
+        cx, cy = int(round(x)), int(round(y))
         best, best_offset = np.inf, (0, 0)
-        for dy in range(-self.search, self.search + 1):
-            for dx in range(-self.search, self.search + 1):
+        for dy in range(-search, search + 1):
+            for dx in range(-search, search + 1):
                 window = self._window(image, cx + dx, cy + dy)
                 use = weights & ~np.isnan(window)
                 if use.sum() < weights.sum() / 2:
@@ -85,7 +98,17 @@ class ObjectFile:
                 cost = float(np.mean((window[use] - self.mean[use]) ** 2))
                 if cost < best:
                     best, best_offset = cost, (dx, dy)
-        self.x, self.y = cx + best_offset[0], cy + best_offset[1]
+        if np.isfinite(best):
+            self.x, self.y = cx + best_offset[0], cy + best_offset[1]
+            self.fit = best / (float(np.mean(self.var[weights])) + 1e-4)
+
+    def _align(self, image: np.ndarray) -> None:
+        self._search(image, self.x, self.y, self.search)
+
+    def relocate(self, image: np.ndarray, x: float, y: float, search: int = 8) -> None:
+        """Look for the object again, near (x, y)."""
+
+        self._search(image, x, y, search)
 
     def follow(self, image: np.ndarray, velocity=(0.0, 0.0)) -> None:
         """One frame: move by ``velocity`` (px per frame), correct by prediction, learn."""
@@ -94,6 +117,9 @@ class ObjectFile:
         self.y += velocity[1]
         if self.frames >= self.align_after:
             self._align(image)
+        if self.ready and self.fit >= self.trust:
+            # What it cannot explain, it does not learn from.
+            return
         window = self._window(image, int(round(self.x)), int(round(self.y)))
         seen = ~np.isnan(window)
         self.n[seen] += 1

@@ -108,15 +108,20 @@ class LearnedScene:
                 ys, xs = np.nonzero(coarse[k])
                 self.files[k] = ObjectFile(xs.mean(), ys.mean())
             u = self.slots.u[k].tolist()
-            self.files[k].follow(image, velocity=(u[0] * scale, u[1] * scale))
+            file = self.files[k]
+            file.follow(image, velocity=(u[0] * scale, u[1] * scale))
+            if file.ready and not file.confident and k in coarse:
+                # Lost: look for the object again where its slot says it is.
+                ys, xs = np.nonzero(coarse[k])
+                file.relocate(image, xs.mean(), ys.mean())
 
     def masks(self, labels: np.ndarray) -> dict[int, np.ndarray]:
-        """Each object slot's region on the pixels: its object file's shape once
-        the file is mature, else the slot's region on V1's grid."""
+        """Each object slot's region on the pixels: its object file's shape while
+        the file is sure of its object, else the slot's region on V1's grid."""
 
         masks = self._grid_masks(labels)
         for k, file in self.files.items():
-            if k in masks and file.ready:
+            if k in masks and file.confident:
                 sharp = file.mask(self.height, self.width)
                 if sharp.any():
                     masks[k] = sharp

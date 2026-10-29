@@ -55,3 +55,31 @@ def test_a_young_file_has_no_shape_yet():
     for t in range(5):
         file.follow(world(t)[0], velocity=(1.0, 0.5))
     assert not file.ready
+
+
+def test_a_file_knows_when_its_appearance_no_longer_fits():
+    image, (x, y), _ = world(0)
+    file = ObjectFile(x, y, radius=12)
+    for t in range(40):
+        file.follow(world(t)[0], velocity=(1.0, 0.5))
+    assert file.confident
+    # The object vanishes: the file's prediction fails.
+    empty = world(40)[0].copy()
+    empty[:] = np.random.default_rng(5).uniform(0.1, 0.6, empty.shape)
+    file.follow(empty, velocity=(1.0, 0.5))
+    assert not file.confident
+
+
+def test_a_lost_file_finds_its_object_again_near_where_it_is_told():
+    image, (x, y), _ = world(0)
+    file = ObjectFile(x, y, radius=12)
+    for t in range(40):
+        file.follow(world(t)[0], velocity=(1.0, 0.5))
+    # It is told a wrong velocity for a few frames and loses the object.
+    for t in range(40, 46):
+        file.follow(world(t)[0], velocity=(-2.0, 0.5))
+    image, (x, y), mask = world(46)
+    file.follow(image, velocity=(1.0, 0.5))
+    file.relocate(image, x + 2, y - 2, search=8)
+    assert file.confident
+    assert iou(file.mask(H, W), mask) > 0.7
