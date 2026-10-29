@@ -196,6 +196,14 @@ class MotionCortex:
         height, width = gray.shape[-2:]
         if self.silenced:
             return torch.zeros(now.shape[0], 2, height, width, device=self.device)
+        velocity = self.between(before, now, learn)
+        return F.interpolate(velocity, size=(height, width), mode="bilinear")
+
+    @torch.no_grad()
+    def between(self, before: torch.Tensor, now: torch.Tensor, learn: bool = False) -> torch.Tensor:
+        """The velocity that carries V1's activity ``before`` to ``now``, in retinal
+        pixels per transition, ``[B, 2, h, w]`` on V1's grid."""
+
         # The fine types' responsibilities, kept for the efference copy to learn from.
         self.last_fine = self.fine.step(before, now, learn)
         fine = self.fine.velocity(self.last_fine) * self.stride
@@ -203,8 +211,7 @@ class MotionCortex:
         coarse = self.coarse.velocity(self.coarse.step(pooled_before, pooled_now, learn))
         coarse = F.interpolate(coarse * 2 * self.stride, size=fine.shape[-2:], mode="bilinear")
         reach = self.fine.reach * self.stride
-        velocity = torch.where(coarse.norm(dim=1, keepdim=True) > reach, coarse, fine)
-        return F.interpolate(velocity, size=(height, width), mode="bilinear")
+        return torch.where(coarse.norm(dim=1, keepdim=True) > reach, coarse, fine)
 
     def save(self, path) -> None:
         torch.save(
