@@ -62,13 +62,15 @@ class MotionSlots:
         death: float = 3.0,
         patience: int = 5,
         confirm: int = 3,
+        edge: int = 1,
+        merge: bool = True,
         field: AssociationField | None = None,
         device="cpu",
     ):
         self.slots, self.stride, self.sigma, self.beta = slots, stride, sigma, beta
         self.blur, self.rounds, self.moving = blur, rounds, moving
         self.birth, self.death, self.patience = birth, death, patience
-        self.confirm = confirm
+        self.confirm, self.edge, self.merging = confirm, edge, merge
         self.field, self.device = field, torch.device(device)
         self.reset()
 
@@ -95,7 +97,11 @@ class MotionSlots:
         sx = gx[None] - shift[:, 0, None, None] * 2 / max(w - 1, 1)
         sy = gy[None] - shift[:, 1, None, None] * 2 / max(h - 1, 1)
         grid = torch.stack([sx, sy], -1)
-        moved = F.grid_sample(q[:, None], grid, align_corners=True, padding_mode="border")
+        # What leaves the view leaves an object's mask; the background fills in behind.
+        moved = F.grid_sample(q[:, None], grid, align_corners=True, padding_mode="zeros")
+        moved[0] = F.grid_sample(q[:1, None], grid[:1], align_corners=True, padding_mode="border")[
+            0
+        ]
         side = torch.tensor([self.blur / 2, 1 - self.blur, self.blur / 2], device=q.device)
         kernel = torch.outer(side, side)[None, None]
         return F.conv2d(F.pad(moved, (1, 1, 1, 1), mode="replicate"), kernel)[:, 0]
@@ -162,6 +168,9 @@ class MotionSlots:
 
     def _births(self, velocity: torch.Tensor, labels: torch.Tensor) -> None:
         candidates = (velocity.norm(dim=0) > self.moving) & (labels == 0)
+        # MT's view is unreliable at the very edge of the picture.
+        candidates[: self.edge] = candidates[-self.edge :] = False
+        candidates[:, : self.edge] = candidates[:, -self.edge :] = False
         found = components(candidates.cpu().numpy())
         sizes = np.bincount(found.ravel())[1:]
         for index in np.argsort(-sizes):
@@ -192,7 +201,8 @@ class MotionSlots:
         prior = self._moved(self.q) + 1e-3
         self._assign(prior, velocity, activity)
         labels = self.q.argmax(0)
-        self._merge(labels)
+        if self.merging:
+            self._merge(labels)
         for k in range(1, self.slots + 1):
             if not self.alive[k]:
                 continue

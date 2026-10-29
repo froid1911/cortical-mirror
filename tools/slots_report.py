@@ -77,7 +77,7 @@ def main() -> None:
     args = parser.parse_args()
 
     seeds = range(*args.seeds) if args.seeds else TEST_SEEDS
-    settings = {k: float(v) for k, v in (s.split("=") for s in args.set)}
+    settings = {k: json.loads(v) for k, v in (s.split("=") for s in args.set)}
     cortex = MotionCortex.load(args.mt, device=args.device)
     state = torch.load(args.field, map_location="cpu", weights_only=False)
     field = AssociationField(types=state["links"].shape[0], device=args.device)
