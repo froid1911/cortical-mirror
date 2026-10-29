@@ -4,6 +4,8 @@ A live mirror that shows what the camera will see next — and keeps learning to
 
 A small predictive-coding hierarchy predicts the next webcam frame from the frames it has already seen. Every prediction is scored only against the frame it was issued for, and that error is the only teaching signal: offline on natural video, and online, continuously, on the camera stream in front of it. Started from random weights, it begins as an exact copy of the last frame. On a person moving in front of a still camera it learns, within about a minute, to predict better than that copy; on short, generic action clips it ends about even with it.
 
+**New in v0.9:** faster motion cells. With more types and faster training motion, they cover 7 of 8 directions at fast speeds (v0.7: 4). The learned self/world separation now passes at the original, larger saccades: 0.145 against 0.72 ([reports](reports/scene/README.md)).
+
 **New in v0.8:** [self and world in one learned code](#v08-self-and-world-in-learned-motion). The eye's own command is told to the learned motion cells, and a map learned by Hebbian averaging says which cells each command makes active. The cortex then explains away 98% of the motion its own saccades cause, while the same shift without a command is seen as the world moving. The newborn cannot tell the two apart.
 
 **New in v0.7:** [motion, learned](#v07-motion-learned). Motion cells learn from video, with no motion detector built in. On fresh UCF101 test clips, real video is now predicted from motion the cortex itself learned: 0.88 × the error of repeating the last frame. Silencing those cells removes all motion from the prediction.
@@ -682,6 +684,10 @@ Tests cover causal counterfactuals, forward-warp direction, the group-disjoint s
 - Live learning needs an NVIDIA GPU. On a CPU the learner manages under one step per second.
 - The mirror has no object permanence, explicit egomotion, or multimodal future; pixel warping and blending can soften detail. The v0.4 scene level has objects and a self, but only in synthetic worlds: on real video it is worse than repeating the last frame, and its adult fails the permanence protocol.
 - The pretrained DMVFN expert is not part of the self-organizing story; ablations without it are reported.
+
+## Changes in v0.9
+
+v0.9 widens the motion cells' speed range: 32 types per scale, and half the training streams skipping frames. Fast directions covered rise from 4 to 7 of 8. Protocol 18 passes at the original saccade size, and protocol 17 passes again on fresh clips (0.855), equal to the v0.7 adult. The demo downloads the v0.9 MT adult.
 
 ## Changes in v0.8
 

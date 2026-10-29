@@ -22,10 +22,13 @@ from cortical_mirror.data import split_videos
 
 
 class Streams:
-    def __init__(self, videos: list[Path], count: int, seed: int):
+    def __init__(self, videos: list[Path], count: int, seed: int, strides: list[int] | None = None):
         self.videos = videos
         self.rng = random.Random(seed)
         self.captures = [self._open() for _ in range(count)]
+        # Frames each stream advances per step: a stride of 2 doubles every speed, as
+        # if the world moved twice as fast.
+        self.strides = strides or [1] * count
 
     def _open(self):
         return cv2.VideoCapture(str(self.rng.choice(self.videos)))
@@ -33,6 +36,8 @@ class Streams:
     def frames(self, device, size: tuple[int, int]) -> torch.Tensor:
         out = []
         for index, capture in enumerate(self.captures):
+            for _ in range(self.strides[index] - 1):
+                capture.grab()
             ok, frame = capture.read()
             while not ok:
                 capture.release()

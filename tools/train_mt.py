@@ -26,6 +26,12 @@ def main() -> None:
     parser.add_argument("--streams", type=int, default=16)
     parser.add_argument("--hours", type=float, default=2.0)
     parser.add_argument("--types", type=int, default=16)
+    parser.add_argument(
+        "--fast-share",
+        type=float,
+        default=0.0,
+        help="share of streams that skip every other frame (doubling their speeds)",
+    )
     parser.add_argument("--log-every", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
@@ -35,7 +41,9 @@ def main() -> None:
 
     split = split_videos(args.data)
     cortex = MotionCortex(v1=args.v1, types=args.types, seed=args.seed, device=args.device)
-    streams = Streams(split.train, args.streams, args.seed)
+    fast = round(args.fast_share * args.streams)
+    strides = [2] * fast + [1] * (args.streams - fast)
+    streams = Streams(split.train, args.streams, args.seed, strides=strides)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.log.parent.mkdir(parents=True, exist_ok=True)
     started, step = time.time(), 0
