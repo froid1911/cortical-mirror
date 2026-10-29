@@ -4,6 +4,8 @@ A live mirror that shows what the camera will see next — and keeps learning to
 
 A small predictive-coding hierarchy predicts the next webcam frame from the frames it has already seen. Every prediction is scored only against the frame it was issued for, and that error is the only teaching signal: offline on natural video, and online, continuously, on the camera stream in front of it. Started from random weights, it begins as an exact copy of the last frame. On a person moving in front of a still camera it learns, within about a minute, to predict better than that copy; on short, generic action clips it ends about even with it.
 
+**New in v0.11:** object files. Each learned object keeps a running mean and variance in its own frame; its shape is where the variance stays low, since its texture moves with it while the background slides past. Learned objects reach 0.505 pixel IoU (from 0.38), the bar earlier protocols failed. But the sharp masks match fewer objects (67% against 85%) and make deleting worse, which the [report](reports/cortex/README.md) states plainly (protocol 23).
+
 **New in v0.10:** [objects from learned motion](#v010-objects-from-learned-motion). Objects are found as what moves together, by the motion cells the cortex learned, and held through pauses by links learned from common fate. A scene of these learned objects, with a memory of the background, can be edited: deleting an object shows what was behind it at 0.24 × a bitmap's error, moving one at 0.59 × (protocol 22). Their masks are still coarse: object IoU stays near 0.3, and the reports show where spatial precision is lost.
 
 **New in v0.9:** faster motion cells. With more types and faster training motion, they cover 7 of 8 directions at fast speeds (v0.7: 4). The learned self/world separation now passes at the original, larger saccades: 0.145 against 0.72 ([reports](reports/scene/README.md)).
@@ -455,6 +457,8 @@ Why the masks stay coarse: given each object's true velocity, assigning places t
 .venv/bin/python tools/manipulation_report.py --mt checkpoints/mt-adult.pt --field checkpoints/links.pt --output reports/cortex/v0.10-manipulation.json
 ```
 
+| [23](docs/protocols/23-object-files.md) Object files | **Passes as written.** Pixel object IoU 0.505 with object files (0.379 without); silenced MT finds nothing; moving errs less (0.0020 against 0.0036). But fewer objects are matched with files (67% against 85%), so the move comparison is over different objects, and deleting gets worse (0.56 × against 0.26 × the bitmap). |
+
 ### References for the scene graph
 
 - E. S. Spelke. Principles of object perception. *Cognitive Science* 14, 1990.
@@ -704,6 +708,10 @@ Tests cover causal counterfactuals, forward-warp direction, the group-disjoint s
 - Live learning needs an NVIDIA GPU. On a CPU the learner manages under one step per second.
 - The mirror has no object permanence, explicit egomotion, or multimodal future; pixel warping and blending can soften detail. The v0.4 scene level has objects and a self, but only in synthetic worlds: on real video it is worse than repeating the last frame, and its adult fails the permanence protocol.
 - The pretrained DMVFN expert is not part of the self-organizing story; ablations without it are reported.
+
+## Changes in v0.11
+
+Object files (`cortex/object_files.py`): a running mean and variance in each object's own frame, aligned by the object's own learned appearance. `LearnedScene(files=True)` uses a mature file's sharp mask instead of the slot's coarse one. `tools/files_report.py` runs protocol 23.
 
 ## Changes in v0.10
 
