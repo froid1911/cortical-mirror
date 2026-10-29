@@ -482,6 +482,11 @@ def motion_cells(cortex, texture_seeds=range(10), frames_grating: int = 16) -> d
         dsi.append(direction_index(float(curve[best]), float(curve[(best + 6) % 12])))
     displacements = level.displacements().cpu()
     long = displacements[displacements.norm(dim=1) >= 0.5]
+    fast = displacements[displacements.norm(dim=1) >= 1.5]
+    fast_sectors = {
+        int(((math.degrees(math.atan2(float(dy), float(dx))) + 22.5) % 360) // 45)
+        for dx, dy in fast
+    }
     sectors = {
         int(((math.degrees(math.atan2(float(dy), float(dx))) + 22.5) % 360) // 45)
         for dx, dy in long
@@ -525,6 +530,7 @@ def motion_cells(cortex, texture_seeds=range(10), frames_grating: int = 16) -> d
         "tuning_agreement": agreeing / judged if judged else 0.0,
         "responsive_types": len(dsi),
         "sectors_covered": len(sectors),
+        "fast_sectors_covered": len(fast_sectors),
         "displacements": displacements.tolist(),
         "median_direction_error": float(torch.tensor(errors).median()),
         "curves": curves.tolist(),
