@@ -148,14 +148,21 @@ class LearnedScene:
     # Explaining by changing -------------------------------------------------
 
     def edit(self, frame: np.ndarray, labels: np.ndarray, delete=frozenset(), move=None):
-        """The frame as it would look with slots deleted or moved by (dx, dy) px."""
+        """The frame as it would look with slots deleted or moved by (dx, dy) px.
+
+        What is removed is all that could belong to the object (a sure file's shape
+        and the slot's coarse region); what is pasted elsewhere is only what surely
+        does (the sure shape). A sharp shape that misses part of its object then
+        leaves no remnant behind."""
 
         move = move or {}
         masks = self.masks(labels)
+        coarse = self._grid_masks(labels)
         out = frame.copy()
         removed = np.zeros_like(out, bool)
         for k in set(delete) | set(move):
             removed |= masks.get(k, np.zeros_like(removed))
+            removed |= coarse.get(k, np.zeros_like(removed))
         known = removed & (self.seen > 0)
         out[known] = self.memory[known]
         out = inpaint(out, removed & ~known)
