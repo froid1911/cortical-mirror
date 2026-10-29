@@ -83,3 +83,14 @@ def test_a_lost_file_finds_its_object_again_near_where_it_is_told():
     file.relocate(image, x + 2, y - 2, search=8)
     assert file.confident
     assert iou(file.mask(H, W), mask) > 0.7
+
+
+def test_a_file_that_explains_only_background_is_not_sure():
+    image, (x, y), _ = world(0)
+    back = world(0)[0].copy()
+    back[:] = np.random.default_rng(1).uniform(0.1, 0.6, back.shape)  # world()'s background
+    # A file that sits on still background from the start.
+    file = ObjectFile(100, 70, radius=12)
+    for _ in range(40):
+        file.follow(back, velocity=(0.0, 0.0), background=back)
+    assert not file.confident

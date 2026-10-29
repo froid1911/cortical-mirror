@@ -101,6 +101,7 @@ class LearnedScene:
         coarse = self._grid_masks(labels)
         # MT's velocity is in retinal px of the 128-wide view; the image is wider.
         scale = self.width / 128
+        background = np.where(self.seen > 0, self.memory, np.nan).astype(np.float32)
         for k in alive:
             if k not in self.files:
                 if k not in coarse:
@@ -109,11 +110,11 @@ class LearnedScene:
                 self.files[k] = ObjectFile(xs.mean(), ys.mean())
             u = self.slots.u[k].tolist()
             file = self.files[k]
-            file.follow(image, velocity=(u[0] * scale, u[1] * scale))
+            file.follow(image, velocity=(u[0] * scale, u[1] * scale), background=background)
             if file.ready and not file.confident and k in coarse:
                 # Lost: look for the object again where its slot says it is.
                 ys, xs = np.nonzero(coarse[k])
-                file.relocate(image, xs.mean(), ys.mean())
+                file.relocate(image, xs.mean(), ys.mean(), background=background)
 
     def masks(self, labels: np.ndarray) -> dict[int, np.ndarray]:
         """Each object slot's region on the pixels: its object file's shape while
