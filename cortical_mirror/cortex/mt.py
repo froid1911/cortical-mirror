@@ -144,6 +144,11 @@ class MotionCortex:
     The fine level works on V1's grid; the coarse one on V1 pooled to half
     resolution, so that fast motion and camera pans are within reach. Where the
     coarse level sees motion beyond the fine level's reach, its velocity is used.
+
+    With ``fast``, MT reads V1's first feedforward response (its learned filters,
+    rectified) instead of the code V1 settles into. The competition of settling
+    makes the code jump between cells under small shifts; the feedforward sweep
+    moves with the image, as the fast (magnocellular) input to MT does.
     """
 
     def __init__(
@@ -154,6 +159,7 @@ class MotionCortex:
         seed: int = 0,
         device="cpu",
         settle: int = 20,
+        fast: bool = False,
     ):
         from .engine import RETINA_SIZE, CortexEngine
         from .retina import Retina
@@ -168,6 +174,7 @@ class MotionCortex:
         self.hierarchy = engine.hierarchy
         self.retina = Retina(*RETINA_SIZE, device=self.device)
         self.settle = settle
+        self.fast = fast
         self.fine = MotionLevel(types=types, reach=reach, seed=seed, device=device)
         self.coarse = MotionLevel(types=types, reach=reach, seed=seed + 1, device=device)
         self.silenced = False
@@ -175,9 +182,13 @@ class MotionCortex:
         self.stride = engine.hierarchy.configs[0].stride
 
     def v1(self, gray: torch.Tensor) -> torch.Tensor:
-        """V1's activity for frames ``[B, 1, 96, 128]`` (settled from rest, frozen)."""
+        """V1's activity for frames ``[B, 1, 96, 128]``: settled from rest (frozen), or
+        with ``fast`` its first feedforward response."""
 
-        return self.hierarchy.settle(self.retina.encode(gray.to(self.device)), self.settle)[0]
+        code = self.retina.encode(gray.to(self.device))
+        if self.fast:
+            return F.relu(self.hierarchy.levels[0].drive(code))
+        return self.hierarchy.settle(code, self.settle)[0]
 
     def reset(self) -> None:
         self.previous = None
@@ -221,18 +232,20 @@ class MotionCortex:
                 "fine": self.fine.state_dict(),
                 "coarse": self.coarse.state_dict(),
                 "settle": self.settle,
+                "fast": self.fast,
             },
             path,
         )
 
     @classmethod
-    def load(cls, path, device="cpu") -> MotionCortex:
+    def load(cls, path, device="cpu", fast: bool | None = None) -> MotionCortex:
         state = torch.load(path, map_location="cpu", weights_only=True)
         cortex = cls(
             types=state["fine"]["settings"]["types"],
             reach=state["fine"]["settings"]["reach"],
             device=device,
             settle=state["settle"],
+            fast=state.get("fast", False) if fast is None else fast,
         )
         cortex.v1_path = state["v1"]
         cortex.hierarchy.load_state_dict(state["v1_state"])

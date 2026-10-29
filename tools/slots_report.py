@@ -73,6 +73,7 @@ def main() -> None:
     parser.add_argument("--field", type=Path, required=True, help="protocol 19's learned field")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument("--fast", action="store_true", help="MT reads V1's feedforward sweep")
     parser.add_argument("--seeds", type=int, nargs=2, help="first and last+1 (development)")
     parser.add_argument("--gap", type=int, default=4, help="frames MT integrates over")
     parser.add_argument("--smoothing", type=int, default=3, help="MT's pooling")
@@ -81,7 +82,7 @@ def main() -> None:
 
     seeds = range(*args.seeds) if args.seeds else TEST_SEEDS
     settings = {k: json.loads(v) for k, v in (s.split("=") for s in args.set)}
-    cortex = MotionCortex.load(args.mt, device=args.device)
+    cortex = MotionCortex.load(args.mt, device=args.device, fast=args.fast)
     if args.smoothing:
         cortex.fine.smoothing = cortex.coarse.smoothing = args.smoothing
     state = torch.load(args.field, map_location="cpu", weights_only=False)
@@ -129,6 +130,7 @@ def main() -> None:
         "seeds": [seeds.start, seeds.stop],
         "settings": settings,
         "gap": args.gap,
+        "fast": args.fast,
         "smoothing": args.smoothing or cortex.fine.smoothing,
         "summary": summary,
         "verdict": verdict,
