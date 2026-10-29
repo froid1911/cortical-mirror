@@ -704,7 +704,9 @@ def lighting(
     return report
 
 
-SMALL_SACCADE = 8  # view pixels: 4 retinal pixels, inside the fine motion cells' reach
+# View pixels per small saccade: 4 view pixels are 2 retinal pixels, one V1 position,
+# a motion the v0.7 MT adult represents in all eight directions.
+SMALL_SACCADE = 4
 
 
 def _small(gaze, command: int):
@@ -772,7 +774,8 @@ def self_world_learned(mt, efference, seeds=range(8000, 8020), settle: int = 30)
         h, w = velocity.shape[-2:]
         centre = (slice(h // 4, 3 * h // 4), slice(w // 4, 3 * w // 4))
         dx, dy = COMMANDS[command]
-        shift = 4.0 * math.hypot(dx, dy)  # retinal pixels the view's content moved
+        # Retinal pixels the view's content moved (the retina is half the view's size).
+        shift = SMALL_SACCADE / 2 * math.hypot(dx, dy)
         for name, told in (("commanded", command), ("uncommanded", 0)):
             world_motion = efference.world_motion(velocity, told, displacements)[0]
             size = world_motion[:, centre[0], centre[1]].norm(dim=0).median()
