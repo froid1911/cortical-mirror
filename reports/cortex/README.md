@@ -72,3 +72,33 @@ The engineered scene graph reaches about 0.8 object IoU on comparable scenes (pr
 - So a still frame in this world does not show its objects in local features. Objects there are defined by their borders and by moving, and a read-out by threshold has no notion of a figure against a ground.
 
 **What this suggests for the next step** (not tested here): a read-out that lets groups compete for places (EM over slots) instead of a global threshold; border ownership, so that a border belongs to the figure inside it; and grouping during motion, where common fate is directly available, with the learned links carrying groups through still moments.
+
+## v0.10 step 2: objects as slots found by learned motion (`v0.10-slots.json`, protocol 20)
+
+Slots (a background slot and up to 6 object slots, assigned by EM) read the frozen v0.9 MT adult's velocity, V1's code and protocol 19's learned links. MT compares V1 now with V1 four frames ago (amended before the test; see the protocol). Test seeds 9000–9019: 200 frames scored while the objects move, and 20 still moments.
+
+| Condition | Moving IoU | Moving ARI | Slots per frame | Still moment: IoU before → after |
+|---|---|---|---|---|
+| **Slots** (motion and links) | **0.304** | **0.505** | 5.6 | 0.313 → 0.123 |
+| Silenced MT | 0 | 0 | 0 | 0 → 0 |
+| Without links | 0.331 | 0.538 | 5.6 | 0.330 → **0.000** |
+
+| Criterion | Result | Verdict |
+|---|---|---|
+| 1. Moving IoU ≥ 0.5 | 0.304 | **fail** |
+| 2. Silenced MT: IoU ≤ 0.1 | 0.000 | **pass** |
+| 3. Still moment: IoU after ≥ 0.8 × before (with links) | 0.39 × | **fail** |
+
+For comparison: the engineered scene graph reaches about 0.8 IoU (protocol 8). Grouping still frames by learned links alone (protocol 19) reached ARI −0.017, and the slots reach 0.505.
+
+**What it shows.**
+- Learned motion finds objects: the ARI rises from chance (protocol 19) to 0.5. Silencing MT removes every object, so motion is what finds them.
+- The learned links are what keep an object when it stops: without them, every slot is lost in the 30-frame pause (IoU 0.000); with them, 39% of the IoU remains. While objects move, the links cost a little (0.304 against 0.331).
+
+**Why it falls short (development, training seeds only).**
+- MT's velocity is too coarse for small, slow sprites. Frame to frame, its median error on the sprites is 0.58 retinal px per frame, about the sprites' own speed. Comparing frames four apart halves it.
+- MT's motion spills onto the background next to a moving object: about 1.5 background places read as moving for every object place. As an object moves, the background it uncovers and covers changes too, and MT reads that change as motion.
+- Even when each object's true velocity is given, choosing places by MT's velocity reaches an IoU of only 0.26. The slots (0.30) already do better than that through their memory and links. The bottleneck is MT's spatial precision at object borders, not the slot machinery.
+- Objects split into fragments: 5.6 slots per frame for 3 objects, and the one-to-one IoU credits only one fragment per object.
+
+**Next.** Make MT precise at borders: motion cells on V1's own grid with less pooling, and a learned account of covering and uncovering (what appears behind a moving edge belongs to the background), the same problem as border ownership. Then rerun protocol 20 unchanged.
