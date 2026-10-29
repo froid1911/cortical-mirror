@@ -33,7 +33,7 @@ class ObjectFile:
         mature: int = 30,
         align_after: int = 10,
         rate: float = 0.05,
-        trust: float = 0.2,
+        trust: float = 5.0,
     ):
         self.x, self.y, self.radius, self.search = float(x), float(y), radius, search
         self.ratio, self.mature, self.align_after = ratio, mature, align_after
