@@ -49,7 +49,7 @@ MT with 32 types per scale was raised for 4 hours on flank's GPU 1 (about 9.9 mi
 
 The untrained comparison used 16 types (the default), not 32. It covers no sectors at any size, so this does not change a verdict.
 
-## v1.0 step 1: grouping learned from common fate (`v1.0-grouping.json`, protocol 19)
+## v0.10 step 1: grouping learned from common fate (`v0.10-grouping.json`, protocol 19)
 
 An association field between V1's 32 types at offsets up to 4 positions learned for 60 training seeds × 300 frames of the sprite world (about 12 minutes on flank's GPU 1), gated by the v0.9 MT adult's velocities. The rule was amended before any test measurement (see the protocol). The test grouped 200 still frames (seeds 9000–9019) from features alone.
 
