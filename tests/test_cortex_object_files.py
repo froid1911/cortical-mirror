@@ -107,3 +107,15 @@ def test_a_file_is_sure_only_against_a_known_background():
     back = np.random.default_rng(1).uniform(0.1, 0.6, (H, W)).astype(np.float32)
     file.follow(world(40)[0], velocity=(1.0, 0.5), background=back)
     assert file.confident
+
+
+def test_a_file_on_plain_background_explains_nothing_the_background_does_not():
+    rng = np.random.default_rng(7)
+    plain = np.full((H, W), 0.4, np.float32)
+    file = ObjectFile(60, 40, radius=12)
+    for _ in range(40):
+        frame = plain + rng.normal(0, 0.003, plain.shape).astype(np.float32)
+        # The remembered background is a little off (exposure drifts), so the file's
+        # own average fits better; but there is nothing here to explain.
+        file.follow(frame, velocity=(0.0, 0.0), background=plain + 0.01)
+    assert not file.confident

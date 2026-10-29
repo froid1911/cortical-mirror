@@ -38,10 +38,13 @@ class ObjectFile:
         align_after: int = 10,
         rate: float = 0.05,
         trust: float = 0.5,
+        contrast: float = 2e-3,
     ):
         self.x, self.y, self.radius, self.search = float(x), float(y), radius, search
         self.ratio, self.mature, self.align_after = ratio, mature, align_after
-        self.rate, self.trust = rate, trust
+        self.rate, self.trust, self.contrast = rate, trust, contrast
+        # How badly the rival explains what the file sees (its error).
+        self.rival = 0.0
         self.fit = np.inf
         # Whether the fit was won against a background the scene knows.
         self.against_background = False
@@ -87,7 +90,11 @@ class ObjectFile:
         background at all) better than a background it knows. A file that has only
         beaten an unrelated template, on a place never seen without it, is not."""
 
-        known = self.against_background or not self.background_given
+        if self.background_given:
+            # There must be something the background does not explain.
+            known = self.against_background and self.rival >= self.contrast
+        else:
+            known = True
         return self.ready and self.fit < self.trust and known
 
     # Following ------------------------------------------------------------------
@@ -100,7 +107,7 @@ class ObjectFile:
         if weights.sum() < 4:
             return
         cx, cy = int(round(x)), int(round(y))
-        best, best_offset, best_chance, best_known = np.inf, (0, 0), 1.0, False
+        best, best_offset, best_chance, best_known = np.inf, (0, 0), 0.0, False
         for dy in range(-search, search + 1):
             for dx in range(-search, search + 1):
                 window = self._window(image, cx + dx, cy + dy)
@@ -116,6 +123,7 @@ class ObjectFile:
             self.x, self.y = cx + best_offset[0], cy + best_offset[1]
             self.fit = best / (best_chance + 1e-6)
             self.against_background = best_known
+            self.rival = best_chance
             self.background_given = background is not None
 
     def _rival(self, seen, expected, background, cx: int, cy: int, use) -> tuple[float, bool]:
