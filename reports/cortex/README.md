@@ -102,3 +102,29 @@ For comparison: the engineered scene graph reaches about 0.8 IoU (protocol 8). G
 - Objects split into fragments: 5.6 slots per frame for 3 objects, and the one-to-one IoU credits only one fragment per object.
 
 **Next.** Make MT precise at borders: motion cells on V1's own grid with less pooling, and a learned account of covering and uncovering (what appears behind a moving edge belongs to the background), the same problem as border ownership. Then rerun protocol 20 unchanged.
+
+### Checks after protocol 20: where MT's spill comes from (development, training seeds 900–903)
+
+The report above blamed covering and uncovering at moving borders for MT's spill. Measured, that is the smaller part:
+
+| Where the spilled "moving" background places lie | Share |
+|---|---|
+| In the area the objects swept during the 4-frame gap (covered or uncovered) | 16% |
+| A ring 1–2 V1 positions around each object, outside the swept area | 61% |
+| 3–8 positions away | 18% |
+| Farther (noise) | 20% |
+
+(The distance bands overlap the swept area, so the shares add to more than 100%.)
+
+Objects have a median radius of only 3.1 positions on V1's grid, so a ring of 1–2 positions nearly doubles them. The ring comes from V1's receptive fields and MT's pooling straddling the object's edge, a matter of resolution.
+
+| Check (no retraining) | Spill per object place | Place-wise ceiling IoU |
+|---|---|---|
+| As in protocol 20 (128 × 96, smoothing 3, gap 4) | 1.78 | 0.256 |
+| A "novelty" competitor in MT (a place no type predicts well counts as unknown), κ = 1 | 1.17 | 0.165 |
+| Full resolution (256 × 192), smoothing 3 | 1.08 | 0.202 |
+| Full resolution, smoothing 5 | 1.37 | 0.214 |
+
+- **Novelty does not single out occlusion.** The untrained MT predicts the sprites' own motion about as badly as uncovered background: at κ = 1 novelty takes 49% of swept background places and 43% of object places.
+- **Looking closer shrinks the ring.** Spill falls from 1.78 to 1.08 background places per object place. But MT's place-by-place velocity does not get more precise (median error 0.7–0.9 world px per frame).
+- **What this means for protocol 20.** A perfect "is it moving" map, with MT's coverage and spill, bounds the object IoU near 0.8 / 2.8 ≈ 0.29 at 128 × 96, which is what the slots reached (0.30). At full resolution the bound is near 0.37. Neither reaches 0.5.
