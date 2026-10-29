@@ -108,9 +108,8 @@ class AssociationField:
         if values.numel() == 0:
             return torch.zeros(h, w, dtype=torch.long)
         threshold = torch.quantile(values.float().cpu(), percentile / 100.0).item()
-        labels = torch.where(active, torch.arange(1, h * w + 1).reshape(h, w), 0).to(
-            affinity.device
-        )
+        places = torch.arange(1, h * w + 1, device=activity.device).reshape(h, w)
+        labels = torch.where(active, places, 0)
         joined = [
             edges[k] & (affinity[k] >= threshold) & (affinity[k] > 0)
             for k in range(len(self.offsets))

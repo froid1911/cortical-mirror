@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import torch
 
 from cortical_mirror.cortex.grouping import AssociationField, adjusted_rand_index
@@ -85,3 +86,11 @@ def test_a_moving_place_beside_a_still_one_weakens_their_link():
     right = field.offsets.index((0, 1))
     assert field.links[0, 1, right] < 0
     assert field.links[0, 0, right] > 0
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs a GPU")
+def test_groups_run_on_the_gpu():
+    a = blob_code().cuda()
+    field = AssociationField(types=4, radius=2, device="cuda")
+    field.links[:] = torch.eye(4, device="cuda")[:, :, None]
+    assert int(field.groups(a).max()) == 2
