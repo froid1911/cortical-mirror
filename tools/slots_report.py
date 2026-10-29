@@ -2,6 +2,7 @@
 
 import argparse
 import json
+from collections import deque
 from pathlib import Path
 
 import numpy as np
@@ -29,22 +30,22 @@ def view(world: SpriteWorld, device) -> torch.Tensor:
     return F.avg_pool2d(torch.from_numpy(world.render())[None, None], 2).to(device)
 
 
-def run(cortex, seed, frames, scored, still_from, conditions) -> dict:
-    """One world, every condition's slots fed the same frames; scores per condition."""
+def run(cortex, seed, frames, scored, still_from, conditions, gap=1) -> dict:
+    """One world, every condition's slots fed the same frames; scores per condition.
+    MT integrates over ``gap`` frames: V1 now against V1 ``gap`` frames ago."""
 
     world = SpriteWorld(seed=seed)
-    cortex.reset()
+    past = deque(maxlen=gap + 1)
     slots = {name: make() for name, make in conditions.items()}
     scores = {name: [] for name in conditions}
     for t in range(frames):
         if t < still_from:
             world.step()
-        gray = view(world, cortex.device)
-        velocity = cortex.step(gray)
-        activity = cortex.previous[0]
-        if velocity is None:
+        past.append(cortex.v1(view(world, cortex.device)))
+        if len(past) < 2:
             continue
-        velocity = F.avg_pool2d(velocity, cortex.stride)[0]
+        velocity = cortex.between(past[0], past[-1])[0] / (len(past) - 1)
+        activity = past[-1][0]
         for name, s in slots.items():
             seen = torch.zeros_like(velocity) if name == "silenced" else velocity
             labels = s.step(seen, activity).numpy()
@@ -73,12 +74,16 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--seeds", type=int, nargs=2, help="first and last+1 (development)")
+    parser.add_argument("--gap", type=int, default=1, help="frames MT integrates over")
+    parser.add_argument("--smoothing", type=int, help="MT's pooling of its evidence")
     parser.add_argument("--set", nargs="*", default=[], help="slot settings, name=value")
     args = parser.parse_args()
 
     seeds = range(*args.seeds) if args.seeds else TEST_SEEDS
     settings = {k: json.loads(v) for k, v in (s.split("=") for s in args.set)}
     cortex = MotionCortex.load(args.mt, device=args.device)
+    if args.smoothing:
+        cortex.fine.smoothing = cortex.coarse.smoothing = args.smoothing
     state = torch.load(args.field, map_location="cpu", weights_only=False)
     field = AssociationField(types=state["links"].shape[0], device=args.device)
     field.links = state["links"].to(args.device)
@@ -91,11 +96,11 @@ def main() -> None:
     still = {name: [] for name in conditions}
     for seed in seeds:
         for name, rows in run(
-            cortex, seed, MOVING_FRAMES, MOVING_SCORED, MOVING_FRAMES, conditions
+            cortex, seed, MOVING_FRAMES, MOVING_SCORED, MOVING_FRAMES, conditions, args.gap
         ).items():
             moving[name] += rows
         for name, rows in run(
-            cortex, seed, STILL_FRAMES, STILL_SCORED, STILL_FROM, conditions
+            cortex, seed, STILL_FRAMES, STILL_SCORED, STILL_FROM, conditions, args.gap
         ).items():
             still[name] += rows
         print(f"seed {seed}: slots IoU {mean(moving['slots'], 'iou'):.3f} so far", flush=True)
@@ -123,6 +128,8 @@ def main() -> None:
     report = {
         "seeds": [seeds.start, seeds.stop],
         "settings": settings,
+        "gap": args.gap,
+        "smoothing": args.smoothing or cortex.fine.smoothing,
         "summary": summary,
         "verdict": verdict,
         "moving": moving,
